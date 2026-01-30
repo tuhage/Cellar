@@ -8,10 +8,8 @@ struct CellarApp: App {
     @State private var serviceStore = ServiceStore()
     @State private var dependencyStore = DependencyStore()
     @State private var brewfileStore = BrewfileStore()
-    @State private var collectionStore = CollectionStore()
     @State private var resourceStore = ResourceStore()
     @State private var projectStore = ProjectStore()
-    @State private var historyStore = HistoryStore()
     @State private var maintenanceStore = MaintenanceStore()
 
     private let notificationObserver = FinderSyncNotificationObserver()
@@ -23,10 +21,8 @@ struct CellarApp: App {
                 .environment(serviceStore)
                 .environment(dependencyStore)
                 .environment(brewfileStore)
-                .environment(collectionStore)
                 .environment(resourceStore)
                 .environment(projectStore)
-                .environment(historyStore)
                 .environment(maintenanceStore)
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     handleSpotlightActivity(activity)

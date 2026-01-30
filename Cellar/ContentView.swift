@@ -45,18 +45,12 @@ private struct DetailView: View {
             HealthCheckView()
         case .security:
             SecurityAlertView()
-        case .collections:
-            CollectionListView()
         case .dependencies:
             DependencyGraphView()
         case .resources:
             ResourceMonitorView()
-        case .history:
-            HistoryView()
         case .projects:
             ProjectListView()
-        case .comparison:
-            ComparisonView()
         case .maintenance:
             MaintenanceView()
         }
@@ -69,10 +63,8 @@ private struct DetailView: View {
         .environment(ServiceStore())
         .environment(DependencyStore())
         .environment(BrewfileStore())
-        .environment(CollectionStore())
         .environment(ResourceStore())
         .environment(ProjectStore())
-        .environment(HistoryStore())
         .environment(MaintenanceStore())
 }
 

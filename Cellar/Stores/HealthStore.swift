@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import CellarCore
@@ -20,8 +21,12 @@ final class HealthStore {
 
     var isLoading = false
     var errorMessage: String?
+    var actionStream: AsyncThrowingStream<String, Error>?
+    var actionTitle: String?
 
     // MARK: Computed
+
+    var isPerformingAction: Bool { actionStream != nil }
 
     /// The system is healthy when no critical or warning issues exist.
     var isHealthy: Bool {
@@ -34,6 +39,21 @@ final class HealthStore {
         return grouped
             .sorted { $0.key < $1.key }
             .map { (severity: $0.key, checks: $0.value) }
+    }
+
+    /// Number of critical issues.
+    var criticalCount: Int {
+        checks.filter { $0.severity == .critical }.count
+    }
+
+    /// Number of warning issues.
+    var warningCount: Int {
+        checks.filter { $0.severity == .warning }.count
+    }
+
+    /// Total number of actionable issues (non-info).
+    var issueCount: Int {
+        checks.filter { $0.severity != .info }.count
     }
 
     // MARK: Dependencies
@@ -81,6 +101,72 @@ final class HealthStore {
         }
 
         isLoading = false
+    }
+
+    // MARK: Quick Actions
+
+    func runCleanup() {
+        actionTitle = "Cleaning Up"
+        actionStream = AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await line in self.service.cleanup() {
+                        continuation.yield(line)
+                    }
+                    continuation.finish()
+                    await self.runDiagnostics()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    func runUpgradeAll() {
+        actionTitle = "Upgrading All Packages"
+        actionStream = AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await line in self.service.upgradeAll() {
+                        continuation.yield(line)
+                    }
+                    continuation.finish()
+                    await self.runDiagnostics()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    func runFix(for check: HealthCheck) {
+        guard let fixCommand = check.fixCommand else { return }
+
+        switch fixCommand {
+        case .brewStream(let arguments):
+            actionTitle = "Fixing: \(check.title)"
+            actionStream = AsyncThrowingStream { continuation in
+                Task {
+                    do {
+                        for try await line in self.service.streamCommand(arguments) {
+                            continuation.yield(line)
+                        }
+                        continuation.finish()
+                        await self.runDiagnostics()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+        case .copyText(let text):
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
+    }
+
+    func dismissAction() {
+        actionStream = nil
+        actionTitle = nil
     }
 
     // MARK: - Parsing
@@ -140,7 +226,7 @@ final class HealthStore {
                     title: title,
                     description: description,
                     solution: suggestSolution(for: category, title: title),
-                    autoFixable: false
+                    fixCommand: suggestFixCommand(for: category, title: title)
                 )
             )
         }
@@ -162,13 +248,15 @@ final class HealthStore {
         guard !lines.isEmpty else { return [] }
 
         return lines.map { line in
-            HealthCheck(
+            // brew missing output: "<formula>: <dep1> <dep2>"
+            let deps = line.components(separatedBy: ": ").last ?? line
+            return HealthCheck(
                 category: .dependencies,
                 severity: .warning,
                 title: "Missing dependency",
                 description: line,
                 solution: "Run `brew install` for the missing dependency.",
-                autoFixable: false
+                fixCommand: .copyText("brew install \(deps)")
             )
         }
     }
@@ -214,6 +302,28 @@ final class HealthStore {
             } else {
                 "Run `brew upgrade` to update outdated packages."
             }
+        case .other:
+            nil
+        }
+    }
+
+    /// Suggests a fix command based on the category and title.
+    private func suggestFixCommand(for category: HealthCategory, title: String) -> FixCommand? {
+        switch category {
+        case .symlinks:
+            .copyText("brew link <formula>")
+        case .dependencies:
+            .copyText("brew install <dependency>")
+        case .permissions:
+            .copyText("sudo chown -R $(whoami) /opt/homebrew")
+        case .outdated:
+            if title.lowercased().contains("xcode") {
+                nil
+            } else {
+                .brewStream(["upgrade"])
+            }
+        case .conflicts:
+            .copyText("brew unlink <conflicting-formula>")
         case .other:
             nil
         }

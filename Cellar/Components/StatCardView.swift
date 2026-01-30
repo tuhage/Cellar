@@ -8,39 +8,37 @@ struct StatCardView: View {
     var color: Color = .accentColor
 
     var body: some View {
-        VStack(spacing: 8) {
+        HStack(spacing: 14) {
             Image(systemName: systemImage)
-                .font(.title2)
-                .foregroundStyle(color)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
                 .frame(width: 36, height: 36)
-                .background(color.opacity(0.1), in: Circle())
+                .background(color.gradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-            Text(value)
-                .font(.system(.title2, design: .rounded, weight: .bold))
-                .contentTransition(.numericText())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value)
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .contentTransition(.numericText())
 
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .padding(.horizontal, 8)
-        .background(color.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(color.opacity(0.1), lineWidth: 1)
-        )
+        .padding(14)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
 #Preview {
-    HStack(spacing: 16) {
-        StatCardView(title: "Formulae", value: "142", systemImage: "shippingbox", color: .blue)
+    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+        StatCardView(title: "Formulae", value: "142", systemImage: "terminal", color: .blue)
         StatCardView(title: "Casks", value: "38", systemImage: "macwindow", color: .purple)
-        StatCardView(title: "Outdated", value: "7", systemImage: "arrow.triangle.2.circlepath", color: .orange)
-        StatCardView(title: "Services", value: "4", systemImage: "gear", color: .green)
+        StatCardView(title: "Services", value: "4/7", systemImage: "gearshape.2", color: .green)
+        StatCardView(title: "Updates", value: "5", systemImage: "arrow.triangle.2.circlepath", color: .orange)
     }
     .padding()
-    .frame(width: 600)
+    .frame(width: 500)
 }

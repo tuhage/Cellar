@@ -23,6 +23,7 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollIndicators(.hidden)
         .navigationTitle("Cellar")
     }
 

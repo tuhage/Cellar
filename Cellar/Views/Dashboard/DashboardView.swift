@@ -53,53 +53,46 @@ struct DashboardView: View {
             }
             .padding(24)
         }
-        .sheet(item: actionOutputBinding) { output in
-            ActionOutputSheet(
-                output: output.text,
-                onDismiss: { dashboardStore.dismissActionOutput() }
-            )
-        }
-        .overlay {
-            if dashboardStore.isPerformingAction {
-                actionOverlay
-            }
-        }
     }
 
     // MARK: - Stats Section
 
     private func statsSection(_ summary: SystemSummary) -> some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 140, maximum: 200), spacing: 16)],
-            spacing: 16
-        ) {
-            StatCardView(
-                title: "Formulae",
-                value: "\(summary.totalFormulae)",
-                systemImage: "terminal",
-                color: .blue
-            )
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderView(title: "Overview", systemImage: "chart.bar.fill", color: .secondary)
 
-            StatCardView(
-                title: "Casks",
-                value: "\(summary.totalCasks)",
-                systemImage: "macwindow",
-                color: .purple
-            )
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
+                spacing: 12
+            ) {
+                StatCardView(
+                    title: "Formulae",
+                    value: "\(summary.totalFormulae)",
+                    systemImage: "terminal",
+                    color: .blue
+                )
 
-            StatCardView(
-                title: "Services",
-                value: "\(summary.runningServices)/\(summary.totalServices)",
-                systemImage: "gearshape.2",
-                color: .green
-            )
+                StatCardView(
+                    title: "Casks",
+                    value: "\(summary.totalCasks)",
+                    systemImage: "macwindow",
+                    color: .purple
+                )
 
-            StatCardView(
-                title: "Updates",
-                value: "\(summary.updatesAvailable)",
-                systemImage: "arrow.triangle.2.circlepath",
-                color: summary.updatesAvailable > 0 ? .orange : .green
-            )
+                StatCardView(
+                    title: "Services",
+                    value: "\(summary.runningServices)/\(summary.totalServices)",
+                    systemImage: "gearshape.2",
+                    color: .green
+                )
+
+                StatCardView(
+                    title: "Updates",
+                    value: "\(summary.updatesAvailable)",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    color: summary.updatesAvailable > 0 ? .orange : .green
+                )
+            }
         }
     }
 
@@ -107,32 +100,37 @@ struct DashboardView: View {
 
     private func quickActionsSection(_ summary: SystemSummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .blue)
+            SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .secondary)
 
             HStack(spacing: 12) {
                 quickActionButton(
                     title: "Upgrade All",
+                    subtitle: summary.updatesAvailable > 0
+                        ? "\(summary.updatesAvailable) available"
+                        : "All up to date",
                     systemImage: "arrow.up.circle.fill",
                     color: .orange,
                     disabled: summary.updatesAvailable == 0
                 ) {
-                    await dashboardStore.upgradeAll()
+                    dashboardStore.upgradeAll()
                 }
 
                 quickActionButton(
                     title: "Cleanup",
+                    subtitle: "Free disk space",
                     systemImage: "trash.circle.fill",
                     color: .red
                 ) {
-                    await dashboardStore.cleanup()
+                    dashboardStore.cleanup()
                 }
 
                 quickActionButton(
                     title: "Health Check",
+                    subtitle: "Run brew doctor",
                     systemImage: "heart.circle.fill",
                     color: .pink
                 ) {
-                    await dashboardStore.healthCheck()
+                    dashboardStore.healthCheck()
                 }
             }
         }
@@ -140,28 +138,39 @@ struct DashboardView: View {
 
     private func quickActionButton(
         title: String,
+        subtitle: String,
         systemImage: String,
         color: Color,
         disabled: Bool = false,
-        action: @escaping () async -> Void
+        action: @escaping () -> Void
     ) -> some View {
-        Button {
-            Task { await action() }
-        } label: {
-            VStack(spacing: 6) {
+        let isDisabled = disabled || dashboardStore.isPerformingAction
+
+        return Button(action: action) {
+            HStack(spacing: 10) {
                 Image(systemName: systemImage)
-                    .font(.title2)
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(color.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.subheadline.weight(.medium))
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.bordered)
-        .tint(color)
-        .controlSize(.large)
-        .disabled(disabled || dashboardStore.isPerformingAction)
+        .buttonStyle(QuickActionStyle())
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.5 : 1)
     }
 
     // MARK: - Outdated Section
@@ -289,80 +298,41 @@ struct DashboardView: View {
         .padding(.horizontal, 4)
     }
 
-    // MARK: - Action Overlay
+    // MARK: - Action Output
 
-    private var actionOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
+    private func actionOutputView(
+        title: String,
+        stream: AsyncThrowingStream<String, Error>
+    ) -> some View {
+        VStack(spacing: 0) {
+            ProcessOutputView(title: title, stream: stream)
 
-            VStack(spacing: 12) {
-                ProgressView()
-                    .controlSize(.large)
+            Divider()
 
-                if let label = dashboardStore.activeActionLabel {
-                    Text("\(label)\u{2026}")
-                        .font(.headline)
-                }
-            }
-            .padding(32)
-            .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 16))
-        }
-    }
-
-    // MARK: - Action Output Binding
-
-    private var actionOutputBinding: Binding<ActionOutputItem?> {
-        Binding(
-            get: {
-                dashboardStore.actionOutput.map { ActionOutputItem(text: $0) }
-            },
-            set: { newValue in
-                if newValue == nil {
-                    dashboardStore.dismissActionOutput()
-                }
-            }
-        )
-    }
-}
-
-// MARK: - ActionOutputItem
-
-/// Wrapper to make action output `Identifiable` for sheet presentation.
-private struct ActionOutputItem: Identifiable {
-    let id = UUID()
-    let text: String
-}
-
-// MARK: - ActionOutputSheet
-
-private struct ActionOutputSheet: View {
-    let output: String
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Action Output")
-                    .font(.headline)
-
                 Spacer()
-
                 Button("Done") {
-                    onDismiss()
+                    dashboardStore.dismissAction()
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
                 .keyboardShortcut(.defaultAction)
             }
-
-            ScrollView {
-                Text(output)
-                    .font(.system(.body, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            .padding()
         }
-        .padding(20)
-        .frame(minWidth: 500, minHeight: 300)
+    }
+}
+
+// MARK: - Quick Action Button Style
+
+private struct QuickActionStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(configuration.isPressed ? .tertiary : .quaternary)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

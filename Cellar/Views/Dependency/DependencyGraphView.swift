@@ -52,10 +52,8 @@ struct DependencyGraphView: View {
                 .help("Show only orphan packages (nothing depends on them)")
             }
         }
-        .task {
-            if store.graph == nil {
-                await store.loadGraph()
-            }
+        .task(id: "refresh") {
+            await store.loadGraph()
         }
     }
 

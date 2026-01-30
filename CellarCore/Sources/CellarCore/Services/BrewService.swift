@@ -93,6 +93,12 @@ public nonisolated final class BrewService: Sendable {
         try await runChecked(["services", "restart", name])
     }
 
+    // MARK: - Generic Stream
+
+    public func streamCommand(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
+        process.stream(arguments)
+    }
+
     // MARK: - Health
 
     public func doctor() async throws -> String {

@@ -1,5 +1,14 @@
 import Foundation
 
+// MARK: - FixCommand
+
+public enum FixCommand: Sendable {
+    /// A brew command that can be streamed (e.g., ["cleanup"], ["upgrade"])
+    case brewStream([String])
+    /// A shell command to copy to clipboard (e.g., "sudo chown -R $(whoami) /opt/homebrew")
+    case copyText(String)
+}
+
 // MARK: - HealthCheck
 
 public struct HealthCheck: Identifiable, Sendable {
@@ -12,7 +21,7 @@ public struct HealthCheck: Identifiable, Sendable {
     public let title: String
     public let description: String
     public let solution: String?
-    public let autoFixable: Bool
+    public let fixCommand: FixCommand?
 
     public init(
         id: UUID = UUID(),
@@ -21,7 +30,7 @@ public struct HealthCheck: Identifiable, Sendable {
         title: String,
         description: String,
         solution: String? = nil,
-        autoFixable: Bool = false
+        fixCommand: FixCommand? = nil
     ) {
         self.id = id
         self.category = category
@@ -29,7 +38,7 @@ public struct HealthCheck: Identifiable, Sendable {
         self.title = title
         self.description = description
         self.solution = solution
-        self.autoFixable = autoFixable
+        self.fixCommand = fixCommand
     }
 
     // MARK: Preview
@@ -41,7 +50,7 @@ public struct HealthCheck: Identifiable, Sendable {
             title: "Some installed kegs have no linked versions",
             description: "You may need to run `brew link` on these kegs to complete the installation.",
             solution: "Run `brew link <formula>` for each affected formula.",
-            autoFixable: false
+            fixCommand: .copyText("brew link <formula>")
         )
     }
 }

@@ -10,12 +10,9 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
     case brewfile
     case health
     case security
-    case collections
     case dependencies
     case resources
-    case history
     case projects
-    case comparison
     case maintenance
 
     var id: String { rawValue }
@@ -31,12 +28,9 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .brewfile: "Brewfile"
         case .health: "Health"
         case .security: "Security"
-        case .collections: "Collections"
         case .dependencies: "Dependencies"
         case .resources: "Resources"
-        case .history: "History"
         case .projects: "Projects"
-        case .comparison: "Comparison"
         case .maintenance: "Maintenance"
         }
     }
@@ -52,12 +46,9 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .brewfile: "doc.text"
         case .health: "heart.text.square"
         case .security: "shield.checkered"
-        case .collections: "folder"
         case .dependencies: "point.3.connected.trianglepath.dotted"
         case .resources: "gauge.with.dots.needle.67percent"
-        case .history: "clock.arrow.circlepath"
         case .projects: "hammer"
-        case .comparison: "arrow.left.arrow.right"
         case .maintenance: "wrench.and.screwdriver"
         }
     }
@@ -67,9 +58,9 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .dashboard: .general
         case .formulae, .casks, .outdated, .search: .packages
         case .services: .services
-        case .brewfile, .collections, .dependencies: .management
+        case .brewfile, .dependencies: .management
         case .health, .security, .resources: .monitoring
-        case .history, .projects, .comparison, .maintenance: .tools
+        case .projects, .maintenance: .tools
         }
     }
 
