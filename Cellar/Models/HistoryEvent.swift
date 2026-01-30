@@ -35,6 +35,32 @@ struct HistoryEvent: Identifiable, Codable, Hashable, Sendable {
         self.details = details
     }
 
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.timestamp = try container.decode(Date.self, forKey: .timestamp)
+        self.eventType = try container.decode(HistoryEventType.self, forKey: .eventType)
+        self.packageName = try container.decode(String.self, forKey: .packageName)
+        self.fromVersion = try container.decodeIfPresent(String.self, forKey: .fromVersion)
+        self.toVersion = try container.decodeIfPresent(String.self, forKey: .toVersion)
+        self.details = try container.decodeIfPresent(String.self, forKey: .details)
+    }
+
+    nonisolated func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(eventType, forKey: .eventType)
+        try container.encode(packageName, forKey: .packageName)
+        try container.encodeIfPresent(fromVersion, forKey: .fromVersion)
+        try container.encodeIfPresent(toVersion, forKey: .toVersion)
+        try container.encodeIfPresent(details, forKey: .details)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, timestamp, eventType, packageName, fromVersion, toVersion, details
+    }
+
     // MARK: Computed
 
     /// A human-readable summary of the event.
@@ -148,6 +174,18 @@ enum HistoryEventType: String, Codable, Sendable, CaseIterable {
     case serviceStarted
     case serviceStopped
     case cleanup
+
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        guard let value = HistoryEventType(rawValue: rawValue) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid HistoryEventType: \(rawValue)"
+            )
+        }
+        self = value
+    }
 
     /// A display-friendly title for the event type.
     var title: String {

@@ -10,7 +10,7 @@ struct SecurityAlertView: View {
                 LoadingView(message: "Scanning packages\u{2026}")
             } else if let errorMessage = store.errorMessage {
                 ErrorView(message: errorMessage) {
-                    Task { await store.scan(formulae: packageStore.formulae, casks: packageStore.casks) }
+                    Task { store.scan(formulae: packageStore.formulae, casks: packageStore.casks) }
                 }
             } else if store.alerts.isEmpty && !packageStore.formulae.isEmpty {
                 EmptyStateView(
@@ -32,7 +32,7 @@ struct SecurityAlertView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await store.scan(formulae: packageStore.formulae, casks: packageStore.casks) }
+                    Task { store.scan(formulae: packageStore.formulae, casks: packageStore.casks) }
                 } label: {
                     Label("Scan Now", systemImage: "shield.checkered")
                 }
@@ -42,7 +42,7 @@ struct SecurityAlertView: View {
         .task {
             if store.alerts.isEmpty {
                 await packageStore.loadAll()
-                await store.scan(formulae: packageStore.formulae, casks: packageStore.casks)
+                store.scan(formulae: packageStore.formulae, casks: packageStore.casks)
             }
         }
     }

@@ -60,7 +60,6 @@ final class PackageStore {
 
     // MARK: Actions
 
-    /// Loads all installed formulae from Homebrew.
     func loadFormulae() async {
         isLoading = true
         errorMessage = nil
@@ -72,7 +71,6 @@ final class PackageStore {
         isLoading = false
     }
 
-    /// Loads all installed casks from Homebrew.
     func loadCasks() async {
         isLoading = true
         errorMessage = nil
@@ -84,7 +82,6 @@ final class PackageStore {
         isLoading = false
     }
 
-    /// Loads both formulae and casks concurrently.
     func loadAll() async {
         isLoading = true
         errorMessage = nil
@@ -99,7 +96,6 @@ final class PackageStore {
         isLoading = false
     }
 
-    /// Upgrades a single formula and reloads the formulae list.
     func upgrade(_ formula: Formula) async {
         isLoading = true
         errorMessage = nil
@@ -112,7 +108,6 @@ final class PackageStore {
         isLoading = false
     }
 
-    /// Upgrades a single cask and reloads the cask list.
     func upgrade(_ cask: Cask) async {
         isLoading = true
         errorMessage = nil
@@ -125,17 +120,30 @@ final class PackageStore {
         isLoading = false
     }
 
-    /// Upgrades all outdated formulae and casks, then reloads everything.
     func upgradeAll() async {
         isLoading = true
         errorMessage = nil
-        do {
-            for formula in outdatedFormulae {
+
+        let formulaeToUpgrade = outdatedFormulae
+        let casksToUpgrade = outdatedCasks
+        var failures: [String] = []
+
+        for formula in formulaeToUpgrade {
+            do {
                 try await formula.upgrade()
+            } catch {
+                failures.append(formula.name)
             }
-            for cask in outdatedCasks {
+        }
+        for cask in casksToUpgrade {
+            do {
                 try await cask.upgrade()
+            } catch {
+                failures.append(cask.token)
             }
+        }
+
+        do {
             async let loadedFormulae = Formula.all
             async let loadedCasks = Cask.all
             formulae = try await loadedFormulae
@@ -143,10 +151,14 @@ final class PackageStore {
         } catch {
             errorMessage = error.localizedDescription
         }
+
+        if !failures.isEmpty && errorMessage == nil {
+            errorMessage = "Failed to upgrade: \(failures.joined(separator: ", "))"
+        }
+
         isLoading = false
     }
 
-    /// Uninstalls a formula and reloads the formulae list.
     func uninstall(_ formula: Formula) async {
         isLoading = true
         errorMessage = nil
@@ -162,7 +174,6 @@ final class PackageStore {
         isLoading = false
     }
 
-    /// Uninstalls a cask and reloads the cask list.
     func uninstall(_ cask: Cask) async {
         isLoading = true
         errorMessage = nil
@@ -178,7 +189,6 @@ final class PackageStore {
         isLoading = false
     }
 
-    /// Pins a formula to prevent it from being upgraded.
     func pin(_ formula: Formula) async {
         errorMessage = nil
         do {
@@ -189,7 +199,6 @@ final class PackageStore {
         }
     }
 
-    /// Unpins a formula so it can be upgraded again.
     func unpin(_ formula: Formula) async {
         errorMessage = nil
         do {

@@ -3,9 +3,6 @@ import SwiftUI
 // MARK: - DashboardView
 
 struct DashboardView: View {
-    @Environment(PackageStore.self) private var packageStore
-    @Environment(ServiceStore.self) private var serviceStore
-
     @State private var dashboardStore = DashboardStore()
 
     var body: some View {
@@ -340,7 +337,5 @@ private struct ActionOutputSheet: View {
     NavigationStack {
         DashboardView()
     }
-    .environment(PackageStore())
-    .environment(ServiceStore())
     .frame(width: 700, height: 600)
 }

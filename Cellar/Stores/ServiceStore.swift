@@ -88,8 +88,4 @@ final class ServiceStore {
         isLoading = false
     }
 
-    /// Reloads the service list from Homebrew.
-    func refresh() async {
-        await load()
-    }
 }

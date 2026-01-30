@@ -45,6 +45,34 @@ struct PackageCollection: Identifiable, Codable, Hashable, Sendable {
         self.isBuiltIn = isBuiltIn
     }
 
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icon = try container.decode(String.self, forKey: .icon)
+        self.colorName = try container.decode(String.self, forKey: .colorName)
+        self.packages = try container.decodeIfPresent([String].self, forKey: .packages) ?? []
+        self.casks = try container.decodeIfPresent([String].self, forKey: .casks) ?? []
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.isBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
+    }
+
+    nonisolated func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(icon, forKey: .icon)
+        try container.encode(colorName, forKey: .colorName)
+        try container.encode(packages, forKey: .packages)
+        try container.encode(casks, forKey: .casks)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encode(isBuiltIn, forKey: .isBuiltIn)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, icon, colorName, packages, casks, description, isBuiltIn
+    }
+
     // MARK: Built-in Collections
 
     static let builtInCollections: [PackageCollection] = [

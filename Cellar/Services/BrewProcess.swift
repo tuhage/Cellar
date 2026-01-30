@@ -33,34 +33,34 @@ nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        return try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { _ in
-                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-                let output = ProcessOutput(
-                    stdout: String(data: stdoutData, encoding: .utf8) ?? "",
-                    stderr: String(data: stderrData, encoding: .utf8) ?? "",
-                    exitCode: process.terminationStatus
-                )
-                continuation.resume(returning: output)
-            }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: BrewError.brewNotFound)
-            }
+        do {
+            try process.run()
+        } catch {
+            throw BrewError.brewNotFound
         }
+
+        // Read pipe data before waiting for termination to avoid deadlock.
+        // If the process fills the pipe buffer (~64KB), it blocks until the
+        // buffer is drained. Reading here prevents that.
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        process.waitUntilExit()
+
+        return ProcessOutput(
+            stdout: String(data: stdoutData, encoding: .utf8) ?? "",
+            stderr: String(data: stderrData, encoding: .utf8) ?? "",
+            exitCode: process.terminationStatus
+        )
     }
 
     func stream(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            let process = Process()
+            nonisolated(unsafe) let process = Process()
             let stdoutPipe = Pipe()
             let stderrPipe = Pipe()
 
-            process.executableURL = URL(fileURLWithPath: brewPath)
+            process.executableURL = URL(fileURLWithPath: self.brewPath)
             process.arguments = arguments
             process.environment = Self.brewEnvironment()
             process.standardOutput = stdoutPipe

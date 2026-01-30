@@ -17,6 +17,7 @@ struct ContentView: View {
                 )
             }
         }
+        .urlSchemeHandler(selection: $selection)
     }
 }
 

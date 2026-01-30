@@ -1,11 +1,19 @@
 import SwiftUI
 
 struct MaintenanceView: View {
-    @State private var store = MaintenanceStore()
+    @Environment(MaintenanceStore.self) private var store
 
     var body: some View {
+        @Bindable var store = store
+
         ZStack {
-            mainContent
+            Form {
+                scheduleSection(store: $store)
+                actionsSection
+                reportsSection
+            }
+            .formStyle(.grouped)
+
             if store.isRunning {
                 runningOverlay
             }
@@ -28,50 +36,39 @@ struct MaintenanceView: View {
         }
     }
 
-    // MARK: - Main Content
-
-    private var mainContent: some View {
-        Form {
-            scheduleSection
-            actionsSection
-            reportsSection
-        }
-        .formStyle(.grouped)
-    }
-
     // MARK: - Schedule Section
 
-    private var scheduleSection: some View {
+    private func scheduleSection(store: Binding<MaintenanceStore>) -> some View {
         Section {
-            Toggle("Auto Cleanup", isOn: $store.schedule.autoCleanup)
-                .onChange(of: store.schedule.autoCleanup) { store.saveSettings() }
+            Toggle("Auto Cleanup", isOn: store.schedule.autoCleanup)
+                .onChange(of: self.store.schedule.autoCleanup) { self.store.saveSettings() }
 
-            if store.schedule.autoCleanup {
-                Picker("Cleanup Frequency", selection: $store.schedule.cleanupFrequency) {
+            if self.store.schedule.autoCleanup {
+                Picker("Cleanup Frequency", selection: store.schedule.cleanupFrequency) {
                     ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
                         Text(frequency.title).tag(frequency)
                     }
                 }
-                .onChange(of: store.schedule.cleanupFrequency) { store.saveSettings() }
+                .onChange(of: self.store.schedule.cleanupFrequency) { self.store.saveSettings() }
             }
 
-            if let lastCleanup = store.schedule.lastCleanup {
+            if let lastCleanup = self.store.schedule.lastCleanup {
                 LabeledContent("Last Cleanup", value: lastCleanup.formatted(date: .abbreviated, time: .shortened))
             }
 
-            Toggle("Auto Health Check", isOn: $store.schedule.autoHealthCheck)
-                .onChange(of: store.schedule.autoHealthCheck) { store.saveSettings() }
+            Toggle("Auto Health Check", isOn: store.schedule.autoHealthCheck)
+                .onChange(of: self.store.schedule.autoHealthCheck) { self.store.saveSettings() }
 
-            if store.schedule.autoHealthCheck {
-                Picker("Health Check Frequency", selection: $store.schedule.healthCheckFrequency) {
+            if self.store.schedule.autoHealthCheck {
+                Picker("Health Check Frequency", selection: store.schedule.healthCheckFrequency) {
                     ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
                         Text(frequency.title).tag(frequency)
                     }
                 }
-                .onChange(of: store.schedule.healthCheckFrequency) { store.saveSettings() }
+                .onChange(of: self.store.schedule.healthCheckFrequency) { self.store.saveSettings() }
             }
 
-            if let lastHealthCheck = store.schedule.lastHealthCheck {
+            if let lastHealthCheck = self.store.schedule.lastHealthCheck {
                 LabeledContent("Last Health Check", value: lastHealthCheck.formatted(date: .abbreviated, time: .shortened))
             }
         } header: {
@@ -233,5 +230,6 @@ private struct MaintenanceReportRow: View {
     NavigationStack {
         MaintenanceView()
     }
+    .environment(MaintenanceStore())
     .frame(width: 600, height: 700)
 }

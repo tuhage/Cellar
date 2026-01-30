@@ -8,10 +8,12 @@ import SwiftUI
 /// relative date (Today, Yesterday, This Week, Older), and a toolbar
 /// button to clear all history.
 struct HistoryView: View {
-    @State private var store = HistoryStore()
+    @Environment(HistoryStore.self) private var store
     @State private var showClearConfirmation = false
 
     var body: some View {
+        @Bindable var store = store
+
         Group {
             if store.isLoading && store.events.isEmpty {
                 LoadingView(message: "Loading history\u{2026}")
@@ -36,7 +38,7 @@ struct HistoryView: View {
             }
         }
         .navigationTitle("History")
-        .searchable(text: searchQuery, prompt: "Search history")
+        .searchable(text: $store.searchQuery, prompt: "Search history")
         .toolbar { toolbarContent }
         .confirmationDialog(
             "Clear History",
@@ -51,15 +53,6 @@ struct HistoryView: View {
             Text("This will permanently remove all history events. This action cannot be undone.")
         }
         .task { store.load() }
-    }
-
-    // MARK: - Bindings
-
-    private var searchQuery: Binding<String> {
-        Binding(
-            get: { store.searchQuery },
-            set: { store.searchQuery = $0 }
-        )
     }
 
     // MARK: - Content
@@ -262,131 +255,8 @@ private struct HistoryEventRow: View {
 
 #Preview {
     NavigationStack {
-        HistoryPreviewWrapper()
+        HistoryView()
     }
+    .environment(HistoryStore())
     .frame(width: 700, height: 600)
-}
-
-/// A wrapper that pre-populates the store with preview data for SwiftUI previews.
-private struct HistoryPreviewWrapper: View {
-    @State private var store = HistoryStore()
-
-    var body: some View {
-        HistoryViewWithStore(store: store)
-            .task {
-                for event in HistoryEvent.previewList {
-                    store.record(event)
-                }
-            }
-    }
-}
-
-/// An internal variant of HistoryView that accepts an externally-provided store.
-/// Used exclusively for previews so the store can be pre-populated.
-private struct HistoryViewWithStore: View {
-    @Bindable var store: HistoryStore
-    @State private var showClearConfirmation = false
-
-    var body: some View {
-        Group {
-            if store.events.isEmpty {
-                EmptyStateView(
-                    title: "No History",
-                    systemImage: "clock.arrow.counterclockwise",
-                    description: "Actions you perform in Cellar will appear here."
-                )
-            } else if store.filteredEvents.isEmpty {
-                EmptyStateView(
-                    title: "No Results",
-                    systemImage: "magnifyingglass",
-                    description: "No history events match your current filters."
-                )
-            } else {
-                VStack(spacing: 0) {
-                    filterChips
-                    Divider()
-                    eventList
-                }
-            }
-        }
-        .navigationTitle("History")
-        .searchable(text: $store.searchQuery, prompt: "Search history")
-    }
-
-    private var filterChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                FilterChip(
-                    title: "All",
-                    isSelected: store.filterType == nil
-                ) {
-                    store.filterType = nil
-                }
-
-                ForEach(HistoryEventType.allCases, id: \.self) { eventType in
-                    FilterChip(
-                        title: eventType.title,
-                        icon: eventType.icon,
-                        color: eventType.color,
-                        isSelected: store.filterType == eventType
-                    ) {
-                        store.filterType = eventType
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-        }
-    }
-
-    private var eventList: some View {
-        let grouped = groupedEvents
-        return List {
-            ForEach(grouped, id: \.label) { group in
-                Section {
-                    ForEach(group.events) { event in
-                        HistoryEventRow(event: event)
-                    }
-                } header: {
-                    Text(group.label)
-                }
-            }
-        }
-        .listStyle(.inset)
-    }
-
-    private var groupedEvents: [EventGroup] {
-        let calendar = Calendar.current
-        let now = Date()
-        let startOfToday = calendar.startOfDay(for: now)
-        guard let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday),
-              let startOfWeek = calendar.date(byAdding: .day, value: -7, to: startOfToday)
-        else {
-            return [EventGroup(label: "All", events: store.filteredEvents)]
-        }
-
-        var today: [HistoryEvent] = []
-        var yesterday: [HistoryEvent] = []
-        var thisWeek: [HistoryEvent] = []
-        var older: [HistoryEvent] = []
-
-        for event in store.filteredEvents {
-            if event.timestamp >= startOfToday {
-                today.append(event)
-            } else if event.timestamp >= startOfYesterday {
-                yesterday.append(event)
-            } else if event.timestamp >= startOfWeek {
-                thisWeek.append(event)
-            } else {
-                older.append(event)
-            }
-        }
-
-        var groups: [EventGroup] = []
-        if !today.isEmpty { groups.append(EventGroup(label: "Today", events: today)) }
-        if !yesterday.isEmpty { groups.append(EventGroup(label: "Yesterday", events: yesterday)) }
-        if !thisWeek.isEmpty { groups.append(EventGroup(label: "This Week", events: thisWeek)) }
-        if !older.isEmpty { groups.append(EventGroup(label: "Older", events: older)) }
-        return groups
-    }
 }

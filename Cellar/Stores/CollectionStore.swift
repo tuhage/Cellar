@@ -128,28 +128,26 @@ final class CollectionStore {
 
     // MARK: - Bulk Install
 
-    /// Installs all packages and casks in the collection sequentially,
-    /// merging their output into a single stream.
     func installAll(_ collection: PackageCollection) {
         isInstalling = true
         errorMessage = nil
 
+        let service = self.service
+        let packages = collection.packages
+        let casks = collection.casks
+
         installStream = AsyncThrowingStream { continuation in
-            Task { @MainActor in
+            Task {
                 do {
-                    // Install formulae
-                    for name in collection.packages {
+                    for name in packages {
                         continuation.yield("==> Installing formula: \(name)")
-                        let stream = service.install(name, isCask: false)
-                        for try await line in stream {
+                        for try await line in service.install(name, isCask: false) {
                             continuation.yield(line)
                         }
                     }
-                    // Install casks
-                    for name in collection.casks {
+                    for name in casks {
                         continuation.yield("==> Installing cask: \(name)")
-                        let stream = service.install(name, isCask: true)
-                        for try await line in stream {
+                        for try await line in service.install(name, isCask: true) {
                             continuation.yield(line)
                         }
                     }
@@ -161,7 +159,6 @@ final class CollectionStore {
         }
     }
 
-    /// Called when the install stream finishes.
     func endInstall() {
         isInstalling = false
         installStream = nil

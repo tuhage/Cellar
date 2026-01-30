@@ -17,6 +17,51 @@ struct MaintenanceSchedule: Codable, Sendable {
     var lastCleanup: Date?
     var lastHealthCheck: Date?
 
+    // MARK: Init
+
+    init(
+        autoCleanup: Bool = false,
+        cleanupFrequency: MaintenanceFrequency = .weekly,
+        autoHealthCheck: Bool = false,
+        healthCheckFrequency: MaintenanceFrequency = .weekly,
+        lastCleanup: Date? = nil,
+        lastHealthCheck: Date? = nil
+    ) {
+        self.autoCleanup = autoCleanup
+        self.cleanupFrequency = cleanupFrequency
+        self.autoHealthCheck = autoHealthCheck
+        self.healthCheckFrequency = healthCheckFrequency
+        self.lastCleanup = lastCleanup
+        self.lastHealthCheck = lastHealthCheck
+    }
+
+    // MARK: Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case autoCleanup, cleanupFrequency, autoHealthCheck, healthCheckFrequency
+        case lastCleanup, lastHealthCheck
+    }
+
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.autoCleanup = try container.decodeIfPresent(Bool.self, forKey: .autoCleanup) ?? false
+        self.cleanupFrequency = try container.decodeIfPresent(MaintenanceFrequency.self, forKey: .cleanupFrequency) ?? .weekly
+        self.autoHealthCheck = try container.decodeIfPresent(Bool.self, forKey: .autoHealthCheck) ?? false
+        self.healthCheckFrequency = try container.decodeIfPresent(MaintenanceFrequency.self, forKey: .healthCheckFrequency) ?? .weekly
+        self.lastCleanup = try container.decodeIfPresent(Date.self, forKey: .lastCleanup)
+        self.lastHealthCheck = try container.decodeIfPresent(Date.self, forKey: .lastHealthCheck)
+    }
+
+    nonisolated func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(autoCleanup, forKey: .autoCleanup)
+        try container.encode(cleanupFrequency, forKey: .cleanupFrequency)
+        try container.encode(autoHealthCheck, forKey: .autoHealthCheck)
+        try container.encode(healthCheckFrequency, forKey: .healthCheckFrequency)
+        try container.encodeIfPresent(lastCleanup, forKey: .lastCleanup)
+        try container.encodeIfPresent(lastHealthCheck, forKey: .lastHealthCheck)
+    }
+
     // MARK: Factory
 
     static var `default`: MaintenanceSchedule { MaintenanceSchedule() }
@@ -24,14 +69,14 @@ struct MaintenanceSchedule: Codable, Sendable {
     // MARK: Preview
 
     static var preview: MaintenanceSchedule {
-        var schedule = MaintenanceSchedule()
-        schedule.autoCleanup = true
-        schedule.cleanupFrequency = .weekly
-        schedule.autoHealthCheck = true
-        schedule.healthCheckFrequency = .monthly
-        schedule.lastCleanup = Calendar.current.date(byAdding: .day, value: -3, to: .now)
-        schedule.lastHealthCheck = Calendar.current.date(byAdding: .day, value: -7, to: .now)
-        return schedule
+        MaintenanceSchedule(
+            autoCleanup: true,
+            cleanupFrequency: .weekly,
+            autoHealthCheck: true,
+            healthCheckFrequency: .monthly,
+            lastCleanup: Calendar.current.date(byAdding: .day, value: -3, to: .now),
+            lastHealthCheck: Calendar.current.date(byAdding: .day, value: -7, to: .now)
+        )
     }
 
     // MARK: Schedule Logic
@@ -62,6 +107,18 @@ enum MaintenanceFrequency: String, Codable, Sendable, CaseIterable {
     case daily
     case weekly
     case monthly
+
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        guard let value = MaintenanceFrequency(rawValue: rawValue) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid MaintenanceFrequency: \(rawValue)"
+            )
+        }
+        self = value
+    }
 
     var title: String {
         switch self {
@@ -107,6 +164,28 @@ struct MaintenanceReport: Identifiable, Codable, Sendable {
         self.details = details
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case id, date, type, summary, details
+    }
+
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.date = try container.decode(Date.self, forKey: .date)
+        self.type = try container.decode(MaintenanceReportType.self, forKey: .type)
+        self.summary = try container.decode(String.self, forKey: .summary)
+        self.details = try container.decodeIfPresent(String.self, forKey: .details)
+    }
+
+    nonisolated func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(date, forKey: .date)
+        try container.encode(type, forKey: .type)
+        try container.encode(summary, forKey: .summary)
+        try container.encodeIfPresent(details, forKey: .details)
+    }
+
     // MARK: Preview
 
     static var preview: MaintenanceReport {
@@ -124,6 +203,18 @@ struct MaintenanceReport: Identifiable, Codable, Sendable {
 enum MaintenanceReportType: String, Codable, Sendable {
     case cleanup
     case healthCheck
+
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        guard let value = MaintenanceReportType(rawValue: rawValue) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid MaintenanceReportType: \(rawValue)"
+            )
+        }
+        self = value
+    }
 
     var title: String {
         switch self {

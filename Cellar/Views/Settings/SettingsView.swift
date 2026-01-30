@@ -46,13 +46,41 @@ struct SettingsView: View {
 }
 
 private struct BrewInfoRow: View {
-    @State private var brewVersion = "Loading…"
+    @State private var brewVersion = "Loading\u{2026}"
     @State private var brewPrefix = ""
 
     var body: some View {
         LabeledContent("Brew Version", value: brewVersion)
         if !brewPrefix.isEmpty {
             LabeledContent("Prefix", value: brewPrefix)
+        }
+    }
+
+    init() {
+        // Load on init, but actual loading happens in .task
+    }
+
+    func loadBrewInfo() async {
+        let process = BrewProcess()
+        do {
+            let versionOutput = try await process.run(["--version"])
+            let version = versionOutput.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !version.isEmpty {
+                brewVersion = version.components(separatedBy: "\n").first ?? version
+            } else {
+                brewVersion = "Unknown"
+            }
+        } catch {
+            brewVersion = "Not found"
+        }
+        do {
+            let prefixOutput = try await process.run(["--prefix"])
+            let prefix = prefixOutput.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !prefix.isEmpty {
+                brewPrefix = prefix
+            }
+        } catch {
+            // Prefix is optional, no error handling needed
         }
     }
 }

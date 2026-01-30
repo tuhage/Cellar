@@ -37,7 +37,6 @@ final class ResourceStore {
 
     // MARK: Actions
 
-    /// Loads CPU and memory usage for each running service that has a PID.
     func loadResourceUsage(for services: [BrewServiceItem]) async {
         let runningServices = services.filter { $0.isRunning && $0.pid != nil }
 
@@ -46,43 +45,36 @@ final class ResourceStore {
             return
         }
 
-        do {
-            var results: [ResourceUsage] = []
+        var results: [ResourceUsage] = []
 
-            for service in runningServices {
-                guard let pid = service.pid else { continue }
+        for service in runningServices {
+            guard let pid = service.pid else { continue }
 
-                let output = try await runCommand(
-                    "/bin/ps",
-                    ["-p", "\(pid)", "-o", "%cpu=,%mem=,rss="]
-                )
+            guard let output = try? await runCommand(
+                "/bin/ps",
+                ["-p", "\(pid)", "-o", "%cpu=,%mem=,rss="]
+            ) else { continue }
 
-                let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { continue }
+            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
 
-                let parts = trimmed.split(whereSeparator: \.isWhitespace)
-                guard parts.count >= 3,
-                      let cpu = Double(parts[0]),
-                      let rssKB = Double(parts[2])
-                else { continue }
+            let parts = trimmed.split(whereSeparator: \.isWhitespace)
+            guard parts.count >= 3,
+                  let cpu = Double(parts[0]),
+                  let rssKB = Double(parts[2])
+            else { continue }
 
-                let memoryMB = rssKB / 1024.0
-
-                results.append(ResourceUsage(
-                    serviceName: service.name,
-                    pid: pid,
-                    cpuPercent: cpu,
-                    memoryMB: memoryMB
-                ))
-            }
-
-            usages = results
-        } catch {
-            errorMessage = error.localizedDescription
+            results.append(ResourceUsage(
+                serviceName: service.name,
+                pid: pid,
+                cpuPercent: cpu,
+                memoryMB: rssKB / 1024.0
+            ))
         }
+
+        usages = results
     }
 
-    /// Loads disk usage for Homebrew, Cellar, and cache directories.
     func loadDiskUsage() async {
         do {
             async let homebrewSize = fetchDirectorySize("/opt/homebrew")
@@ -101,7 +93,6 @@ final class ResourceStore {
         }
     }
 
-    /// Loads both resource usage and disk usage.
     func loadAll(services: [BrewServiceItem]) async {
         isLoading = true
         errorMessage = nil

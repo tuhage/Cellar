@@ -9,86 +9,34 @@ nonisolated final class BrewService: Sendable {
 
     // MARK: - Formula
 
-    func listFormulae() async throws -> [[String: Any]] {
-        let output = try await process.run(["list", "--formula", "--json=v2"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        return try parseJSONv2(output.stdout, key: "formulae")
+    func listFormulaeData() async throws -> Data {
+        try await runJSON(["list", "--formula", "--json=v2"])
     }
 
-    func formulaInfo(_ name: String) async throws -> [String: Any] {
-        let output = try await process.run(["info", "--json=v2", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        let items: [[String: Any]] = try parseJSONv2(output.stdout, key: "formulae")
-        guard let first = items.first else {
-            throw BrewError.parsingFailure(context: "No formula info for \(name)")
-        }
-        return first
+    func formulaInfoData(_ name: String) async throws -> Data {
+        try await runJSON(["info", "--json=v2", name])
     }
 
     // MARK: - Cask
 
-    func listCasks() async throws -> [[String: Any]] {
-        let output = try await process.run(["list", "--cask", "--json=v2"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        return try parseJSONv2(output.stdout, key: "casks")
+    func listCasksData() async throws -> Data {
+        try await runJSON(["list", "--cask", "--json=v2"])
     }
 
-    func caskInfo(_ name: String) async throws -> [String: Any] {
-        let output = try await process.run(["info", "--cask", "--json=v2", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        let items: [[String: Any]] = try parseJSONv2(output.stdout, key: "casks")
-        guard let first = items.first else {
-            throw BrewError.parsingFailure(context: "No cask info for \(name)")
-        }
-        return first
+    func caskInfoData(_ name: String) async throws -> Data {
+        try await runJSON(["info", "--cask", "--json=v2", name])
     }
 
     // MARK: - Search
 
     func searchFormulae(_ query: String) async throws -> [String] {
-        let output = try await process.run(["search", "--formula", query])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        return output.stdout
-            .split(separator: "\n")
-            .map(String.init)
-            .filter { !$0.isEmpty }
+        let output = try await runChecked(["search", "--formula", query])
+        return parseLines(output.stdout)
     }
 
     func searchCasks(_ query: String) async throws -> [String] {
-        let output = try await process.run(["search", "--cask", query])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        return output.stdout
-            .split(separator: "\n")
-            .map(String.init)
-            .filter { !$0.isEmpty }
-    }
-
-    // MARK: - Outdated
-
-    func outdated() async throws -> [[String: Any]] {
-        let output = try await process.run(["outdated", "--json=v2"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        guard let data = output.stdout.data(using: .utf8),
-              let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw BrewError.parsingFailure(context: "Invalid outdated JSON")
-        }
-        let formulae = json["formulae"] as? [[String: Any]] ?? []
-        let casks = json["casks"] as? [[String: Any]] ?? []
-        return formulae + casks
+        let output = try await runChecked(["search", "--cask", query])
+        return parseLines(output.stdout)
     }
 
     // MARK: - Install / Uninstall / Upgrade
@@ -101,10 +49,7 @@ nonisolated final class BrewService: Sendable {
     }
 
     func uninstall(_ name: String) async throws {
-        let output = try await process.run(["uninstall", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        try await runChecked(["uninstall", name])
     }
 
     func upgrade(_ name: String) -> AsyncThrowingStream<String, Error> {
@@ -118,10 +63,7 @@ nonisolated final class BrewService: Sendable {
     // MARK: - Cleanup
 
     func cleanupDryRun() async throws -> String {
-        let output = try await process.run(["cleanup", "-n"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        let output = try await runChecked(["cleanup", "-n"])
         return output.stdout
     }
 
@@ -135,44 +77,27 @@ nonisolated final class BrewService: Sendable {
 
     // MARK: - Services
 
-    func listServices() async throws -> [[String: Any]] {
-        let output = try await process.run(["services", "list", "--json"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        guard let data = output.stdout.data(using: .utf8),
-              let json = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw BrewError.parsingFailure(context: "Invalid services JSON")
-        }
-        return json
+    func listServicesData() async throws -> Data {
+        try await runJSON(["services", "list", "--json"])
     }
 
     func startService(_ name: String) async throws {
-        let output = try await process.run(["services", "start", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        try await runChecked(["services", "start", name])
     }
 
     func stopService(_ name: String) async throws {
-        let output = try await process.run(["services", "stop", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        try await runChecked(["services", "stop", name])
     }
 
     func restartService(_ name: String) async throws {
-        let output = try await process.run(["services", "restart", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        try await runChecked(["services", "restart", name])
     }
 
     // MARK: - Health
 
     func doctor() async throws -> String {
         let output = try await process.run(["doctor"])
-        // brew doctor exits non-zero when issues found — that's expected
+        // brew doctor exits non-zero when issues found -- that's expected
         return output.stdout + output.stderr
     }
 
@@ -184,39 +109,24 @@ nonisolated final class BrewService: Sendable {
     // MARK: - Dependencies
 
     func deps(_ name: String) async throws -> String {
-        let output = try await process.run(["deps", "--tree", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        let output = try await runChecked(["deps", "--tree", name])
         return output.stdout
     }
 
     func depsInstalled() async throws -> String {
-        let output = try await process.run(["deps", "--installed"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        let output = try await runChecked(["deps", "--installed"])
         return output.stdout
     }
 
     func uses(_ name: String) async throws -> [String] {
-        let output = try await process.run(["uses", "--installed", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        return output.stdout
-            .split(separator: "\n")
-            .map(String.init)
-            .filter { !$0.isEmpty }
+        let output = try await runChecked(["uses", "--installed", name])
+        return parseLines(output.stdout)
     }
 
     // MARK: - Brewfile
 
     func bundleDump(to path: String) async throws {
-        let output = try await process.run(["bundle", "dump", "--file=\(path)", "--force"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        try await runChecked(["bundle", "dump", "--file=\(path)", "--force"])
     }
 
     func bundleInstall(from path: String) -> AsyncThrowingStream<String, Error> {
@@ -236,77 +146,36 @@ nonisolated final class BrewService: Sendable {
     // MARK: - Pin
 
     func pin(_ name: String) async throws {
-        let output = try await process.run(["pin", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
+        try await runChecked(["pin", name])
     }
 
     func unpin(_ name: String) async throws {
-        let output = try await process.run(["unpin", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-    }
-
-    // MARK: - Raw JSON Data
-
-    /// Returns raw JSON `Data` from `brew list --formula --json=v2`.
-    func listFormulaeData() async throws -> Data {
-        let output = try await process.run(["list", "--formula", "--json=v2"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        guard let data = output.stdout.data(using: .utf8) else {
-            throw BrewError.parsingFailure(context: "Invalid UTF-8 in formulae list output")
-        }
-        return data
-    }
-
-    /// Returns raw JSON `Data` from `brew list --cask --json=v2`.
-    func listCasksData() async throws -> Data {
-        let output = try await process.run(["list", "--cask", "--json=v2"])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        guard let data = output.stdout.data(using: .utf8) else {
-            throw BrewError.parsingFailure(context: "Invalid UTF-8 in cask list output")
-        }
-        return data
-    }
-
-    /// Returns raw JSON `Data` from `brew info --json=v2 <name>`.
-    func formulaInfoData(_ name: String) async throws -> Data {
-        let output = try await process.run(["info", "--json=v2", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        guard let data = output.stdout.data(using: .utf8) else {
-            throw BrewError.parsingFailure(context: "Invalid UTF-8 in formula info output")
-        }
-        return data
-    }
-
-    /// Returns raw JSON `Data` from `brew info --cask --json=v2 <name>`.
-    func caskInfoData(_ name: String) async throws -> Data {
-        let output = try await process.run(["info", "--cask", "--json=v2", name])
-        guard output.exitCode == 0 else {
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
-        }
-        guard let data = output.stdout.data(using: .utf8) else {
-            throw BrewError.parsingFailure(context: "Invalid UTF-8 in cask info output")
-        }
-        return data
+        try await runChecked(["unpin", name])
     }
 
     // MARK: - Private
 
-    private func parseJSONv2<T>(_ string: String, key: String) throws -> T {
-        guard let data = string.data(using: .utf8),
-              let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let result = json[key] as? T else {
-            throw BrewError.parsingFailure(context: "Missing key '\(key)' in brew JSON output")
+    @discardableResult
+    private func runChecked(_ arguments: [String]) async throws -> ProcessOutput {
+        let output = try await process.run(arguments)
+        guard output.exitCode == 0 else {
+            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
         }
-        return result
+        return output
+    }
+
+    private func runJSON(_ arguments: [String]) async throws -> Data {
+        let output = try await runChecked(arguments)
+        guard let data = output.stdout.data(using: .utf8) else {
+            throw BrewError.parsingFailure(context: "Invalid UTF-8 in brew output")
+        }
+        return data
+    }
+
+    private func parseLines(_ string: String) -> [String] {
+        string
+            .split(separator: "\n")
+            .map(String.init)
+            .filter { !$0.isEmpty }
     }
 }

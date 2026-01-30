@@ -41,17 +41,12 @@ final class SecurityStore {
 
     // MARK: Actions
 
-    /// Scans formulae and casks for security concerns.
-    ///
-    /// This method analyzes the already-loaded package data without
-    /// making any additional brew CLI calls.
-    func scan(formulae: [Formula], casks: [Cask]) async {
+    func scan(formulae: [Formula], casks: [Cask]) {
         isLoading = true
         errorMessage = nil
 
         var results: [SecurityAlert] = []
 
-        // Scan formulae
         for formula in formulae {
             if formula.disabled {
                 results.append(

@@ -35,15 +35,20 @@ final class HealthStore {
             .map { (severity: $0.key, checks: $0.value) }
     }
 
+    // MARK: Dependencies
+
+    private let service: BrewService
+
+    init(service: BrewService = BrewService()) {
+        self.service = service
+    }
+
     // MARK: Actions
 
-    /// Runs full diagnostics by invoking `brew doctor` and `brew missing`.
     func runDiagnostics() async {
         isLoading = true
         errorMessage = nil
         checks = []
-
-        let service = BrewService()
 
         do {
             async let doctorOutput = service.doctor()

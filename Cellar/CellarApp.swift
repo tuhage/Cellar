@@ -25,5 +25,14 @@ struct CellarApp: App {
                 .environment(historyStore)
                 .environment(maintenanceStore)
         }
+        .commands { AppCommands() }
+
+        MenuBarExtra("Cellar", systemImage: "mug") {
+            MenuBarView()
+                .environment(packageStore)
+                .environment(serviceStore)
+                .environment(maintenanceStore)
+        }
+        .menuBarExtraStyle(.menu)
     }
 }

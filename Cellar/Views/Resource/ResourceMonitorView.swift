@@ -4,8 +4,7 @@ import SwiftUI
 
 struct ResourceMonitorView: View {
     @Environment(ServiceStore.self) private var serviceStore
-
-    @State private var store = ResourceStore()
+    @Environment(ResourceStore.self) private var store
 
     var body: some View {
         Group {
@@ -247,5 +246,6 @@ struct ResourceMonitorView: View {
         ResourceMonitorView()
     }
     .environment(ServiceStore())
+    .environment(ResourceStore())
     .frame(width: 700, height: 600)
 }
