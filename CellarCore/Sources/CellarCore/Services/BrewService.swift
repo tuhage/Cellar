@@ -10,7 +10,7 @@ public nonisolated final class BrewService: Sendable {
     // MARK: - Formula
 
     public func listFormulaeData() async throws -> Data {
-        try await runJSON(["list", "--formula", "--json=v2"])
+        try await runJSON(["info", "--json=v2", "--installed", "--formula"])
     }
 
     public func formulaInfoData(_ name: String) async throws -> Data {
@@ -20,7 +20,7 @@ public nonisolated final class BrewService: Sendable {
     // MARK: - Cask
 
     public func listCasksData() async throws -> Data {
-        try await runJSON(["list", "--cask", "--json=v2"])
+        try await runJSON(["info", "--json=v2", "--installed", "--cask"])
     }
 
     public func caskInfoData(_ name: String) async throws -> Data {
