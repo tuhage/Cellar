@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import CellarCore
 
 // MARK: - BrewfileStore
 

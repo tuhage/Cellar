@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 import UniformTypeIdentifiers
 
 // MARK: - ComparisonView
@@ -9,7 +10,7 @@ import UniformTypeIdentifiers
 struct ComparisonView: View {
     @State private var sourcePath = ""
     @State private var targetPath = ""
-    @State private var result: ComparisonResult?
+    @State private var result: CellarCore.ComparisonResult?
     @State private var errorMessage: String?
     @State private var isExporting = false
 
@@ -106,7 +107,7 @@ struct ComparisonView: View {
         }
     }
 
-    private func resultContent(_ result: ComparisonResult) -> some View {
+    private func resultContent(_ result: CellarCore.ComparisonResult) -> some View {
         VStack(spacing: 0) {
             statsBar(result)
             Divider()
@@ -114,7 +115,7 @@ struct ComparisonView: View {
         }
     }
 
-    private func statsBar(_ result: ComparisonResult) -> some View {
+    private func statsBar(_ result: CellarCore.ComparisonResult) -> some View {
         HStack(spacing: 20) {
             statBadge(
                 label: "Only in Source",
@@ -153,7 +154,7 @@ struct ComparisonView: View {
         }
     }
 
-    private func resultList(_ result: ComparisonResult) -> some View {
+    private func resultList(_ result: CellarCore.ComparisonResult) -> some View {
         List {
             if !result.onlyInSource.isEmpty {
                 Section {
@@ -246,13 +247,13 @@ struct ComparisonView: View {
         let target = targetPath.trimmingCharacters(in: .whitespaces)
 
         do {
-            let sourcePackages = try ComparisonResult.parseBrewfile(at: source)
-            let targetPackages = try ComparisonResult.parseBrewfile(at: target)
+            let sourcePackages = try CellarCore.ComparisonResult.parseBrewfile(at: source)
+            let targetPackages = try CellarCore.ComparisonResult.parseBrewfile(at: target)
 
             let sourceFileName = URL(fileURLWithPath: source).lastPathComponent
             let targetFileName = URL(fileURLWithPath: target).lastPathComponent
 
-            result = ComparisonResult.compare(
+            result = CellarCore.ComparisonResult.compare(
                 source: sourcePackages,
                 target: targetPackages,
                 sourceLabel: sourceFileName,

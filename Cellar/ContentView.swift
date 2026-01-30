@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct ContentView: View {
     @State private var selection: SidebarItem? = .dashboard

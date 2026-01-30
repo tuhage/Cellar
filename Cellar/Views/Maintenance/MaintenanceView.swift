@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct MaintenanceView: View {
     @Environment(MaintenanceStore.self) private var store

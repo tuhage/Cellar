@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct HealthCheckView: View {
     @State private var store = HealthStore()

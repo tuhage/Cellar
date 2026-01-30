@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct LoadingView: View {
     var message: String = "Loading…"

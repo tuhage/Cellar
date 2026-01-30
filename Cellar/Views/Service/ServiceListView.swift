@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct ServiceListView: View {
     @Environment(ServiceStore.self) private var store

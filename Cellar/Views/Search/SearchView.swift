@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct SearchView: View {
     @State private var query = ""

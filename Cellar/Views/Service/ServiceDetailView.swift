@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct ServiceDetailView: View {
     let service: BrewServiceItem

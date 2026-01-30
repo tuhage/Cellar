@@ -1,0 +1,81 @@
+import Foundation
+
+// MARK: - SystemSummary
+
+/// Aggregates system-wide Homebrew statistics at a point in time.
+///
+/// Not `Codable` — this is computed at runtime from live brew data,
+/// never persisted. Used by `DashboardStore` to power the dashboard view.
+public struct SystemSummary: Sendable {
+
+    // MARK: Data
+
+    public let totalFormulae: Int
+    public let totalCasks: Int
+    public let runningServices: Int
+    public let totalServices: Int
+    public let updatesAvailable: Int
+    public let outdatedFormulae: [Formula]
+    public let outdatedCasks: [Cask]
+
+    /// Total packages across both formulae and casks.
+    public var totalPackages: Int {
+        totalFormulae + totalCasks
+    }
+
+    // MARK: Init
+
+    public init(
+        totalFormulae: Int,
+        totalCasks: Int,
+        runningServices: Int,
+        totalServices: Int,
+        updatesAvailable: Int,
+        outdatedFormulae: [Formula],
+        outdatedCasks: [Cask]
+    ) {
+        self.totalFormulae = totalFormulae
+        self.totalCasks = totalCasks
+        self.runningServices = runningServices
+        self.totalServices = totalServices
+        self.updatesAvailable = updatesAvailable
+        self.outdatedFormulae = outdatedFormulae
+        self.outdatedCasks = outdatedCasks
+    }
+
+    // MARK: Factory Method
+
+    /// Builds a summary from the current state of loaded data.
+    public static func current(
+        formulae: [Formula],
+        casks: [Cask],
+        services: [BrewServiceItem]
+    ) -> SystemSummary {
+        let outdatedFormulae = formulae.filter(\.outdated)
+        let outdatedCasks = casks.filter(\.outdated)
+
+        return SystemSummary(
+            totalFormulae: formulae.count,
+            totalCasks: casks.count,
+            runningServices: services.filter(\.isRunning).count,
+            totalServices: services.count,
+            updatesAvailable: outdatedFormulae.count + outdatedCasks.count,
+            outdatedFormulae: outdatedFormulae,
+            outdatedCasks: outdatedCasks
+        )
+    }
+
+    // MARK: Preview
+
+    public static var preview: SystemSummary {
+        SystemSummary(
+            totalFormulae: 142,
+            totalCasks: 38,
+            runningServices: 4,
+            totalServices: 7,
+            updatesAvailable: 5,
+            outdatedFormulae: [.preview],
+            outdatedCasks: [.preview]
+        )
+    }
+}

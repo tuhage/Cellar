@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct SecurityAlertView: View {
     @Environment(PackageStore.self) private var packageStore

@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct OutdatedView: View {
     @Environment(PackageStore.self) private var store

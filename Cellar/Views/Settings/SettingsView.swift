@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct SettingsView: View {
     @AppStorage("refreshInterval") private var refreshInterval = 5.0

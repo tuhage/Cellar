@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 // MARK: - URLSchemeHandler
 
@@ -13,6 +14,7 @@ import SwiftUI
 /// - `cellar://health`
 struct URLSchemeHandler: ViewModifier {
     @Binding var selection: SidebarItem?
+    @Environment(PackageStore.self) private var packageStore
 
     func body(content: Content) -> some View {
         content
@@ -59,6 +61,18 @@ struct URLSchemeHandler: ViewModifier {
             selection = .maintenance
         case "settings":
             selection = .settings
+        case "formula":
+            // cellar://formula/<name>
+            selection = .formulae
+            if let name = url.pathComponents.dropFirst().first {
+                packageStore.selectedFormulaId = name
+            }
+        case "cask":
+            // cellar://cask/<token>
+            selection = .casks
+            if let token = url.pathComponents.dropFirst().first {
+                packageStore.selectedCaskId = token
+            }
         default:
             break
         }

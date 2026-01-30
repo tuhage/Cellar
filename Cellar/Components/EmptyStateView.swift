@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct EmptyStateView: View {
     let title: String

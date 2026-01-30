@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct ProcessOutputView: View {
     let title: String

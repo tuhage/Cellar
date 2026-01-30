@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct CaskListView: View {
     @Environment(PackageStore.self) private var store

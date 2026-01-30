@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import CellarCore
 
 // MARK: - PackageStore
 
@@ -90,6 +91,9 @@ final class PackageStore {
             async let loadedCasks = Cask.all
             formulae = try await loadedFormulae
             casks = try await loadedCasks
+
+            // Re-index Spotlight
+            await SpotlightService.shared.indexAll(formulae: formulae, casks: casks)
         } catch {
             errorMessage = error.localizedDescription
         }

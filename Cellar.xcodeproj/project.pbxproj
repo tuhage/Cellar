@@ -6,11 +6,66 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CC100001WIDGET0000000001 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC100002WIDGET0000000002 /* CellarCore */; };
+		CC200001CLI000000000001 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC200002CLI000000000002 /* CellarCore */; };
+		CCF00001FSBUILDFILE00001 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CCF00002FSPKGDEP00000001 /* CellarCore */; };
+		E59E70032F2D213A00937D73 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC000002CELLARCORE000002 /* CellarCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		CC400001WIDGETPROXY00001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E59E6E2B2F2CDDDC00937D73 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CC500001WIDGETTARGET0001;
+			remoteInfo = CellarWidget;
+		};
+		CCF00003FSPROXY000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E59E6E2B2F2CDDDC00937D73 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CCF00010FSTARGET00000001;
+			remoteInfo = CellarFinderSync;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CC300001EMBEDEXT0000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		CC500002WIDGETAPPEX0001 /* CellarWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CellarWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC600001CLIPRODUCT00001 /* cellar */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cellar; sourceTree = BUILT_PRODUCTS_DIR; };
+		CCF00004FSPRODUCT0000001 /* CellarFinderSync.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CellarFinderSync.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E59E6E332F2CDDDC00937D73 /* Cellar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cellar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		CC700001WIDGETFSGROUP001 /* CellarWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CellarWidget;
+			sourceTree = "<group>";
+		};
+		CC800001CLIFSGROUP00001 /* CellarCLI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CellarCLI;
+			sourceTree = "<group>";
+		};
+		CCF00005FSGROUP000000001 /* CellarFinderSync */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CellarFinderSync;
+			sourceTree = "<group>";
+		};
 		E59E6E352F2CDDDC00937D73 /* Cellar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Cellar;
@@ -19,10 +74,35 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		CC900001WIDGETFWPHASE01 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC100001WIDGET0000000001 /* CellarCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCA00001CLIFWPHASE00001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC200001CLI000000000001 /* CellarCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCF00006FSFWPHASE0000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CCF00001FSBUILDFILE00001 /* CellarCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E59E6E302F2CDDDC00937D73 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E59E70032F2D213A00937D73 /* CellarCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +113,9 @@
 			isa = PBXGroup;
 			children = (
 				E59E6E352F2CDDDC00937D73 /* Cellar */,
+				CC700001WIDGETFSGROUP001 /* CellarWidget */,
+				CC800001CLIFSGROUP00001 /* CellarCLI */,
+				CCF00005FSGROUP000000001 /* CellarFinderSync */,
 				E59E6E342F2CDDDC00937D73 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +124,9 @@
 			isa = PBXGroup;
 			children = (
 				E59E6E332F2CDDDC00937D73 /* Cellar.app */,
+				CC500002WIDGETAPPEX0001 /* CellarWidget.appex */,
+				CC600001CLIPRODUCT00001 /* cellar */,
+				CCF00004FSPRODUCT0000001 /* CellarFinderSync.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +134,74 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		CC500001WIDGETTARGET0001 /* CellarWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CCB00001WIDGETCFGLIST001 /* Build configuration list for PBXNativeTarget "CellarWidget" */;
+			buildPhases = (
+				CCB00002WIDGETSRC000001 /* Sources */,
+				CC900001WIDGETFWPHASE01 /* Frameworks */,
+				CCB00003WIDGETRES000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CC700001WIDGETFSGROUP001 /* CellarWidget */,
+			);
+			name = CellarWidget;
+			packageProductDependencies = (
+				CC100002WIDGET0000000002 /* CellarCore */,
+			);
+			productName = CellarWidget;
+			productReference = CC500002WIDGETAPPEX0001 /* CellarWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		CCC00001CLITARGET000001 /* CellarCLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CCC00002CLICFGLIST00001 /* Build configuration list for PBXNativeTarget "CellarCLI" */;
+			buildPhases = (
+				CCC00003CLISRC00000001 /* Sources */,
+				CCA00001CLIFWPHASE00001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CC800001CLIFSGROUP00001 /* CellarCLI */,
+			);
+			name = CellarCLI;
+			packageProductDependencies = (
+				CC200002CLI000000000002 /* CellarCore */,
+			);
+			productName = cellar;
+			productReference = CC600001CLIPRODUCT00001 /* cellar */;
+			productType = "com.apple.product-type.tool";
+		};
+		CCF00010FSTARGET00000001 /* CellarFinderSync */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CCF00011FSCFGLIST0000001 /* Build configuration list for PBXNativeTarget "CellarFinderSync" */;
+			buildPhases = (
+				CCF00007FSSRC0000000001 /* Sources */,
+				CCF00006FSFWPHASE0000001 /* Frameworks */,
+				CCF00008FSRES0000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CCF00005FSGROUP000000001 /* CellarFinderSync */,
+			);
+			name = CellarFinderSync;
+			packageProductDependencies = (
+				CCF00002FSPKGDEP00000001 /* CellarCore */,
+			);
+			productName = CellarFinderSync;
+			productReference = CCF00004FSPRODUCT0000001 /* CellarFinderSync.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		E59E6E322F2CDDDC00937D73 /* Cellar */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E59E6E3E2F2CDDDD00937D73 /* Build configuration list for PBXNativeTarget "Cellar" */;
@@ -55,16 +209,20 @@
 				E59E6E2F2F2CDDDC00937D73 /* Sources */,
 				E59E6E302F2CDDDC00937D73 /* Frameworks */,
 				E59E6E312F2CDDDC00937D73 /* Resources */,
+				CC300001EMBEDEXT0000001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CC400002WIDGETDEP000001 /* PBXTargetDependency */,
+				CCF00009FSDEP0000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				E59E6E352F2CDDDC00937D73 /* Cellar */,
 			);
 			name = Cellar;
 			packageProductDependencies = (
+				CC000002CELLARCORE000002 /* CellarCore */,
 			);
 			productName = Cellar;
 			productReference = E59E6E332F2CDDDC00937D73 /* Cellar.app */;
@@ -80,6 +238,15 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					CC500001WIDGETTARGET0001 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					CCC00001CLITARGET000001 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					CCF00010FSTARGET00000001 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					E59E6E322F2CDDDC00937D73 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -94,17 +261,37 @@
 			);
 			mainGroup = E59E6E2A2F2CDDDC00937D73;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CC000001CELLARCORE000001 /* XCLocalSwiftPackageReference "CellarCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E59E6E342F2CDDDC00937D73 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				E59E6E322F2CDDDC00937D73 /* Cellar */,
+				CC500001WIDGETTARGET0001 /* CellarWidget */,
+				CCC00001CLITARGET000001 /* CellarCLI */,
+				CCF00010FSTARGET00000001 /* CellarFinderSync */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		CCB00003WIDGETRES000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCF00008FSRES0000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E59E6E312F2CDDDC00937D73 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +302,27 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		CCB00002WIDGETSRC000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCC00003CLISRC00000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCF00007FSSRC0000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E59E6E2F2F2CDDDC00937D73 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -124,7 +332,148 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		CC400002WIDGETDEP000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CC500001WIDGETTARGET0001 /* CellarWidget */;
+			targetProxy = CC400001WIDGETPROXY00001 /* PBXContainerItemProxy */;
+		};
+		CCF00009FSDEP0000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CCF00010FSTARGET00000001 /* CellarFinderSync */;
+			targetProxy = CCF00003FSPROXY000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		CCD00001WIDGETDBG000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CellarWidget/CellarWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 23H73A78A7;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CellarWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.Widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CCD00002WIDGETREL000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CellarWidget/CellarWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 23H73A78A7;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CellarWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.Widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		CCE00001CLIDBG000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 23H73A78A7;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.CLI;
+				PRODUCT_NAME = cellar;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CCE00002CLIREL000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 23H73A78A7;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.CLI;
+				PRODUCT_NAME = cellar;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		CCF00012FSDBG0000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CellarFinderSync/CellarFinderSync.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 23H73A78A7;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CellarFinderSync/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CellarFinderSync;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.FinderSync;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CCF00013FSREL0000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CellarFinderSync/CellarFinderSync.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 23H73A78A7;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CellarFinderSync/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CellarFinderSync;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.FinderSync;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		E59E6E3C2F2CDDDD00937D73 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -250,6 +599,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Cellar/Cellar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -281,6 +631,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Cellar/Cellar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -310,6 +661,33 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		CCB00001WIDGETCFGLIST001 /* Build configuration list for PBXNativeTarget "CellarWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CCD00001WIDGETDBG000001 /* Debug */,
+				CCD00002WIDGETREL000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CCC00002CLICFGLIST00001 /* Build configuration list for PBXNativeTarget "CellarCLI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CCE00001CLIDBG000000001 /* Debug */,
+				CCE00002CLIREL000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CCF00011FSCFGLIST0000001 /* Build configuration list for PBXNativeTarget "CellarFinderSync" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CCF00012FSDBG0000000001 /* Debug */,
+				CCF00013FSREL0000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		E59E6E2E2F2CDDDC00937D73 /* Build configuration list for PBXProject "Cellar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -329,6 +707,32 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CC000001CELLARCORE000001 /* XCLocalSwiftPackageReference "CellarCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = CellarCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CC000002CELLARCORE000002 /* CellarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CellarCore;
+		};
+		CC100002WIDGET0000000002 /* CellarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CellarCore;
+		};
+		CC200002CLI000000000002 /* CellarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CellarCore;
+		};
+		CCF00002FSPKGDEP00000001 /* CellarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CellarCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E59E6E2B2F2CDDDC00937D73 /* Project object */;
 }

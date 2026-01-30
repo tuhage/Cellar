@@ -1,4 +1,6 @@
 import SwiftUI
+import CellarCore
+import CoreSpotlight
 
 @main
 struct CellarApp: App {
@@ -24,6 +26,10 @@ struct CellarApp: App {
                 .environment(projectStore)
                 .environment(historyStore)
                 .environment(maintenanceStore)
+                .onContinueUserActivity(CSSearchableItemActionType) { activity in
+                    handleSpotlightActivity(activity)
+                }
+                .onAppear { registerFinderSyncNotifications() }
         }
         .commands { AppCommands() }
 
@@ -34,5 +40,51 @@ struct CellarApp: App {
                 .environment(maintenanceStore)
         }
         .menuBarExtraStyle(.menu)
+    }
+
+    // MARK: - Spotlight
+
+    private func handleSpotlightActivity(_ activity: NSUserActivity) {
+        guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String else {
+            return
+        }
+
+        if identifier.hasPrefix("formula:") {
+            let name = String(identifier.dropFirst("formula:".count))
+            packageStore.selectedFormulaId = name
+        } else if identifier.hasPrefix("cask:") {
+            let token = String(identifier.dropFirst("cask:".count))
+            packageStore.selectedCaskId = token
+        }
+    }
+
+    // MARK: - Finder Sync Notifications
+
+    private func registerFinderSyncNotifications() {
+        let center = DistributedNotificationCenter.default()
+
+        center.addObserver(
+            forName: .init("com.tuhage.Cellar.stopService"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let serviceName = notification.userInfo?["serviceName"] as? String else { return }
+            Task { @MainActor in
+                guard let service = serviceStore.services.first(where: { $0.name == serviceName }) else { return }
+                await serviceStore.stop(service)
+            }
+        }
+
+        center.addObserver(
+            forName: .init("com.tuhage.Cellar.startService"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let serviceName = notification.userInfo?["serviceName"] as? String else { return }
+            Task { @MainActor in
+                guard let service = serviceStore.services.first(where: { $0.name == serviceName }) else { return }
+                await serviceStore.start(service)
+            }
+        }
     }
 }

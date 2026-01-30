@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct FormulaListView: View {
     @Environment(PackageStore.self) private var store

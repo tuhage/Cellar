@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct SidebarView: View {
     @Binding var selection: SidebarItem?

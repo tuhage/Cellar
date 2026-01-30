@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import CellarCore
+import WidgetKit
 
 // MARK: - DashboardStore
 
@@ -49,11 +51,17 @@ final class DashboardStore {
             let casks = try await loadedCasks
             let services = try await loadedServices
 
-            summary = SystemSummary.current(
+            let loadedSummary = SystemSummary.current(
                 formulae: formulae,
                 casks: casks,
                 services: services
             )
+            summary = loadedSummary
+
+            // Write snapshot for widget
+            let snapshot = WidgetSnapshot.from(summary: loadedSummary, services: services)
+            snapshot.save()
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             errorMessage = error.localizedDescription
         }

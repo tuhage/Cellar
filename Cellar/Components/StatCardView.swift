@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct StatCardView: View {
     let title: String

@@ -1,4 +1,5 @@
 import SwiftUI
+import CellarCore
 
 struct ErrorView: View {
     let message: String
