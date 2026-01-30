@@ -1,0 +1,169 @@
+import Foundation
+import Observation
+
+// MARK: - CollectionStore
+
+/// Manages package collection state: loading, creating, deleting collections,
+/// and adding/removing packages. Merges user-created collections with built-in
+/// ones on load.
+@Observable
+@MainActor
+final class CollectionStore {
+
+    // MARK: Data
+
+    var collections: [PackageCollection] = []
+
+    // MARK: State
+
+    var selectedCollectionId: UUID?
+    var isLoading = false
+    var isInstalling = false
+    var errorMessage: String?
+    var installStream: AsyncThrowingStream<String, Error>?
+
+    // MARK: Computed
+
+    var selectedCollection: PackageCollection? {
+        guard let selectedCollectionId else { return nil }
+        return collections.first { $0.id == selectedCollectionId }
+    }
+
+    // MARK: Dependencies
+
+    private let persistence = PersistenceService()
+    private let service = BrewService()
+
+    private static let fileName = "package_collections.json"
+
+    // MARK: - Load & Save
+
+    /// Loads user collections from persistence and merges with built-in collections.
+    func load() {
+        let savedCollections = persistence.loadOrDefault(
+            [PackageCollection].self,
+            from: Self.fileName,
+            default: []
+        )
+
+        // Start with built-in collections, then add user-created ones
+        var merged: [PackageCollection] = PackageCollection.builtInCollections
+        for saved in savedCollections {
+            // If a built-in was customized (same name), replace it
+            if let index = merged.firstIndex(where: { $0.name == saved.name && $0.isBuiltIn && saved.isBuiltIn }) {
+                merged[index] = saved
+            } else if !saved.isBuiltIn {
+                merged.append(saved)
+            }
+        }
+
+        collections = merged
+    }
+
+    /// Persists all collections to disk.
+    func save() {
+        do {
+            try persistence.save(collections, to: Self.fileName)
+        } catch {
+            errorMessage = "Failed to save collections: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Collection CRUD
+
+    /// Creates a new user collection and selects it.
+    func create(name: String, icon: String, colorName: String) {
+        let collection = PackageCollection(
+            name: name,
+            icon: icon,
+            colorName: colorName,
+            isBuiltIn: false
+        )
+        collections.append(collection)
+        selectedCollectionId = collection.id
+        save()
+    }
+
+    /// Deletes a collection. Only user-created collections can be deleted.
+    func delete(_ collection: PackageCollection) {
+        guard !collection.isBuiltIn else { return }
+        collections.removeAll { $0.id == collection.id }
+        if selectedCollectionId == collection.id {
+            selectedCollectionId = nil
+        }
+        save()
+    }
+
+    // MARK: - Package Management
+
+    /// Adds a formula name to the given collection's packages list.
+    func addPackage(_ name: String, to collection: PackageCollection) {
+        guard let index = collections.firstIndex(where: { $0.id == collection.id }) else { return }
+        guard !collections[index].packages.contains(name) else { return }
+        collections[index].packages.append(name)
+        save()
+    }
+
+    /// Removes a formula name from the given collection's packages list.
+    func removePackage(_ name: String, from collection: PackageCollection) {
+        guard let index = collections.firstIndex(where: { $0.id == collection.id }) else { return }
+        collections[index].packages.removeAll { $0 == name }
+        save()
+    }
+
+    /// Adds a cask token to the given collection's casks list.
+    func addCask(_ name: String, to collection: PackageCollection) {
+        guard let index = collections.firstIndex(where: { $0.id == collection.id }) else { return }
+        guard !collections[index].casks.contains(name) else { return }
+        collections[index].casks.append(name)
+        save()
+    }
+
+    /// Removes a cask token from the given collection's casks list.
+    func removeCask(_ name: String, from collection: PackageCollection) {
+        guard let index = collections.firstIndex(where: { $0.id == collection.id }) else { return }
+        collections[index].casks.removeAll { $0 == name }
+        save()
+    }
+
+    // MARK: - Bulk Install
+
+    /// Installs all packages and casks in the collection sequentially,
+    /// merging their output into a single stream.
+    func installAll(_ collection: PackageCollection) {
+        isInstalling = true
+        errorMessage = nil
+
+        installStream = AsyncThrowingStream { continuation in
+            Task { @MainActor in
+                do {
+                    // Install formulae
+                    for name in collection.packages {
+                        continuation.yield("==> Installing formula: \(name)")
+                        let stream = service.install(name, isCask: false)
+                        for try await line in stream {
+                            continuation.yield(line)
+                        }
+                    }
+                    // Install casks
+                    for name in collection.casks {
+                        continuation.yield("==> Installing cask: \(name)")
+                        let stream = service.install(name, isCask: true)
+                        for try await line in stream {
+                            continuation.yield(line)
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Called when the install stream finishes.
+    func endInstall() {
+        isInstalling = false
+        installStream = nil
+    }
+}
