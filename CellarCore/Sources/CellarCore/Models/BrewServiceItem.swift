@@ -77,6 +77,7 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
         get async throws {
             let service = BrewService()
             let data = try await service.listServicesData()
+            if data.isEmpty { return [] }
             return try JSONDecoder().decode([BrewServiceItem].self, from: data)
         }
     }

@@ -167,22 +167,26 @@ struct ResourceMonitorView: View {
     // MARK: - Resource Summary
 
     private var resourceSummary: some View {
-        HStack(spacing: 24) {
-            Label {
-                Text("Total CPU: \(formatPercent(store.totalCPU))")
-                    .font(.callout.monospaced())
-            } icon: {
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
                 Image(systemName: "cpu")
                     .foregroundStyle(.blue)
-            }
-
-            Label {
-                Text("Total Memory: \(formatMemory(store.totalMemoryMB))")
+                Text("CPU: \(formatPercent(store.totalCPU))")
                     .font(.callout.monospaced())
-            } icon: {
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.blue.opacity(0.08), in: Capsule())
+
+            HStack(spacing: 6) {
                 Image(systemName: "memorychip")
                     .foregroundStyle(.purple)
+                Text("Memory: \(formatMemory(store.totalMemoryMB))")
+                    .font(.callout.monospaced())
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.purple.opacity(0.08), in: Capsule())
 
             Spacer()
         }
@@ -228,15 +232,15 @@ struct ResourceMonitorView: View {
     private func cpuBar(percent: Double) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: 4)
                     .fill(.quaternary)
 
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: 4)
                     .fill(cpuColor(for: percent))
                     .frame(width: geometry.size.width * min(percent / 100.0, 1.0))
             }
         }
-        .frame(width: 40, height: 6)
+        .frame(width: 60, height: 8)
     }
 }
 

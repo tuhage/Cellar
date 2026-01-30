@@ -36,12 +36,20 @@ struct ServiceDetailView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(service.name)
-                .font(.largeTitle)
-                .fontWeight(.bold)
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "gearshape.2")
+                .font(.title2)
+                .foregroundStyle(.green)
+                .frame(width: 44, height: 44)
+                .background(.green.opacity(0.1), in: Circle())
 
-            ServiceDetailStatusBadge(status: service.status)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(service.name)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+
+                ServiceDetailStatusBadge(status: service.status)
+            }
         }
     }
 
@@ -171,14 +179,21 @@ struct ServiceDetailView: View {
             Text("Logs")
                 .font(.headline)
 
-            GroupBox {
-                ContentUnavailableView {
-                    Label("No Logs Available", systemImage: "text.alignleft")
-                } description: {
-                    Text("Service log viewing will be available in a future update.")
-                }
-                .frame(minHeight: 150)
+            VStack(spacing: 12) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.largeTitle)
+                    .foregroundStyle(.tertiary)
+
+                Text("No Logs Available")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+
+                Text("Service log viewing will be available in a future update.")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
             }
+            .frame(maxWidth: .infinity, minHeight: 150)
+            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
         }
     }
 

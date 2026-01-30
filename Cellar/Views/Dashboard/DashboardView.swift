@@ -103,8 +103,7 @@ struct DashboardView: View {
 
     private func quickActionsSection(_ summary: SystemSummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Quick Actions")
-                .font(.headline)
+            SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .blue)
 
             HStack(spacing: 12) {
                 quickActionButton(
@@ -145,8 +144,15 @@ struct DashboardView: View {
         Button {
             Task { await action() }
         } label: {
-            Label(title, systemImage: systemImage)
-                .frame(maxWidth: .infinity)
+            VStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.title2)
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
         }
         .buttonStyle(.bordered)
         .tint(color)
@@ -158,12 +164,11 @@ struct DashboardView: View {
 
     private func outdatedSection(_ summary: SystemSummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Outdated Packages")
-                    .font(.headline)
-
-                Spacer()
-
+            SectionHeaderView(
+                title: "Outdated Packages",
+                systemImage: "arrow.triangle.2.circlepath",
+                color: .orange
+            ) {
                 Text("\(summary.updatesAvailable) update\(summary.updatesAvailable == 1 ? "" : "s") available")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -224,9 +229,19 @@ struct DashboardView: View {
 
             Spacer()
 
-            Text(formula.version)
-                .font(.callout.monospaced())
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(formula.version)
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.secondary)
+
+                Image(systemName: "arrow.right")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+
+                Text("latest")
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.orange)
+            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
@@ -252,9 +267,19 @@ struct DashboardView: View {
 
             Spacer()
 
-            Text(cask.installed ?? cask.version)
-                .font(.callout.monospaced())
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(cask.installed ?? cask.version)
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.secondary)
+
+                Image(systemName: "arrow.right")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+
+                Text(cask.version)
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.orange)
+            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
@@ -263,17 +288,22 @@ struct DashboardView: View {
     // MARK: - Action Overlay
 
     private var actionOverlay: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.large)
+        ZStack {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
 
-            if let label = dashboardStore.activeActionLabel {
-                Text("\(label)\u{2026}")
-                    .font(.headline)
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.large)
+
+                if let label = dashboardStore.activeActionLabel {
+                    Text("\(label)\u{2026}")
+                        .font(.headline)
+                }
             }
+            .padding(32)
+            .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial)
     }
 
     // MARK: - Action Output Binding

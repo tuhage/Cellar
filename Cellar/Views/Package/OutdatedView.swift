@@ -110,7 +110,7 @@ struct OutdatedView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 10))
         .shadow(radius: 4, y: 2)
         .padding(.top, 8)
     }
@@ -156,9 +156,19 @@ private struct OutdatedFormulaRow: View {
 
             Spacer()
 
-            Text(formula.version)
-                .font(.callout.monospaced())
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(formula.version)
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.secondary)
+
+                Image(systemName: "arrow.right")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+
+                Text("latest")
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.orange)
+            }
 
             Button {
                 isUpgrading = true
@@ -173,6 +183,7 @@ private struct OutdatedFormulaRow: View {
                 }
             }
             .buttonStyle(.bordered)
+            .tint(.orange)
             .controlSize(.small)
             .disabled(isUpgrading)
         }
@@ -204,9 +215,19 @@ private struct OutdatedCaskRow: View {
 
             Spacer()
 
-            Text(cask.installed ?? cask.version)
-                .font(.callout.monospaced())
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(cask.installed ?? cask.version)
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.secondary)
+
+                Image(systemName: "arrow.right")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+
+                Text(cask.version)
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.orange)
+            }
 
             Button {
                 isUpgrading = true
@@ -221,6 +242,7 @@ private struct OutdatedCaskRow: View {
                 }
             }
             .buttonStyle(.bordered)
+            .tint(.orange)
             .controlSize(.small)
             .disabled(isUpgrading)
         }

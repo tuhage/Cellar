@@ -138,7 +138,11 @@ struct BrewfileView: View {
     }
 
     private func editorHeader(for profile: BrewfileProfile) -> some View {
-        HStack {
+        HStack(spacing: 10) {
+            Image(systemName: "doc.text")
+                .font(.title3)
+                .foregroundStyle(.blue)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(profile.name)
                     .font(.headline)
@@ -163,6 +167,9 @@ struct BrewfileView: View {
             Text("\(lineCount) lines")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(.fill.tertiary, in: Capsule())
 
             Spacer()
 

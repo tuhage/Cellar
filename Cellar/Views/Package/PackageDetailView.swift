@@ -66,6 +66,20 @@ struct PackageDetailView: View {
     @State private var isPerformingAction = false
     @State private var actionError: String?
 
+    private var packageIcon: String {
+        switch package {
+        case .formula: "terminal"
+        case .cask: "macwindow"
+        }
+    }
+
+    private var packageColor: Color {
+        switch package {
+        case .formula: .blue
+        case .cask: .purple
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -104,22 +118,30 @@ struct PackageDetailView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(package.name)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: packageIcon)
+                .font(.title2)
+                .foregroundStyle(packageColor)
+                .frame(width: 44, height: 44)
+                .background(packageColor.opacity(0.1), in: Circle())
 
-                Text(package.version)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .fontDesign(.monospaced)
-            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(package.name)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
 
-            if let description = package.description {
-                Text(description)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    Text(package.version)
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .fontDesign(.monospaced)
+                }
+
+                if let description = package.description {
+                    Text(description)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -151,6 +173,7 @@ struct PackageDetailView: View {
                         .foregroundStyle(.secondary)
                     Link(homepage, destination: url)
                         .lineLimit(1)
+                        .tint(.blue)
                 }
             }
 
@@ -189,23 +212,23 @@ struct PackageDetailView: View {
 
     // MARK: - Badges
 
-    private var badges: [PackageBadge] {
-        var result: [PackageBadge] = []
+    private var badges: [(text: String, color: Color, icon: String)] {
+        var result: [(text: String, color: Color, icon: String)] = []
         if package.isOutdated {
-            result.append(PackageBadge(text: "Outdated", color: .orange, icon: "arrow.triangle.2.circlepath"))
+            result.append(("Outdated", .orange, "arrow.triangle.2.circlepath"))
         }
         if package.isDeprecated {
-            result.append(PackageBadge(text: "Deprecated", color: .red, icon: "exclamationmark.triangle"))
+            result.append(("Deprecated", .red, "exclamationmark.triangle"))
         }
         if case .formula(let formula) = package {
             if formula.pinned {
-                result.append(PackageBadge(text: "Pinned", color: .blue, icon: "pin.fill"))
+                result.append(("Pinned", .blue, "pin.fill"))
             }
             if formula.isKegOnly {
-                result.append(PackageBadge(text: "Keg-only", color: .purple, icon: "shippingbox"))
+                result.append(("Keg-only", .purple, "shippingbox"))
             }
             if formula.disabled {
-                result.append(PackageBadge(text: "Disabled", color: .gray, icon: "xmark.circle"))
+                result.append(("Disabled", .gray, "xmark.circle"))
             }
         }
         return result
@@ -218,13 +241,7 @@ struct PackageDetailView: View {
 
             HStack(spacing: 8) {
                 ForEach(badges, id: \.text) { badge in
-                    Label(badge.text, systemImage: badge.icon)
-                        .font(.callout)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(badge.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-                        .foregroundStyle(badge.color)
+                    StatusBadge(text: badge.text, color: badge.color, icon: badge.icon)
                 }
             }
         }
@@ -293,6 +310,7 @@ struct PackageDetailView: View {
                         Label("Upgrade", systemImage: "arrow.up.circle")
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(.orange)
                 }
 
                 if case .formula(let formula) = package {
@@ -349,70 +367,6 @@ struct PackageDetailView: View {
                 actionError = error
             }
         }
-    }
-}
-
-// MARK: - PackageBadge
-
-private struct PackageBadge {
-    let text: String
-    let color: Color
-    let icon: String
-}
-
-// MARK: - FlowLayout
-
-/// A simple horizontal wrapping layout for tags and badges.
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(
-                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                proposal: .unspecified
-            )
-        }
-    }
-
-    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> ArrangeResult {
-        let maxWidth = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        var totalWidth: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-
-            if currentX + size.width > maxWidth, currentX > 0 {
-                currentX = 0
-                currentY += lineHeight + spacing
-                lineHeight = 0
-            }
-
-            positions.append(CGPoint(x: currentX, y: currentY))
-            lineHeight = max(lineHeight, size.height)
-            currentX += size.width + spacing
-            totalWidth = max(totalWidth, currentX - spacing)
-        }
-
-        return ArrangeResult(
-            positions: positions,
-            size: CGSize(width: totalWidth, height: currentY + lineHeight)
-        )
-    }
-
-    private struct ArrangeResult {
-        let positions: [CGPoint]
-        let size: CGSize
     }
 }
 

@@ -8,23 +8,29 @@ struct StatCardView: View {
     var color: Color = .accentColor
 
     var body: some View {
-        GroupBox {
-            VStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.title)
-                    .foregroundStyle(color)
+        VStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.title2)
+                .foregroundStyle(color)
+                .frame(width: 36, height: 36)
+                .background(color.opacity(0.1), in: Circle())
 
-                Text(value)
-                    .font(.system(.title, design: .rounded, weight: .bold))
-                    .contentTransition(.numericText())
+            Text(value)
+                .font(.system(.title2, design: .rounded, weight: .bold))
+                .contentTransition(.numericText())
 
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 8)
+        .background(color.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(color.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 

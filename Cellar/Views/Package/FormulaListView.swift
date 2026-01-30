@@ -140,23 +140,6 @@ struct FormulaListView: View {
     }
 }
 
-// MARK: - Status Badge
-
-private struct StatusBadge: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15), in: Capsule())
-            .foregroundStyle(color)
-    }
-}
-
 // MARK: - Preview
 
 #Preview {

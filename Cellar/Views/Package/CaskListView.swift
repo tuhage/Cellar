@@ -96,10 +96,10 @@ struct CaskListView: View {
             TableColumn("Status") { cask in
                 HStack(spacing: 6) {
                     if cask.outdated {
-                        CaskStatusBadge(text: "Outdated", color: .orange)
+                        StatusBadge(text: "Outdated", color: .orange)
                     }
                     if cask.deprecated {
-                        CaskStatusBadge(text: "Deprecated", color: .red)
+                        StatusBadge(text: "Deprecated", color: .red)
                     }
                 }
             }
@@ -135,23 +135,6 @@ struct CaskListView: View {
         } label: {
             Label("Uninstall", systemImage: "trash")
         }
-    }
-}
-
-// MARK: - Cask Status Badge
-
-private struct CaskStatusBadge: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15), in: Capsule())
-            .foregroundStyle(color)
     }
 }
 

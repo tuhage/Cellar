@@ -78,10 +78,12 @@ struct SecurityAlertView: View {
     // MARK: - Alert Count Banner
 
     private var alertCountBanner: some View {
-        HStack(spacing: 12) {
+        let bannerColor: Color = store.hasCriticalAlerts ? .red : .orange
+
+        return HStack(spacing: 12) {
             Image(systemName: store.hasCriticalAlerts ? "shield.fill" : "shield.checkered")
                 .font(.largeTitle)
-                .foregroundStyle(store.hasCriticalAlerts ? .red : .orange)
+                .foregroundStyle(bannerColor)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(store.alertCount) Alert\(store.alertCount == 1 ? "" : "s") Found")
@@ -97,7 +99,8 @@ struct SecurityAlertView: View {
 
             Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(bannerColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Helpers
@@ -186,17 +189,23 @@ private struct SecurityAlertRow: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "arrow.right.circle.fill")
-                    .foregroundStyle(.blue)
-                    .font(.caption)
+            HStack(alignment: .top, spacing: 8) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(.blue)
+                    .frame(width: 3)
 
-                Text(alert.recommendation)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .foregroundStyle(.blue)
+                        .font(.caption)
+
+                    Text(alert.recommendation)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(8)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
         }
         .padding(.leading, 24)
     }

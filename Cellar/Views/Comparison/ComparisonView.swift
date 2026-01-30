@@ -152,6 +152,9 @@ struct ComparisonView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(color.opacity(0.08), in: Capsule())
     }
 
     private func resultList(_ result: CellarCore.ComparisonResult) -> some View {

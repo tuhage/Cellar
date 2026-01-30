@@ -85,6 +85,7 @@ struct DependencyGraphView: View {
 
             if store.filteredNodes.isEmpty {
                 ContentUnavailableView.search(text: store.searchQuery)
+                    .frame(maxHeight: .infinity)
             } else {
                 List(store.filteredNodes, selection: Binding(
                     get: { store.selectedNodeName },
@@ -96,6 +97,7 @@ struct DependencyGraphView: View {
                 .listStyle(.inset(alternatesRowBackgrounds: true))
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - Stats Row
@@ -143,6 +145,7 @@ struct DependencyGraphView: View {
                 systemImage: "point.3.connected.trianglepath.dotted",
                 description: Text("Choose a package to see its dependency details.")
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
@@ -181,10 +184,10 @@ private struct DependencyNodeRow: View {
             Spacer()
 
             if node.isOrphan {
-                NodeBadge(text: "Orphan", color: .orange)
+                StatusBadge(text: "Orphan", color: .orange)
             }
             if node.isLeaf {
-                NodeBadge(text: "Leaf", color: .green)
+                StatusBadge(text: "Leaf", color: .green)
             }
         }
         .padding(.vertical, 2)
@@ -232,13 +235,13 @@ private struct DependencyDetailView: View {
 
             HStack(spacing: 8) {
                 if node.isOrphan {
-                    NodeBadge(text: "Orphan", color: .orange)
+                    StatusBadge(text: "Orphan", color: .orange)
                 }
                 if node.isLeaf {
-                    NodeBadge(text: "Leaf", color: .green)
+                    StatusBadge(text: "Leaf", color: .green)
                 }
                 if !node.isOrphan && !node.isLeaf {
-                    NodeBadge(text: "Intermediate", color: .blue)
+                    StatusBadge(text: "Intermediate", color: .blue)
                 }
 
                 Text("\(node.connectionCount) connections")
@@ -330,7 +333,7 @@ private struct DependencyLinkButton: View {
             HStack(spacing: 6) {
                 Image(systemName: "shippingbox")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tint)
                 Text(name)
                     .foregroundStyle(.primary)
                 Spacer()
@@ -338,28 +341,12 @@ private struct DependencyLinkButton: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - NodeBadge
-
-private struct NodeBadge: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15), in: Capsule())
-            .foregroundStyle(color)
     }
 }
 

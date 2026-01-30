@@ -89,10 +89,16 @@ struct ProjectListView: View {
 
     private func projectRow(_ project: ProjectEnvironment) -> some View {
         HStack(spacing: 10) {
-            // Active indicator
             Circle()
                 .fill(store.activeProjectId == project.id ? .green : .clear)
                 .frame(width: 8, height: 8)
+                .overlay {
+                    if store.activeProjectId == project.id {
+                        Circle()
+                            .fill(.green.opacity(0.4))
+                            .frame(width: 14, height: 14)
+                    }
+                }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
@@ -132,8 +138,10 @@ struct ProjectListView: View {
     private func projectDetailHeader(_ project: ProjectEnvironment) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "hammer")
-                .font(.title)
+                .font(.title2)
                 .foregroundStyle(.tint)
+                .frame(width: 44, height: 44)
+                .background(Color.accentColor.opacity(0.1), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
@@ -182,16 +190,27 @@ struct ProjectListView: View {
 
     private func projectDetailBody(_ project: ProjectEnvironment) -> some View {
         List {
-            // Missing packages warning
             if !missingPackages.isEmpty {
                 Section {
                     ForEach(missingPackages, id: \.self) { name in
-                        Label(name, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.orange)
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .font(.caption)
+                            Text(name)
+                                .fontWeight(.medium)
+                        }
                     }
                 } header: {
-                    Label("Missing Packages", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                    HStack(spacing: 6) {
+                        Label("Missing Packages", systemImage: "exclamationmark.triangle.fill")
+                        Text("\(missingPackages.count)")
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.orange.opacity(0.15), in: Capsule())
+                    }
+                    .foregroundStyle(.orange)
                 }
             }
 

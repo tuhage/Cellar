@@ -70,10 +70,12 @@ struct HealthCheckView: View {
     // MARK: - Status Banner
 
     private var healthStatusBanner: some View {
-        HStack(spacing: 12) {
+        let bannerColor: Color = store.isHealthy ? .green : .yellow
+
+        return HStack(spacing: 12) {
             Image(systemName: store.isHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                 .font(.largeTitle)
-                .foregroundStyle(store.isHealthy ? .green : .yellow)
+                .foregroundStyle(bannerColor)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.isHealthy ? "System Healthy" : "Issues Found")
@@ -88,7 +90,8 @@ struct HealthCheckView: View {
 
             Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(bannerColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Helpers
@@ -158,17 +161,23 @@ private struct HealthCheckRow: View {
                 .foregroundStyle(.secondary)
 
             if let solution = check.solution {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundStyle(.yellow)
-                        .font(.caption)
+                HStack(alignment: .top, spacing: 8) {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(.yellow)
+                        .frame(width: 3)
 
-                    Text(solution)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundStyle(.yellow)
+                            .font(.caption)
+
+                        Text(solution)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(8)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
             }
         }
         .padding(.leading, 24)

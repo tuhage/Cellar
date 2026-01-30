@@ -42,6 +42,7 @@ struct SearchView: View {
     private var promptView: some View {
         ContentUnavailableView {
             Label("Search Homebrew", systemImage: "magnifyingglass")
+                .font(.largeTitle)
         } description: {
             Text("Find formulae and casks to install from the Homebrew repository.")
         }
@@ -171,8 +172,12 @@ private struct SearchFormulaRow: View {
             Spacer()
 
             if formula.isInstalled {
-                Label("Installed", systemImage: "checkmark.circle.fill")
-                    .font(.callout)
+                Text("Installed")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.green.opacity(0.12), in: Capsule())
                     .foregroundStyle(.green)
             } else {
                 Button {
@@ -186,6 +191,7 @@ private struct SearchFormulaRow: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .tint(.blue)
                 .controlSize(.small)
                 .disabled(isInstalling)
             }
@@ -224,8 +230,12 @@ private struct SearchCaskRow: View {
             Spacer()
 
             if cask.isInstalled {
-                Label("Installed", systemImage: "checkmark.circle.fill")
-                    .font(.callout)
+                Text("Installed")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.green.opacity(0.12), in: Capsule())
                     .foregroundStyle(.green)
             } else {
                 Button {
@@ -239,6 +249,7 @@ private struct SearchCaskRow: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .tint(.blue)
                 .controlSize(.small)
                 .disabled(isInstalling)
             }

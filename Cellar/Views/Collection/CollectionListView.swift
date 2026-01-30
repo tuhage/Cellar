@@ -135,10 +135,13 @@ struct CollectionListView: View {
     }
 
     private func collectionDetailHeader(_ collection: PackageCollection) -> some View {
-        HStack(spacing: 12) {
+        let iconColor = color(for: collection.colorName)
+        return HStack(spacing: 12) {
             Image(systemName: collection.icon)
-                .font(.title)
-                .foregroundStyle(color(for: collection.colorName))
+                .font(.title2)
+                .foregroundStyle(iconColor)
+                .frame(width: 44, height: 44)
+                .background(iconColor.opacity(0.1), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(collection.name)

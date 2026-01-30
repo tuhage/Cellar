@@ -42,7 +42,10 @@ struct ServiceListView: View {
                 if store.runningCount > 0 {
                     Text("\(store.runningCount) running")
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.green.opacity(0.1), in: Capsule())
                 }
             }
         }
@@ -133,6 +136,13 @@ private struct ServiceStatusBadge: View {
             Circle()
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
+                .overlay {
+                    if status == .started {
+                        Circle()
+                            .fill(statusColor.opacity(0.4))
+                            .frame(width: 14, height: 14)
+                    }
+                }
 
             Text(statusLabel)
                 .font(.callout)

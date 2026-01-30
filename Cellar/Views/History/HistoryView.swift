@@ -196,15 +196,15 @@ private struct FilterChip: View {
                 }
                 Text(title)
                     .font(.caption)
-                    .fontWeight(.medium)
+                    .fontWeight(isSelected ? .bold : .medium)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(isSelected ? color.opacity(0.15) : Color.clear, in: Capsule())
+            .background(isSelected ? color.opacity(0.2) : Color.clear, in: Capsule())
             .foregroundStyle(isSelected ? color : .secondary)
             .overlay(
                 Capsule()
-                    .strokeBorder(isSelected ? color.opacity(0.3) : Color.secondary.opacity(0.2), lineWidth: 1)
+                    .strokeBorder(isSelected ? color.opacity(0.4) : Color.secondary.opacity(0.2), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -220,9 +220,10 @@ private struct HistoryEventRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: event.eventType.icon)
-                .font(.title3)
+                .font(.callout)
                 .foregroundStyle(event.eventType.color)
-                .frame(width: 28)
+                .frame(width: 28, height: 28)
+                .background(event.eventType.color.opacity(0.1), in: Circle())
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(event.packageName)

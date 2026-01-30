@@ -29,8 +29,21 @@ struct SettingsView: View {
             }
 
             Section("About") {
-                LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-                LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
+                HStack(spacing: 12) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .frame(width: 48, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Cellar")
+                            .font(.headline)
+                        Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
 
                 Link(destination: URL(string: "https://brew.sh")!) {
                     Label("Homebrew Website", systemImage: "globe")
@@ -52,7 +65,10 @@ private struct BrewInfoRow: View {
 
     var body: some View {
         Group {
-            LabeledContent("Brew Version", value: brewVersion)
+            LabeledContent("Brew Version") {
+                Text(brewVersion)
+                    .fontDesign(.monospaced)
+            }
             if !brewPrefix.isEmpty {
                 LabeledContent("Prefix", value: brewPrefix)
             }
