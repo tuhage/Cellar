@@ -1,5 +1,3 @@
-import Foundation
-
 enum HelpCommand {
     static func run() {
         let name = TerminalOutput.bold("cellar")

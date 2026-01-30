@@ -50,11 +50,9 @@ struct CellarApp: App {
         }
 
         if identifier.hasPrefix("formula:") {
-            let name = String(identifier.dropFirst("formula:".count))
-            packageStore.selectedFormulaId = name
+            packageStore.selectedFormulaId = String(identifier.dropFirst("formula:".count))
         } else if identifier.hasPrefix("cask:") {
-            let token = String(identifier.dropFirst("cask:".count))
-            packageStore.selectedCaskId = token
+            packageStore.selectedCaskId = String(identifier.dropFirst("cask:".count))
         }
     }
 
@@ -63,27 +61,28 @@ struct CellarApp: App {
     private func registerFinderSyncNotifications() {
         let center = DistributedNotificationCenter.default()
 
-        center.addObserver(
-            forName: .init("com.tuhage.Cellar.stopService"),
-            object: nil,
-            queue: .main
-        ) { notification in
-            guard let serviceName = notification.userInfo?["serviceName"] as? String else { return }
-            Task { @MainActor in
-                guard let service = serviceStore.services.first(where: { $0.name == serviceName }) else { return }
-                await serviceStore.stop(service)
-            }
+        observeServiceNotification(on: center, named: "com.tuhage.Cellar.stopService") { service in
+            await serviceStore.stop(service)
         }
+        observeServiceNotification(on: center, named: "com.tuhage.Cellar.startService") { service in
+            await serviceStore.start(service)
+        }
+    }
 
+    private func observeServiceNotification(
+        on center: DistributedNotificationCenter,
+        named name: String,
+        action: @escaping (BrewServiceItem) async -> Void
+    ) {
         center.addObserver(
-            forName: .init("com.tuhage.Cellar.startService"),
+            forName: .init(name),
             object: nil,
             queue: .main
         ) { notification in
             guard let serviceName = notification.userInfo?["serviceName"] as? String else { return }
             Task { @MainActor in
                 guard let service = serviceStore.services.first(where: { $0.name == serviceName }) else { return }
-                await serviceStore.start(service)
+                await action(service)
             }
         }
     }

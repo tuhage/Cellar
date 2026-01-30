@@ -6,7 +6,6 @@ struct CellarWidgetMediumView: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // Left: Running services
             VStack(alignment: .leading, spacing: 6) {
                 Label("Services", systemImage: "gearshape.2.fill")
                     .font(.caption)
@@ -37,7 +36,6 @@ struct CellarWidgetMediumView: View {
 
             Divider()
 
-            // Right: Outdated count
             VStack(spacing: 8) {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.title2)

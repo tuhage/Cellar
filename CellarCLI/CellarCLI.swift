@@ -16,17 +16,11 @@ struct CellarCLI {
             case "status":
                 try await StatusCommand.run()
             case "start":
-                guard let serviceName = arguments.dropFirst().first else {
-                    TerminalOutput.printError("Missing service name. Usage: cellar start <service>")
-                    exit(1)
-                }
-                try await StartCommand.run(serviceName: serviceName)
+                let name = try requireServiceName(from: arguments, command: "start")
+                try await StartCommand.run(serviceName: name)
             case "stop":
-                guard let serviceName = arguments.dropFirst().first else {
-                    TerminalOutput.printError("Missing service name. Usage: cellar stop <service>")
-                    exit(1)
-                }
-                try await StopCommand.run(serviceName: serviceName)
+                let name = try requireServiceName(from: arguments, command: "stop")
+                try await StopCommand.run(serviceName: name)
             case "health":
                 try await HealthCommand.run()
             case "cleanup":
@@ -45,5 +39,16 @@ struct CellarCLI {
             TerminalOutput.printError(error.localizedDescription)
             exit(1)
         }
+    }
+
+    private static func requireServiceName(
+        from arguments: [String],
+        command: String
+    ) throws -> String {
+        guard let name = arguments.dropFirst().first else {
+            TerminalOutput.printError("Missing service name. Usage: cellar \(command) <service>")
+            exit(1)
+        }
+        return name
     }
 }

@@ -1,4 +1,3 @@
-import Foundation
 import CellarCore
 
 enum HealthCommand {
@@ -13,17 +12,17 @@ enum HealthCommand {
 
         let output = try await service.doctor()
 
-        if output.contains("Your system is ready to brew") {
+        guard !output.contains("Your system is ready to brew") else {
             TerminalOutput.printSuccess("Your system is ready to brew.")
-        } else {
-            let lines = output.split(separator: "\n", omittingEmptySubsequences: false)
-            for line in lines {
-                let text = String(line)
-                if text.hasPrefix("Warning:") || text.hasPrefix("Error:") {
-                    print(TerminalOutput.warning(text))
-                } else {
-                    print(text)
-                }
+            return
+        }
+
+        for line in output.split(separator: "\n", omittingEmptySubsequences: false) {
+            let text = String(line)
+            if text.hasPrefix("Warning:") || text.hasPrefix("Error:") {
+                print(TerminalOutput.warning(text))
+            } else {
+                print(text)
             }
         }
     }

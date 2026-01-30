@@ -15,9 +15,7 @@ enum ANSIColor: String {
 }
 
 enum TerminalOutput {
-    private static var colorEnabled: Bool {
-        isatty(STDOUT_FILENO) != 0
-    }
+    private static let colorEnabled = isatty(STDOUT_FILENO) != 0
 
     static func colored(_ text: String, _ color: ANSIColor) -> String {
         guard colorEnabled else { return text }
@@ -44,9 +42,11 @@ enum TerminalOutput {
         colored(text, .cyan)
     }
 
+    // MARK: - Printing
+
     static func printHeader(_ title: String) {
         print(bold(title))
-        print(String(repeating: "─", count: title.count))
+        print(String(repeating: "\u{2500}", count: title.count))
     }
 
     static func printError(_ message: String) {
@@ -54,10 +54,12 @@ enum TerminalOutput {
     }
 
     static func printSuccess(_ message: String) {
-        print(success("✓ \(message)"))
+        print(success("\u{2713} \(message)"))
     }
 
-    static func printStatusDot(running: Bool) -> String {
-        running ? success("●") : colored("○", .dim)
+    // MARK: - Formatting
+
+    static func statusDot(running: Bool) -> String {
+        running ? success("\u{25CF}") : colored("\u{25CB}", .dim)
     }
 }

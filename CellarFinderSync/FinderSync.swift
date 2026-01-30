@@ -3,6 +3,9 @@ import FinderSync
 import CellarCore
 
 final class CellarFinderSyncExtension: FIFinderSync {
+    private static let stopServiceNotification = Notification.Name("com.tuhage.Cellar.stopService")
+    private static let brewfileBadgeIdentifier = "brewfile"
+
     private let monitoredPaths: [URL] = {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return [
@@ -18,17 +21,21 @@ final class CellarFinderSyncExtension: FIFinderSync {
 
         FIFinderSyncController.default().directoryURLs = Set(monitoredPaths)
 
-        let badgeImage = NSImage(systemSymbolName: "mug.fill", accessibilityDescription: "Brewfile")
-        FIFinderSyncController.default().setBadgeImage(badgeImage!, label: "Brewfile", forBadgeIdentifier: "brewfile")
+        if let badgeImage = NSImage(systemSymbolName: "mug.fill", accessibilityDescription: "Brewfile") {
+            FIFinderSyncController.default().setBadgeImage(
+                badgeImage,
+                label: "Brewfile",
+                forBadgeIdentifier: Self.brewfileBadgeIdentifier
+            )
+        }
     }
 
     // MARK: - Badges
 
     override func requestBadgeIdentifier(for url: URL) {
         let brewfilePath = url.appendingPathComponent("Brewfile").path
-        if FileManager.default.fileExists(atPath: brewfilePath) {
-            FIFinderSyncController.default().setBadgeIdentifier("brewfile", for: url)
-        }
+        guard FileManager.default.fileExists(atPath: brewfilePath) else { return }
+        FIFinderSyncController.default().setBadgeIdentifier(Self.brewfileBadgeIdentifier, for: url)
     }
 
     // MARK: - Menu
@@ -40,8 +47,7 @@ final class CellarFinderSyncExtension: FIFinderSync {
 
         let menu = NSMenu(title: "Cellar")
 
-        let snapshot = WidgetSnapshot.load()
-        let serviceNames = snapshot?.runningServiceNames ?? []
+        let serviceNames = WidgetSnapshot.load()?.runningServiceNames ?? []
 
         if serviceNames.isEmpty {
             let item = NSMenuItem(title: "No services running", action: nil, keyEquivalent: "")
@@ -78,7 +84,7 @@ final class CellarFinderSyncExtension: FIFinderSync {
     @objc private func stopServiceAction(_ sender: NSMenuItem) {
         guard let serviceName = sender.representedObject as? String else { return }
         DistributedNotificationCenter.default().postNotificationName(
-            .init("com.tuhage.Cellar.stopService"),
+            Self.stopServiceNotification,
             object: nil,
             userInfo: ["serviceName": serviceName],
             deliverImmediately: true
@@ -86,8 +92,9 @@ final class CellarFinderSyncExtension: FIFinderSync {
     }
 
     @objc private func openCellarAction(_ sender: NSMenuItem) {
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.tuhage.Cellar") {
-            NSWorkspace.shared.openApplication(at: url, configuration: .init())
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.tuhage.Cellar") else {
+            return
         }
+        NSWorkspace.shared.openApplication(at: url, configuration: .init())
     }
 }

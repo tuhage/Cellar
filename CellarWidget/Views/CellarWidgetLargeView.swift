@@ -6,7 +6,6 @@ struct CellarWidgetLargeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header
             HStack {
                 Image(systemName: "mug.fill")
                     .foregroundStyle(.blue)
@@ -20,7 +19,6 @@ struct CellarWidgetLargeView: View {
 
             Divider()
 
-            // Stats row
             HStack(spacing: 16) {
                 statItem(value: entry.totalFormulae, label: "Formulae", icon: "terminal")
                 statItem(value: entry.totalCasks, label: "Casks", icon: "macwindow")
@@ -40,58 +38,37 @@ struct CellarWidgetLargeView: View {
 
             Divider()
 
-            // Services section
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Running Services")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if entry.runningServiceNames.isEmpty {
-                    Text("No services running")
+            itemListSection(
+                title: "Running Services",
+                items: entry.runningServiceNames,
+                maxVisible: 3,
+                emptyText: "No services running"
+            ) { name in
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 6, height: 6)
+                    Text(name)
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                } else {
-                    ForEach(entry.runningServiceNames.prefix(3), id: \.self) { name in
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(.green)
-                                .frame(width: 6, height: 6)
-                            Text(name)
-                                .font(.caption2)
-                                .lineLimit(1)
-                        }
-                    }
-                    if entry.runningServiceNames.count > 3 {
-                        Text("+\(entry.runningServiceNames.count - 3) more")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                        .lineLimit(1)
                 }
             }
 
-            // Outdated section
             if !entry.outdatedPackageNames.isEmpty {
                 Divider()
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Outdated Packages")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    ForEach(entry.outdatedPackageNames.prefix(3), id: \.self) { name in
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.up.circle")
-                                .font(.caption2)
-                                .foregroundStyle(.orange)
-                            Text(name)
-                                .font(.caption2)
-                                .lineLimit(1)
-                        }
-                    }
-                    if entry.outdatedPackageNames.count > 3 {
-                        Text("+\(entry.outdatedPackageNames.count - 3) more")
+                itemListSection(
+                    title: "Outdated Packages",
+                    items: entry.outdatedPackageNames,
+                    maxVisible: 3
+                ) { name in
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.circle")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.orange)
+                        Text(name)
+                            .font(.caption2)
+                            .lineLimit(1)
                     }
                 }
             }
@@ -101,6 +78,8 @@ struct CellarWidgetLargeView: View {
         .containerBackground(.fill.tertiary, for: .widget)
         .widgetURL(URL(string: "cellar://dashboard"))
     }
+
+    // MARK: - Subviews
 
     private func statItem(
         value: Int,
@@ -127,5 +106,34 @@ struct CellarWidgetLargeView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func itemListSection<Content: View>(
+        title: String,
+        items: [String],
+        maxVisible: Int,
+        emptyText: String? = nil,
+        @ViewBuilder row: @escaping (String) -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if items.isEmpty, let emptyText {
+                Text(emptyText)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            } else {
+                ForEach(items.prefix(maxVisible), id: \.self) { item in
+                    row(item)
+                }
+                if items.count > maxVisible {
+                    Text("+\(items.count - maxVisible) more")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
