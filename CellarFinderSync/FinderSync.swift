@@ -2,7 +2,7 @@ import Cocoa
 import FinderSync
 import CellarCore
 
-final class FinderSync: FIFinderSync {
+final class CellarFinderSyncExtension: FIFinderSync {
     private let monitoredPaths: [URL] = {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return [
