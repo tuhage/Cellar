@@ -76,3 +76,4 @@ private struct DetailView: View {
         .environment(HistoryStore())
         .environment(MaintenanceStore())
 }
+

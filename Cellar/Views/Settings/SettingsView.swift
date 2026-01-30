@@ -50,17 +50,16 @@ private struct BrewInfoRow: View {
     @State private var brewPrefix = ""
 
     var body: some View {
-        LabeledContent("Brew Version", value: brewVersion)
-        if !brewPrefix.isEmpty {
-            LabeledContent("Prefix", value: brewPrefix)
+        Group {
+            LabeledContent("Brew Version", value: brewVersion)
+            if !brewPrefix.isEmpty {
+                LabeledContent("Prefix", value: brewPrefix)
+            }
         }
+        .task { await loadBrewInfo() }
     }
 
-    init() {
-        // Load on init, but actual loading happens in .task
-    }
-
-    func loadBrewInfo() async {
+    private func loadBrewInfo() async {
         let process = BrewProcess()
         do {
             let versionOutput = try await process.run(["--version"])
@@ -80,7 +79,7 @@ private struct BrewInfoRow: View {
                 brewPrefix = prefix
             }
         } catch {
-            // Prefix is optional, no error handling needed
+            // Prefix is optional
         }
     }
 }

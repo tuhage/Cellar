@@ -8,7 +8,42 @@ struct MaintenanceView: View {
 
         ZStack {
             Form {
-                scheduleSection(store: $store)
+                Section {
+                    Toggle("Auto Cleanup", isOn: $store.schedule.autoCleanup)
+                        .onChange(of: store.schedule.autoCleanup) { self.store.saveSettings() }
+
+                    if store.schedule.autoCleanup {
+                        Picker("Cleanup Frequency", selection: $store.schedule.cleanupFrequency) {
+                            ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
+                                Text(frequency.title).tag(frequency)
+                            }
+                        }
+                        .onChange(of: store.schedule.cleanupFrequency) { self.store.saveSettings() }
+                    }
+
+                    if let lastCleanup = store.schedule.lastCleanup {
+                        LabeledContent("Last Cleanup", value: lastCleanup.formatted(date: .abbreviated, time: .shortened))
+                    }
+
+                    Toggle("Auto Health Check", isOn: $store.schedule.autoHealthCheck)
+                        .onChange(of: store.schedule.autoHealthCheck) { self.store.saveSettings() }
+
+                    if store.schedule.autoHealthCheck {
+                        Picker("Health Check Frequency", selection: $store.schedule.healthCheckFrequency) {
+                            ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
+                                Text(frequency.title).tag(frequency)
+                            }
+                        }
+                        .onChange(of: store.schedule.healthCheckFrequency) { self.store.saveSettings() }
+                    }
+
+                    if let lastHealthCheck = store.schedule.lastHealthCheck {
+                        LabeledContent("Last Health Check", value: lastHealthCheck.formatted(date: .abbreviated, time: .shortened))
+                    }
+                } header: {
+                    Text("Schedule")
+                }
+
                 actionsSection
                 reportsSection
             }
@@ -33,46 +68,6 @@ struct MaintenanceView: View {
             store.loadSettings()
             store.loadReports()
             await store.checkSchedule()
-        }
-    }
-
-    // MARK: - Schedule Section
-
-    private func scheduleSection(store: Binding<MaintenanceStore>) -> some View {
-        Section {
-            Toggle("Auto Cleanup", isOn: store.schedule.autoCleanup)
-                .onChange(of: self.store.schedule.autoCleanup) { self.store.saveSettings() }
-
-            if self.store.schedule.autoCleanup {
-                Picker("Cleanup Frequency", selection: store.schedule.cleanupFrequency) {
-                    ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
-                        Text(frequency.title).tag(frequency)
-                    }
-                }
-                .onChange(of: self.store.schedule.cleanupFrequency) { self.store.saveSettings() }
-            }
-
-            if let lastCleanup = self.store.schedule.lastCleanup {
-                LabeledContent("Last Cleanup", value: lastCleanup.formatted(date: .abbreviated, time: .shortened))
-            }
-
-            Toggle("Auto Health Check", isOn: store.schedule.autoHealthCheck)
-                .onChange(of: self.store.schedule.autoHealthCheck) { self.store.saveSettings() }
-
-            if self.store.schedule.autoHealthCheck {
-                Picker("Health Check Frequency", selection: store.schedule.healthCheckFrequency) {
-                    ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
-                        Text(frequency.title).tag(frequency)
-                    }
-                }
-                .onChange(of: self.store.schedule.healthCheckFrequency) { self.store.saveSettings() }
-            }
-
-            if let lastHealthCheck = self.store.schedule.lastHealthCheck {
-                LabeledContent("Last Health Check", value: lastHealthCheck.formatted(date: .abbreviated, time: .shortened))
-            }
-        } header: {
-            Text("Schedule")
         }
     }
 
