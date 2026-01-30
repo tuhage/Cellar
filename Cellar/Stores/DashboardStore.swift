@@ -20,9 +20,10 @@ final class DashboardStore {
 
     var isLoading = false
     var errorMessage: String?
-    var actionOutput: String?
-    var isPerformingAction = false
-    var activeActionLabel: String?
+    var actionStream: AsyncThrowingStream<String, Error>?
+    var actionTitle: String?
+
+    var isPerformingAction: Bool { actionStream != nil }
 
     // MARK: Dependencies
 
@@ -55,51 +56,59 @@ final class DashboardStore {
         isLoading = false
     }
 
-    func upgradeAll() async {
-        await performAction("Upgrading all packages") {
-            for try await _ in service.upgradeAll() {}
-            await load()
-        }
-    }
-
-    func cleanup() async {
-        await performAction("Cleaning up") {
-            var output = ""
-            for try await line in service.cleanup() {
-                output += line
+    func upgradeAll() {
+        actionTitle = "Upgrading All Packages"
+        actionStream = AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await line in self.service.upgradeAll() {
+                        continuation.yield(line)
+                    }
+                    continuation.finish()
+                    await self.load()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
             }
-            actionOutput = output.isEmpty ? "Nothing to clean up." : output
-            await load()
         }
     }
 
-    func healthCheck() async {
-        await performAction("Running health check") {
-            let output = try await service.doctor()
-            actionOutput = output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "Your system is ready to brew."
-                : output
+    func cleanup() {
+        actionTitle = "Cleaning Up"
+        actionStream = AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await line in self.service.cleanup() {
+                        continuation.yield(line)
+                    }
+                    continuation.finish()
+                    await self.load()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
         }
     }
 
-    func dismissActionOutput() {
-        actionOutput = nil
+    func healthCheck() {
+        actionTitle = "Health Check"
+        actionStream = AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let output = try await self.service.doctor()
+                    let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                    continuation.yield(message.isEmpty ? "Your system is ready to brew." : message)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 
-    // MARK: Private
-
-    private func performAction(_ label: String, body: () async throws -> Void) async {
-        isPerformingAction = true
-        activeActionLabel = label
-        actionOutput = nil
-        errorMessage = nil
-        do {
-            try await body()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isPerformingAction = false
-        activeActionLabel = nil
+    func dismissAction() {
+        actionStream = nil
+        actionTitle = nil
     }
 
     private func writeWidgetSnapshot(summary: SystemSummary, services: [BrewServiceItem]) {

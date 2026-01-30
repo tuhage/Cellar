@@ -8,15 +8,19 @@ struct DashboardView: View {
 
     var body: some View {
         Group {
-            if dashboardStore.isLoading && dashboardStore.summary == nil {
-                LoadingView(message: "Loading dashboard\u{2026}")
-            } else if let errorMessage = dashboardStore.errorMessage,
-                      dashboardStore.summary == nil {
+            if let stream = dashboardStore.actionStream {
+                actionOutputView(
+                    title: dashboardStore.actionTitle ?? "Running",
+                    stream: stream
+                )
+            } else if let summary = dashboardStore.summary {
+                dashboardContent(summary)
+            } else if let errorMessage = dashboardStore.errorMessage {
                 ErrorView(message: errorMessage) {
                     Task { await dashboardStore.load() }
                 }
-            } else if let summary = dashboardStore.summary {
-                dashboardContent(summary)
+            } else {
+                LoadingView(message: "Loading dashboard\u{2026}")
             }
         }
         .navigationTitle("Dashboard")

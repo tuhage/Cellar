@@ -59,8 +59,6 @@ private struct DetailView: View {
             ComparisonView()
         case .maintenance:
             MaintenanceView()
-        case .settings:
-            SettingsView()
         }
     }
 }

@@ -35,6 +35,10 @@ struct CellarApp: App {
         }
         .commands { AppCommands() }
 
+        Settings {
+            SettingsView()
+        }
+
         MenuBarExtra("Cellar", systemImage: "mug") {
             MenuBarView()
                 .environment(packageStore)

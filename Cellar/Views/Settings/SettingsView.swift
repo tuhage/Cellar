@@ -55,7 +55,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Settings")
     }
 }
 

@@ -17,7 +17,6 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
     case projects
     case comparison
     case maintenance
-    case settings
 
     var id: String { rawValue }
 
@@ -39,7 +38,6 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .projects: "Projects"
         case .comparison: "Comparison"
         case .maintenance: "Maintenance"
-        case .settings: "Settings"
         }
     }
 
@@ -57,11 +55,10 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .collections: "folder"
         case .dependencies: "point.3.connected.trianglepath.dotted"
         case .resources: "gauge.with.dots.needle.67percent"
-        case .history: "clock.arrow.counterclockwise"
+        case .history: "clock.arrow.circlepath"
         case .projects: "hammer"
         case .comparison: "arrow.left.arrow.right"
         case .maintenance: "wrench.and.screwdriver"
-        case .settings: "gearshape"
         }
     }
 
@@ -73,7 +70,6 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .brewfile, .collections, .dependencies: .management
         case .health, .security, .resources: .monitoring
         case .history, .projects, .comparison, .maintenance: .tools
-        case .settings: .general
         }
     }
 
