@@ -107,47 +107,35 @@ public struct DependencyGraph: Sendable {
     /// ca-certificates:
     /// ```
     public static func build(from depsOutput: String) -> DependencyGraph {
-        // Parse each line into (package, [dependency])
         var dependencyMap: [String: [String]] = [:]
 
-        let lines = depsOutput.split(separator: "\n", omittingEmptySubsequences: true)
-        for line in lines {
+        for line in depsOutput.split(separator: "\n") {
             guard let colonIndex = line.firstIndex(of: ":") else { continue }
-            let package = String(line[line.startIndex..<colonIndex]).trimmingCharacters(in: .whitespaces)
+            let package = String(line[..<colonIndex]).trimmingCharacters(in: .whitespaces)
             guard !package.isEmpty else { continue }
 
-            let depsString = line[line.index(after: colonIndex)...]
-            let deps = depsString
-                .split(separator: " ", omittingEmptySubsequences: true)
+            let deps = line[line.index(after: colonIndex)...]
+                .split(separator: " ")
                 .map(String.init)
 
             dependencyMap[package] = deps
 
-            // Ensure every dependency also has an entry (some may have no line of their own)
-            for dep in deps {
-                if dependencyMap[dep] == nil {
-                    dependencyMap[dep] = []
-                }
+            for dep in deps where dependencyMap[dep] == nil {
+                dependencyMap[dep] = []
             }
         }
 
-        // Build reverse map: who depends on each package
+        // Build reverse map and edges in a single pass
         var dependentsMap: [String: [String]] = [:]
+        var edges: [(from: String, to: String)] = []
+
         for (package, deps) in dependencyMap {
             for dep in deps {
                 dependentsMap[dep, default: []].append(package)
-            }
-        }
-
-        // Build edges
-        var edges: [(from: String, to: String)] = []
-        for (package, deps) in dependencyMap {
-            for dep in deps {
                 edges.append((from: package, to: dep))
             }
         }
 
-        // Build nodes
         let nodes = dependencyMap.keys.sorted().map { name in
             DependencyNode(
                 name: name,

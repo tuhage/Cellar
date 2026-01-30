@@ -15,11 +15,11 @@ public struct HistoryEvent: Identifiable, Codable, Hashable, Sendable {
     public let toVersion: String?
     public let details: String?
 
-    // MARK: Initializer
+    // MARK: Init
 
     public init(
         id: UUID = UUID(),
-        timestamp: Date = Date(),
+        timestamp: Date = .now,
         eventType: HistoryEventType,
         packageName: String,
         fromVersion: String? = nil,
@@ -33,32 +33,6 @@ public struct HistoryEvent: Identifiable, Codable, Hashable, Sendable {
         self.fromVersion = fromVersion
         self.toVersion = toVersion
         self.details = details
-    }
-
-    public nonisolated init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decode(UUID.self, forKey: .id)
-        self.timestamp = try container.decode(Date.self, forKey: .timestamp)
-        self.eventType = try container.decode(HistoryEventType.self, forKey: .eventType)
-        self.packageName = try container.decode(String.self, forKey: .packageName)
-        self.fromVersion = try container.decodeIfPresent(String.self, forKey: .fromVersion)
-        self.toVersion = try container.decodeIfPresent(String.self, forKey: .toVersion)
-        self.details = try container.decodeIfPresent(String.self, forKey: .details)
-    }
-
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(timestamp, forKey: .timestamp)
-        try container.encode(eventType, forKey: .eventType)
-        try container.encode(packageName, forKey: .packageName)
-        try container.encodeIfPresent(fromVersion, forKey: .fromVersion)
-        try container.encodeIfPresent(toVersion, forKey: .toVersion)
-        try container.encodeIfPresent(details, forKey: .details)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, timestamp, eventType, packageName, fromVersion, toVersion, details
     }
 
     // MARK: Computed
@@ -91,7 +65,6 @@ public struct HistoryEvent: Identifiable, Codable, Hashable, Sendable {
 
     public static var preview: HistoryEvent {
         HistoryEvent(
-            timestamp: Date(),
             eventType: .installed,
             packageName: "openssl@3",
             toVersion: "3.6.0"
@@ -99,7 +72,7 @@ public struct HistoryEvent: Identifiable, Codable, Hashable, Sendable {
     }
 
     public static var previewList: [HistoryEvent] {
-        let now = Date()
+        let now = Date.now
         let calendar = Calendar.current
 
         return [
@@ -174,18 +147,6 @@ public enum HistoryEventType: String, Codable, Sendable, CaseIterable {
     case serviceStarted
     case serviceStopped
     case cleanup
-
-    public nonisolated init(from decoder: any Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let rawValue = try container.decode(String.self)
-        guard let value = HistoryEventType(rawValue: rawValue) else {
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "Invalid HistoryEventType: \(rawValue)"
-            )
-        }
-        self = value
-    }
 
     /// A display-friendly title for the event type.
     public var title: String {

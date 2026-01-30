@@ -8,20 +8,18 @@ public struct BrewJSONResponse: Codable, Sendable {
     public let formulae: [Formula]
     public let casks: [Cask]?
 
+    public init(formulae: [Formula], casks: [Cask]? = nil) {
+        self.formulae = formulae
+        self.casks = casks
+    }
+
     public nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.formulae = try container.decodeIfPresent([Formula].self, forKey: .formulae) ?? []
         self.casks = try container.decodeIfPresent([Cask].self, forKey: .casks)
     }
 
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(formulae, forKey: .formulae)
-        try container.encodeIfPresent(casks, forKey: .casks)
-    }
-
     private enum CodingKeys: String, CodingKey {
-        case formulae
-        case casks
+        case formulae, casks
     }
 }

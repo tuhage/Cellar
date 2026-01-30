@@ -23,7 +23,7 @@ public struct PackageCollection: Identifiable, Codable, Hashable, Sendable {
 
     public var totalCount: Int { packages.count + casks.count }
 
-    // MARK: Initializer
+    // MARK: Init
 
     public init(
         id: UUID = UUID(),
@@ -45,6 +45,7 @@ public struct PackageCollection: Identifiable, Codable, Hashable, Sendable {
         self.isBuiltIn = isBuiltIn
     }
 
+    // Backward-compatible decoding: missing keys fall back to defaults.
     public nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
@@ -55,18 +56,6 @@ public struct PackageCollection: Identifiable, Codable, Hashable, Sendable {
         self.casks = try container.decodeIfPresent([String].self, forKey: .casks) ?? []
         self.description = try container.decodeIfPresent(String.self, forKey: .description)
         self.isBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
-    }
-
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(name, forKey: .name)
-        try container.encode(icon, forKey: .icon)
-        try container.encode(colorName, forKey: .colorName)
-        try container.encode(packages, forKey: .packages)
-        try container.encode(casks, forKey: .casks)
-        try container.encodeIfPresent(description, forKey: .description)
-        try container.encode(isBuiltIn, forKey: .isBuiltIn)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -99,7 +88,6 @@ public struct PackageCollection: Identifiable, Codable, Hashable, Sendable {
             icon: "chart.bar.xaxis",
             colorName: "green",
             packages: ["python", "jupyter"],
-            casks: [],
             description: "Python-based data science stack.",
             isBuiltIn: true
         ),
@@ -108,7 +96,6 @@ public struct PackageCollection: Identifiable, Codable, Hashable, Sendable {
             icon: "server.rack",
             colorName: "orange",
             packages: ["docker", "kubernetes-cli", "terraform"],
-            casks: [],
             description: "Infrastructure and container management.",
             isBuiltIn: true
         ),
@@ -117,7 +104,6 @@ public struct PackageCollection: Identifiable, Codable, Hashable, Sendable {
             icon: "photo.on.rectangle",
             colorName: "purple",
             packages: ["ffmpeg", "imagemagick"],
-            casks: [],
             description: "Audio, video, and image processing tools.",
             isBuiltIn: true
         ),

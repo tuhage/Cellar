@@ -5,6 +5,7 @@ import CellarCore
 final class CellarFinderSyncExtension: FIFinderSync {
     private static let stopServiceNotification = Notification.Name("com.tuhage.Cellar.stopService")
     private static let brewfileBadgeIdentifier = "brewfile"
+    private static let bundleIdentifier = "com.tuhage.Cellar"
 
     private let monitoredPaths: [URL] = {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -19,22 +20,18 @@ final class CellarFinderSyncExtension: FIFinderSync {
     override init() {
         super.init()
 
-        FIFinderSyncController.default().directoryURLs = Set(monitoredPaths)
+        let controller = FIFinderSyncController.default()
+        controller.directoryURLs = Set(monitoredPaths)
 
         if let badgeImage = NSImage(systemSymbolName: "mug.fill", accessibilityDescription: "Brewfile") {
-            FIFinderSyncController.default().setBadgeImage(
-                badgeImage,
-                label: "Brewfile",
-                forBadgeIdentifier: Self.brewfileBadgeIdentifier
-            )
+            controller.setBadgeImage(badgeImage, label: "Brewfile", forBadgeIdentifier: Self.brewfileBadgeIdentifier)
         }
     }
 
     // MARK: - Badges
 
     override func requestBadgeIdentifier(for url: URL) {
-        let brewfilePath = url.appendingPathComponent("Brewfile").path
-        guard FileManager.default.fileExists(atPath: brewfilePath) else { return }
+        guard FileManager.default.fileExists(atPath: url.appendingPathComponent("Brewfile").path) else { return }
         FIFinderSyncController.default().setBadgeIdentifier(Self.brewfileBadgeIdentifier, for: url)
     }
 
@@ -46,7 +43,6 @@ final class CellarFinderSyncExtension: FIFinderSync {
         }
 
         let menu = NSMenu(title: "Cellar")
-
         let serviceNames = WidgetSnapshot.load()?.runningServiceNames ?? []
 
         if serviceNames.isEmpty {
@@ -68,11 +64,7 @@ final class CellarFinderSyncExtension: FIFinderSync {
 
         menu.addItem(.separator())
 
-        let openItem = NSMenuItem(
-            title: "Open Cellar",
-            action: #selector(openCellarAction(_:)),
-            keyEquivalent: ""
-        )
+        let openItem = NSMenuItem(title: "Open Cellar", action: #selector(openCellarAction(_:)), keyEquivalent: "")
         openItem.target = self
         menu.addItem(openItem)
 
@@ -92,7 +84,7 @@ final class CellarFinderSyncExtension: FIFinderSync {
     }
 
     @objc private func openCellarAction(_ sender: NSMenuItem) {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.tuhage.Cellar") else {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.bundleIdentifier) else {
             return
         }
         NSWorkspace.shared.openApplication(at: url, configuration: .init())

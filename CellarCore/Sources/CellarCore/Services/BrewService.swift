@@ -173,9 +173,6 @@ public nonisolated final class BrewService: Sendable {
     }
 
     private func parseLines(_ string: String) -> [String] {
-        string
-            .split(separator: "\n")
-            .map(String.init)
-            .filter { !$0.isEmpty }
+        string.split(separator: "\n").map(String.init)
     }
 }

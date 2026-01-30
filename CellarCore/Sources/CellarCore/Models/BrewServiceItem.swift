@@ -120,15 +120,4 @@ extension BrewServiceItem {
         self.pid = try container.decodeIfPresent(Int.self, forKey: .pid)
         self.registered = try container.decodeIfPresent(Bool.self, forKey: .registered)
     }
-
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(name, forKey: .name)
-        try container.encode(status, forKey: .status)
-        try container.encodeIfPresent(user, forKey: .user)
-        try container.encodeIfPresent(file, forKey: .file)
-        try container.encodeIfPresent(exitCode, forKey: .exitCode)
-        try container.encodeIfPresent(pid, forKey: .pid)
-        try container.encodeIfPresent(registered, forKey: .registered)
-    }
 }

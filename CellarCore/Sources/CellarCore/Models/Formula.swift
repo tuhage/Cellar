@@ -101,7 +101,7 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         get async throws {
             let service = BrewService()
             let data = try await service.listFormulaeData()
-            let response = try JSONDecoder.brew.decode(BrewJSONResponse.self, from: data)
+            let response = try JSONDecoder().decode(BrewJSONResponse.self, from: data)
             return response.formulae
         }
     }
@@ -149,26 +149,14 @@ public struct RuntimeDependency: Codable, Hashable, Sendable {
     public let fullName: String
     public let version: String
 
-    private enum CodingKeys: String, CodingKey {
-        case fullName = "full_name"
-        case version
-    }
-
-    public nonisolated init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.fullName = try container.decode(String.self, forKey: .fullName)
-        self.version = try container.decode(String.self, forKey: .version)
-    }
-
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(fullName, forKey: .fullName)
-        try container.encode(version, forKey: .version)
-    }
-
     public init(fullName: String, version: String) {
         self.fullName = fullName
         self.version = version
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case fullName = "full_name"
+        case version
     }
 }
 
@@ -197,14 +185,6 @@ extension Formula {
         case stable
     }
 
-    private enum InstalledKeys: String, CodingKey {
-        case version
-        case installedOnRequest = "installed_on_request"
-        case installedAsDependency = "installed_as_dependency"
-        case time
-        case runtimeDependencies = "runtime_dependencies"
-    }
-
     public nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
@@ -229,22 +209,15 @@ extension Formula {
             stableVersion = nil
         }
 
-        // Parse the "installed" array — may be empty or missing for search results
-        let installedEntries = try container.decodeIfPresent([InstalledEntry].self, forKey: .installed)
-        let firstInstalled = installedEntries?.first
-
-        if let entry = firstInstalled {
+        // Parse the "installed" array -- may be empty or missing for search results
+        if let entry = try container.decodeIfPresent([InstalledEntry].self, forKey: .installed)?.first {
             self.installedVersion = entry.version
             self.version = entry.version
             self.installedOnRequest = entry.installedOnRequest
             self.installedAsDependency = entry.installedAsDependency
             self.isInstalled = true
             self.runtimeDependencies = entry.runtimeDependencies ?? []
-            if let timestamp = entry.time {
-                self.installTime = Date(timeIntervalSince1970: TimeInterval(timestamp))
-            } else {
-                self.installTime = nil
-            }
+            self.installTime = entry.time.map { Date(timeIntervalSince1970: TimeInterval($0)) }
         } else {
             self.installedVersion = nil
             self.version = stableVersion ?? "unknown"
@@ -310,21 +283,8 @@ private struct InstalledEntry: Codable, Sendable {
         case runtimeDependencies = "runtime_dependencies"
     }
 
-    nonisolated init(
-        version: String,
-        installedOnRequest: Bool,
-        installedAsDependency: Bool,
-        time: Int?,
-        runtimeDependencies: [RuntimeDependency]?
-    ) {
-        self.version = version
-        self.installedOnRequest = installedOnRequest
-        self.installedAsDependency = installedAsDependency
-        self.time = time
-        self.runtimeDependencies = runtimeDependencies
-    }
-
-    nonisolated init(from decoder: any Decoder) throws {
+    // Custom decoding: missing boolean keys default to false.
+    init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.version = try container.decode(String.self, forKey: .version)
         self.installedOnRequest = try container.decodeIfPresent(Bool.self, forKey: .installedOnRequest) ?? false
@@ -333,13 +293,13 @@ private struct InstalledEntry: Codable, Sendable {
         self.runtimeDependencies = try container.decodeIfPresent([RuntimeDependency].self, forKey: .runtimeDependencies)
     }
 
-    nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(version, forKey: .version)
-        try container.encode(installedOnRequest, forKey: .installedOnRequest)
-        try container.encode(installedAsDependency, forKey: .installedAsDependency)
-        try container.encodeIfPresent(time, forKey: .time)
-        try container.encodeIfPresent(runtimeDependencies, forKey: .runtimeDependencies)
+    // Used by Formula.encode(to:) to construct entries for encoding.
+    init(version: String, installedOnRequest: Bool, installedAsDependency: Bool, time: Int?, runtimeDependencies: [RuntimeDependency]?) {
+        self.version = version
+        self.installedOnRequest = installedOnRequest
+        self.installedAsDependency = installedAsDependency
+        self.time = time
+        self.runtimeDependencies = runtimeDependencies
     }
 }
 

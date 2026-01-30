@@ -35,10 +35,7 @@ public struct ProjectEnvironment: Identifiable, Codable, Hashable, Sendable {
         self.autoStart = autoStart
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case id, name, path, services, packages, autoStart
-    }
-
+    // Backward-compatible decoding: missing keys fall back to defaults.
     public nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
@@ -49,14 +46,8 @@ public struct ProjectEnvironment: Identifiable, Codable, Hashable, Sendable {
         self.autoStart = try container.decodeIfPresent(Bool.self, forKey: .autoStart) ?? false
     }
 
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(name, forKey: .name)
-        try container.encode(path, forKey: .path)
-        try container.encode(services, forKey: .services)
-        try container.encode(packages, forKey: .packages)
-        try container.encode(autoStart, forKey: .autoStart)
+    private enum CodingKeys: String, CodingKey {
+        case id, name, path, services, packages, autoStart
     }
 
     // MARK: Preview

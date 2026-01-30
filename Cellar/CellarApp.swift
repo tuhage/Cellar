@@ -14,6 +14,8 @@ struct CellarApp: App {
     @State private var historyStore = HistoryStore()
     @State private var maintenanceStore = MaintenanceStore()
 
+    private let notificationObserver = FinderSyncNotificationObserver()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -29,7 +31,7 @@ struct CellarApp: App {
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     handleSpotlightActivity(activity)
                 }
-                .onAppear { registerFinderSyncNotifications() }
+                .task { notificationObserver.register(serviceStore: serviceStore) }
         }
         .commands { AppCommands() }
 
@@ -55,35 +57,52 @@ struct CellarApp: App {
             packageStore.selectedCaskId = String(identifier.dropFirst("cask:".count))
         }
     }
+}
 
-    // MARK: - Finder Sync Notifications
+// MARK: - Finder Sync Notification Observer
 
-    private func registerFinderSyncNotifications() {
+/// Registers distributed notification observers for Finder Sync service commands.
+/// Uses a class to ensure observers are registered exactly once.
+@MainActor
+private final class FinderSyncNotificationObserver {
+    private var isRegistered = false
+
+    func register(serviceStore: ServiceStore) {
+        guard !isRegistered else { return }
+        isRegistered = true
+
         let center = DistributedNotificationCenter.default()
 
-        observeServiceNotification(on: center, named: "com.tuhage.Cellar.stopService") { service in
-            await serviceStore.stop(service)
-        }
-        observeServiceNotification(on: center, named: "com.tuhage.Cellar.startService") { service in
-            await serviceStore.start(service)
-        }
-    }
-
-    private func observeServiceNotification(
-        on center: DistributedNotificationCenter,
-        named name: String,
-        action: @escaping (BrewServiceItem) async -> Void
-    ) {
         center.addObserver(
-            forName: .init(name),
+            forName: .init("com.tuhage.Cellar.stopService"),
             object: nil,
             queue: .main
         ) { notification in
-            guard let serviceName = notification.userInfo?["serviceName"] as? String else { return }
-            Task { @MainActor in
-                guard let service = serviceStore.services.first(where: { $0.name == serviceName }) else { return }
-                await action(service)
+            Self.handleServiceNotification(notification, serviceStore: serviceStore) { service in
+                await serviceStore.stop(service)
             }
+        }
+
+        center.addObserver(
+            forName: .init("com.tuhage.Cellar.startService"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            Self.handleServiceNotification(notification, serviceStore: serviceStore) { service in
+                await serviceStore.start(service)
+            }
+        }
+    }
+
+    private static func handleServiceNotification(
+        _ notification: Notification,
+        serviceStore: ServiceStore,
+        action: @escaping (BrewServiceItem) async -> Void
+    ) {
+        guard let serviceName = notification.userInfo?["serviceName"] as? String else { return }
+        Task { @MainActor in
+            guard let service = serviceStore.services.first(where: { $0.name == serviceName }) else { return }
+            await action(service)
         }
     }
 }

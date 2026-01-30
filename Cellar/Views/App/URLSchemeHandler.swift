@@ -1,85 +1,40 @@
 import SwiftUI
 import CellarCore
 
-// MARK: - URLSchemeHandler
-
-/// A view modifier that handles `cellar://` URL scheme deep links.
-///
-/// Supports navigating to sidebar sections via URLs like:
-/// - `cellar://dashboard`
-/// - `cellar://formulae`
-/// - `cellar://casks`
-/// - `cellar://services`
-/// - `cellar://search`
-/// - `cellar://health`
+/// Handles `cellar://` URL scheme deep links (e.g., `cellar://formulae`, `cellar://formula/<name>`).
 struct URLSchemeHandler: ViewModifier {
     @Binding var selection: SidebarItem?
     @Environment(PackageStore.self) private var packageStore
 
     func body(content: Content) -> some View {
-        content
-            .onOpenURL { url in
-                handleURL(url)
-            }
+        content.onOpenURL { url in handleURL(url) }
     }
 
     private func handleURL(_ url: URL) {
-        guard url.scheme == "cellar" else { return }
+        guard url.scheme == "cellar", let host = url.host else { return }
 
-        switch url.host {
-        case "dashboard":
-            selection = .dashboard
-        case "formulae":
-            selection = .formulae
-        case "casks":
-            selection = .casks
-        case "services":
-            selection = .services
-        case "outdated":
-            selection = .outdated
-        case "search":
-            selection = .search
-        case "brewfile":
-            selection = .brewfile
-        case "health":
-            selection = .health
-        case "security":
-            selection = .security
-        case "collections":
-            selection = .collections
-        case "dependencies":
-            selection = .dependencies
-        case "resources":
-            selection = .resources
-        case "history":
-            selection = .history
-        case "projects":
-            selection = .projects
-        case "comparison":
-            selection = .comparison
-        case "maintenance":
-            selection = .maintenance
-        case "settings":
-            selection = .settings
-        case "formula":
-            // cellar://formula/<name>
+        // Deep links to a specific package: cellar://formula/<name> or cellar://cask/<token>
+        if host == "formula" {
             selection = .formulae
             if let name = url.pathComponents.dropFirst().first {
                 packageStore.selectedFormulaId = name
             }
-        case "cask":
-            // cellar://cask/<token>
+            return
+        }
+        if host == "cask" {
             selection = .casks
             if let token = url.pathComponents.dropFirst().first {
                 packageStore.selectedCaskId = token
             }
-        default:
-            break
+            return
+        }
+
+        // Direct sidebar navigation: cellar://dashboard, cellar://services, etc.
+        if let item = SidebarItem(rawValue: host) {
+            selection = item
         }
     }
 }
-
-// MARK: - View Extension
 
 extension View {
     func urlSchemeHandler(selection: Binding<SidebarItem?>) -> some View {

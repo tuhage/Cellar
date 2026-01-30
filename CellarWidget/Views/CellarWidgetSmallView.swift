@@ -4,6 +4,10 @@ import WidgetKit
 struct CellarWidgetSmallView: View {
     let entry: CellarWidgetEntry
 
+    private var serviceLabel: String {
+        entry.runningServices == 1 ? "Service Running" : "Services Running"
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "gearshape.2.fill")
@@ -13,7 +17,7 @@ struct CellarWidgetSmallView: View {
             Text("\(entry.runningServices)")
                 .font(.system(size: 36, weight: .bold, design: .rounded))
 
-            Text(entry.runningServices == 1 ? "Service Running" : "Services Running")
+            Text(serviceLabel)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -21,4 +25,10 @@ struct CellarWidgetSmallView: View {
         .containerBackground(.fill.tertiary, for: .widget)
         .widgetURL(URL(string: "cellar://services"))
     }
+}
+
+#Preview(as: .systemSmall) {
+    CellarWidget()
+} timeline: {
+    CellarWidgetEntry.placeholder
 }

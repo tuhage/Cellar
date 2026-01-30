@@ -7,46 +7,48 @@ nonisolated final class SpotlightService: Sendable {
     private static let formulaeDomain = "com.tuhage.Cellar.formulae"
     private static let casksDomain = "com.tuhage.Cellar.casks"
 
-    /// Indexes all formulae and casks in Spotlight.
     func indexAll(formulae: [Formula], casks: [Cask]) async {
         let index = CSSearchableIndex.default()
 
-        // Delete existing entries first
         try? await index.deleteSearchableItems(withDomainIdentifiers: [
             Self.formulaeDomain,
             Self.casksDomain,
         ])
 
-        var items: [CSSearchableItem] = []
-
-        for formula in formulae {
-            let attributes = CSSearchableItemAttributeSet(contentType: .item)
-            attributes.title = formula.name
-            attributes.contentDescription = formula.desc ?? "Homebrew formula"
-            attributes.keywords = ["homebrew", "formula", "brew", formula.name]
-
-            let item = CSSearchableItem(
-                uniqueIdentifier: "formula:\(formula.name)",
-                domainIdentifier: Self.formulaeDomain,
-                attributeSet: attributes
+        let formulaeItems = formulae.map { formula in
+            makeItem(
+                identifier: "formula:\(formula.name)",
+                domain: Self.formulaeDomain,
+                title: formula.name,
+                description: formula.desc ?? "Homebrew formula",
+                keywords: ["homebrew", "formula", "brew", formula.name]
             )
-            items.append(item)
         }
 
-        for cask in casks {
-            let attributes = CSSearchableItemAttributeSet(contentType: .item)
-            attributes.title = cask.displayName
-            attributes.contentDescription = cask.desc ?? "Homebrew cask"
-            attributes.keywords = ["homebrew", "cask", "brew", cask.token]
-
-            let item = CSSearchableItem(
-                uniqueIdentifier: "cask:\(cask.token)",
-                domainIdentifier: Self.casksDomain,
-                attributeSet: attributes
+        let caskItems = casks.map { cask in
+            makeItem(
+                identifier: "cask:\(cask.token)",
+                domain: Self.casksDomain,
+                title: cask.displayName,
+                description: cask.desc ?? "Homebrew cask",
+                keywords: ["homebrew", "cask", "brew", cask.token]
             )
-            items.append(item)
         }
 
-        try? await index.indexSearchableItems(items)
+        try? await index.indexSearchableItems(formulaeItems + caskItems)
+    }
+
+    private func makeItem(
+        identifier: String,
+        domain: String,
+        title: String,
+        description: String,
+        keywords: [String]
+    ) -> CSSearchableItem {
+        let attributes = CSSearchableItemAttributeSet(contentType: .item)
+        attributes.title = title
+        attributes.contentDescription = description
+        attributes.keywords = keywords
+        return CSSearchableItem(uniqueIdentifier: identifier, domainIdentifier: domain, attributeSet: attributes)
     }
 }

@@ -4,15 +4,12 @@ enum HealthCommand {
     static func run() async throws {
         TerminalOutput.printHeader("Homebrew Health Check")
         print("")
-
-        let service = BrewService()
-
         print("Running \(TerminalOutput.info("brew doctor"))...")
         print("")
 
-        let output = try await service.doctor()
+        let output = try await BrewService().doctor()
 
-        guard !output.contains("Your system is ready to brew") else {
+        if output.contains("Your system is ready to brew") {
             TerminalOutput.printSuccess("Your system is ready to brew.")
             return
         }

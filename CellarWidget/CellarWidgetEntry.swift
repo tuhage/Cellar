@@ -1,9 +1,9 @@
-import WidgetKit
 import CellarCore
+import WidgetKit
 
 struct CellarWidgetEntry: TimelineEntry {
     let date: Date
-    private let snapshot: WidgetSnapshot
+    let snapshot: WidgetSnapshot
 
     var totalFormulae: Int { snapshot.totalFormulae }
     var totalCasks: Int { snapshot.totalCasks }
@@ -13,23 +13,18 @@ struct CellarWidgetEntry: TimelineEntry {
     var runningServiceNames: [String] { snapshot.runningServiceNames }
     var outdatedPackageNames: [String] { snapshot.outdatedPackageNames }
 
-    init(date: Date, snapshot: WidgetSnapshot) {
-        self.date = date
-        self.snapshot = snapshot
-    }
-
     static let placeholder = CellarWidgetEntry(date: .now, snapshot: .preview)
+    static let empty = CellarWidgetEntry(date: .now, snapshot: .empty)
+}
 
-    static let empty = CellarWidgetEntry(
-        date: .now,
-        snapshot: WidgetSnapshot(
-            totalFormulae: 0,
-            totalCasks: 0,
-            runningServices: 0,
-            totalServices: 0,
-            outdatedCount: 0,
-            runningServiceNames: [],
-            outdatedPackageNames: []
-        )
+extension WidgetSnapshot {
+    static let empty = WidgetSnapshot(
+        totalFormulae: 0,
+        totalCasks: 0,
+        runningServices: 0,
+        totalServices: 0,
+        outdatedCount: 0,
+        runningServiceNames: [],
+        outdatedPackageNames: []
     )
 }

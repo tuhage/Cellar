@@ -83,7 +83,7 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
         get async throws {
             let service = BrewService()
             let data = try await service.listCasksData()
-            let response = try JSONDecoder.brew.decode(BrewJSONResponse.self, from: data)
+            let response = try JSONDecoder().decode(BrewJSONResponse.self, from: data)
             return response.casks ?? []
         }
     }
@@ -147,22 +147,6 @@ extension Cask {
         self.autoUpdates = try container.decodeIfPresent(Bool.self, forKey: .autoUpdates) ?? false
         self.deprecated = try container.decodeIfPresent(Bool.self, forKey: .deprecated) ?? false
         self.disabled = try container.decodeIfPresent(Bool.self, forKey: .disabled) ?? false
-    }
-
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-
-        try container.encode(token, forKey: .token)
-        try container.encode(fullToken, forKey: .fullToken)
-        try container.encode(names, forKey: .names)
-        try container.encodeIfPresent(desc, forKey: .desc)
-        try container.encodeIfPresent(homepage, forKey: .homepage)
-        try container.encode(version, forKey: .version)
-        try container.encodeIfPresent(installed, forKey: .installed)
-        try container.encode(outdated, forKey: .outdated)
-        try container.encode(autoUpdates, forKey: .autoUpdates)
-        try container.encode(deprecated, forKey: .deprecated)
-        try container.encode(disabled, forKey: .disabled)
     }
 }
 

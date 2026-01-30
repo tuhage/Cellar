@@ -79,7 +79,7 @@ public struct ComparisonResult: Sendable {
                     if trimmed.hasPrefix(prefix) {
                         let afterPrefix = trimmed.dropFirst(prefix.count)
                         if let endQuote = afterPrefix.firstIndex(of: "\"") {
-                            return String(afterPrefix[afterPrefix.startIndex..<endQuote])
+                            return String(afterPrefix[..<endQuote])
                         }
                     }
                 }

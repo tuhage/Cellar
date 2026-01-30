@@ -1,5 +1,5 @@
-import WidgetKit
 import CellarCore
+import WidgetKit
 
 struct CellarWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> CellarWidgetEntry {

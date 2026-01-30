@@ -35,13 +35,7 @@ public struct MaintenanceSchedule: Codable, Sendable {
         self.lastHealthCheck = lastHealthCheck
     }
 
-    // MARK: Codable
-
-    private enum CodingKeys: String, CodingKey {
-        case autoCleanup, cleanupFrequency, autoHealthCheck, healthCheckFrequency
-        case lastCleanup, lastHealthCheck
-    }
-
+    // Backward-compatible decoding: missing keys fall back to defaults.
     public nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.autoCleanup = try container.decodeIfPresent(Bool.self, forKey: .autoCleanup) ?? false
@@ -52,14 +46,9 @@ public struct MaintenanceSchedule: Codable, Sendable {
         self.lastHealthCheck = try container.decodeIfPresent(Date.self, forKey: .lastHealthCheck)
     }
 
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(autoCleanup, forKey: .autoCleanup)
-        try container.encode(cleanupFrequency, forKey: .cleanupFrequency)
-        try container.encode(autoHealthCheck, forKey: .autoHealthCheck)
-        try container.encode(healthCheckFrequency, forKey: .healthCheckFrequency)
-        try container.encodeIfPresent(lastCleanup, forKey: .lastCleanup)
-        try container.encodeIfPresent(lastHealthCheck, forKey: .lastHealthCheck)
+    private enum CodingKeys: String, CodingKey {
+        case autoCleanup, cleanupFrequency, autoHealthCheck, healthCheckFrequency
+        case lastCleanup, lastHealthCheck
     }
 
     // MARK: Factory
@@ -108,18 +97,6 @@ public enum MaintenanceFrequency: String, Codable, Sendable, CaseIterable {
     case weekly
     case monthly
 
-    public nonisolated init(from decoder: any Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let rawValue = try container.decode(String.self)
-        guard let value = MaintenanceFrequency(rawValue: rawValue) else {
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "Invalid MaintenanceFrequency: \(rawValue)"
-            )
-        }
-        self = value
-    }
-
     public var title: String {
         switch self {
         case .daily: "Daily"
@@ -164,28 +141,6 @@ public struct MaintenanceReport: Identifiable, Codable, Sendable {
         self.details = details
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case id, date, type, summary, details
-    }
-
-    public nonisolated init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decode(UUID.self, forKey: .id)
-        self.date = try container.decode(Date.self, forKey: .date)
-        self.type = try container.decode(MaintenanceReportType.self, forKey: .type)
-        self.summary = try container.decode(String.self, forKey: .summary)
-        self.details = try container.decodeIfPresent(String.self, forKey: .details)
-    }
-
-    public nonisolated func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(date, forKey: .date)
-        try container.encode(type, forKey: .type)
-        try container.encode(summary, forKey: .summary)
-        try container.encodeIfPresent(details, forKey: .details)
-    }
-
     // MARK: Preview
 
     public static var preview: MaintenanceReport {
@@ -203,18 +158,6 @@ public struct MaintenanceReport: Identifiable, Codable, Sendable {
 public enum MaintenanceReportType: String, Codable, Sendable {
     case cleanup
     case healthCheck
-
-    public nonisolated init(from decoder: any Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let rawValue = try container.decode(String.self)
-        guard let value = MaintenanceReportType(rawValue: rawValue) else {
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "Invalid MaintenanceReportType: \(rawValue)"
-            )
-        }
-        self = value
-    }
 
     public var title: String {
         switch self {

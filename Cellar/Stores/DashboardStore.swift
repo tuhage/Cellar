@@ -3,8 +3,6 @@ import Observation
 import CellarCore
 import WidgetKit
 
-// MARK: - DashboardStore
-
 /// Manages the state for the dashboard view.
 ///
 /// Loads formulae, casks, and services concurrently to build a
@@ -22,14 +20,8 @@ final class DashboardStore {
 
     var isLoading = false
     var errorMessage: String?
-
-    /// Output from the most recent quick action (cleanup, health check).
     var actionOutput: String?
-
-    /// Whether a quick action is currently running.
     var isPerformingAction = false
-
-    /// Label for the currently running action.
     var activeActionLabel: String?
 
     // MARK: Dependencies
@@ -38,7 +30,6 @@ final class DashboardStore {
 
     // MARK: Actions
 
-    /// Loads all data concurrently and builds a system summary.
     func load() async {
         isLoading = true
         errorMessage = nil
@@ -57,65 +48,53 @@ final class DashboardStore {
                 services: services
             )
             summary = loadedSummary
-
-            // Write snapshot for widget
-            let snapshot = WidgetSnapshot.from(summary: loadedSummary, services: services)
-            snapshot.save()
-            WidgetCenter.shared.reloadAllTimelines()
+            writeWidgetSnapshot(summary: loadedSummary, services: services)
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
-    /// Upgrades all outdated packages and reloads.
     func upgradeAll() async {
-        isPerformingAction = true
-        activeActionLabel = "Upgrading all packages"
-        errorMessage = nil
-        do {
+        await performAction("Upgrading all packages") {
             for try await _ in service.upgradeAll() {}
             await load()
-        } catch {
-            errorMessage = error.localizedDescription
         }
-        isPerformingAction = false
-        activeActionLabel = nil
     }
 
-    /// Runs `brew cleanup` and captures the output.
     func cleanup() async {
-        isPerformingAction = true
-        activeActionLabel = "Cleaning up"
-        actionOutput = nil
-        errorMessage = nil
-        do {
+        await performAction("Cleaning up") {
             var output = ""
             for try await line in service.cleanup() {
                 output += line
             }
-            actionOutput = output.isEmpty
-                ? "Nothing to clean up."
-                : output
+            actionOutput = output.isEmpty ? "Nothing to clean up." : output
             await load()
-        } catch {
-            errorMessage = error.localizedDescription
         }
-        isPerformingAction = false
-        activeActionLabel = nil
     }
 
-    /// Runs `brew doctor` and captures the output.
     func healthCheck() async {
-        isPerformingAction = true
-        activeActionLabel = "Running health check"
-        actionOutput = nil
-        errorMessage = nil
-        do {
+        await performAction("Running health check") {
             let output = try await service.doctor()
             actionOutput = output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? "Your system is ready to brew."
                 : output
+        }
+    }
+
+    func dismissActionOutput() {
+        actionOutput = nil
+    }
+
+    // MARK: Private
+
+    private func performAction(_ label: String, body: () async throws -> Void) async {
+        isPerformingAction = true
+        activeActionLabel = label
+        actionOutput = nil
+        errorMessage = nil
+        do {
+            try await body()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -123,8 +102,9 @@ final class DashboardStore {
         activeActionLabel = nil
     }
 
-    /// Clears the last action output.
-    func dismissActionOutput() {
-        actionOutput = nil
+    private func writeWidgetSnapshot(summary: SystemSummary, services: [BrewServiceItem]) {
+        let snapshot = WidgetSnapshot.from(summary: summary, services: services)
+        snapshot.save()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
