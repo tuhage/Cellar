@@ -3,14 +3,15 @@ import CellarCore
 
 // MARK: - BrewfileView
 
-/// Section-based Brewfile management view with info banner, stats,
-/// quick actions, check results, and categorised package lists.
+/// Section-based Brewfile management view with unified profile header,
+/// stats, quick actions, check results, and categorised package lists.
 struct BrewfileView: View {
     @Environment(BrewfileStore.self) private var store
 
     @State private var isAddingProfile = false
     @State private var isEditingRaw = false
-    @State private var isConfirmingDeleteBrewfile = false
+    @State private var isConfirmingDeleteProfile = false
+    @State private var alsoDeleteFile = false
     @State private var newProfileName = ""
     @State private var newProfilePath = ""
     @State private var newProfileMode: BrewfileCreationMode = .empty
@@ -35,16 +36,27 @@ struct BrewfileView: View {
         .sheet(isPresented: $isAddingProfile) { addProfileSheet }
         .sheet(isPresented: $isEditingRaw) { rawEditorSheet }
         .alert(
-            "Delete Brewfile?",
-            isPresented: $isConfirmingDeleteBrewfile
+            "Delete \"\(store.selectedProfile?.name ?? "Profile")\"?",
+            isPresented: $isConfirmingDeleteProfile
         ) {
             Button("Delete", role: .destructive) {
                 guard let profile = store.selectedProfile else { return }
-                store.deleteBrewfile(for: profile)
+                if alsoDeleteFile {
+                    store.deleteBrewfile(for: profile)
+                }
+                store.deleteProfile(profile)
+                if let first = store.profiles.first {
+                    store.selectProfile(first.id)
+                }
+                alsoDeleteFile = false
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) {
+                alsoDeleteFile = false
+            }
         } message: {
-            Text("This will permanently delete the Brewfile from disk. The profile will be kept.")
+            if let profile = store.selectedProfile {
+                Text("This will remove the profile. You can also delete the Brewfile at \(profile.path).")
+            }
         }
         .task {
             store.loadProfiles()
@@ -60,10 +72,7 @@ struct BrewfileView: View {
     private var brewfileContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                infoBanner
-                if store.profiles.count > 1 {
-                    profilePickerSection
-                }
+                profileHeader
                 statsSection
                 quickActionsSection
                 if let result = store.checkResult {
@@ -75,37 +84,36 @@ struct BrewfileView: View {
         }
     }
 
-    // MARK: - Info Banner
+    // MARK: - Profile Header
 
-    private var infoBanner: some View {
-        HStack(spacing: 12) {
+    private var profileHeader: some View {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "doc.text.fill")
                 .font(.largeTitle)
                 .foregroundStyle(.blue)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Brewfile")
-                    .font(.headline)
-
-                Text("A Brewfile lists all your Homebrew packages. Use it to back up your setup or migrate to another Mac.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
+            VStack(alignment: .leading, spacing: 4) {
                 if let profile = store.selectedProfile {
-                    HStack(spacing: 8) {
+                    Text(profile.name)
+                        .font(.headline)
+
+                    HStack(spacing: 6) {
                         Text(profile.path)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
                             .lineLimit(1)
                             .truncationMode(.middle)
 
                         if let lastExported = profile.lastExported {
+                            Text("·")
                             Text("Exported \(lastExported, format: .relative(presentation: .named))")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
                         }
                     }
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
                 }
+
+                Text("A Brewfile lists all your Homebrew packages. Use it to back up your setup or migrate to another Mac.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -114,63 +122,57 @@ struct BrewfileView: View {
                 ProgressView()
                     .controlSize(.small)
             }
+
+            profileMenu
         }
         .padding(12)
         .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    // MARK: - Profile Picker
+    // MARK: - Profile Menu
 
-    private var profilePickerSection: some View {
-        HStack(spacing: 8) {
-            Picker("Profile", selection: Binding(
-                get: { store.selectedProfileId },
-                set: { store.selectProfile($0) }
-            )) {
-                ForEach(store.profiles) { profile in
-                    Text(profile.name).tag(Optional(profile.id))
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(maxWidth: 200)
-
-            Menu {
+    private var profileMenu: some View {
+        Menu {
+            ForEach(store.profiles) { profile in
                 Button {
-                    newProfileName = ""
-                    newProfilePath = defaultBrewfilePath()
-                    newProfileMode = .empty
-                    isAddingProfile = true
+                    store.selectProfile(profile.id)
                 } label: {
-                    Label("New Profile", systemImage: "plus")
-                }
-
-                if store.brewfileExistsOnDisk {
-                    Divider()
-                    Button(role: .destructive) {
-                        isConfirmingDeleteBrewfile = true
-                    } label: {
-                        Label("Delete Brewfile", systemImage: "doc.fill.badge.minus")
+                    if profile.id == store.selectedProfileId {
+                        Label(profile.name, systemImage: "checkmark")
+                    } else {
+                        Text(profile.name)
                     }
                 }
-
-                if let profile = store.selectedProfile, store.profiles.count > 1 {
-                    Divider()
-                    Button(role: .destructive) {
-                        store.deleteProfile(profile)
-                        if let first = store.profiles.first {
-                            store.selectProfile(first.id)
-                        }
-                    } label: {
-                        Label("Delete \"\(profile.name)\"", systemImage: "trash")
-                    }
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
             }
-            .menuStyle(.borderlessButton)
 
-            Spacer()
+            Divider()
+
+            Button {
+                newProfileName = ""
+                newProfilePath = defaultBrewfilePath()
+                newProfileMode = .empty
+                isAddingProfile = true
+            } label: {
+                Label("New Profile...", systemImage: "plus")
+            }
+
+            if store.selectedProfile != nil {
+                Divider()
+
+                Button(role: .destructive) {
+                    alsoDeleteFile = false
+                    isConfirmingDeleteProfile = true
+                } label: {
+                    Label("Delete Profile", systemImage: "trash")
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.down.circle.fill")
+                .symbolRenderingMode(.hierarchical)
+                .font(.title3)
         }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     // MARK: - Stats Section
@@ -491,29 +493,18 @@ struct BrewfileView: View {
             } label: {
                 Label("Edit Raw", systemImage: "pencil")
             }
-            .disabled(store.selectedProfile == nil)
+            .disabled(store.selectedProfile == nil || !store.brewfileExistsOnDisk)
             .help("Edit raw Brewfile content")
 
-            if store.profiles.count <= 1 {
-                if store.brewfileExistsOnDisk {
-                    Button(role: .destructive) {
-                        isConfirmingDeleteBrewfile = true
-                    } label: {
-                        Label("Delete Brewfile", systemImage: "trash")
-                    }
-                    .help("Delete the Brewfile from disk")
-                }
-
-                Button {
-                    newProfileName = ""
-                    newProfilePath = defaultBrewfilePath()
-                    newProfileMode = .empty
-                    isAddingProfile = true
-                } label: {
-                    Label("New Profile", systemImage: "plus")
-                }
-                .help("Create a new Brewfile profile")
+            Button {
+                newProfileName = ""
+                newProfilePath = defaultBrewfilePath()
+                newProfileMode = .empty
+                isAddingProfile = true
+            } label: {
+                Label("New Profile", systemImage: "plus")
             }
+            .help("Create a new Brewfile profile")
         }
     }
 

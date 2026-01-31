@@ -17,6 +17,9 @@ public struct SystemSummary: Sendable {
     public let updatesAvailable: Int
     public let outdatedFormulae: [Formula]
     public let outdatedCasks: [Cask]
+    public let services: [BrewServiceItem]
+    public let recentlyInstalled: [Formula]
+    public let taps: [Tap]
 
     /// Total packages across both formulae and casks.
     public var totalPackages: Int {
@@ -32,7 +35,10 @@ public struct SystemSummary: Sendable {
         totalServices: Int,
         updatesAvailable: Int,
         outdatedFormulae: [Formula],
-        outdatedCasks: [Cask]
+        outdatedCasks: [Cask],
+        services: [BrewServiceItem],
+        recentlyInstalled: [Formula],
+        taps: [Tap]
     ) {
         self.totalFormulae = totalFormulae
         self.totalCasks = totalCasks
@@ -41,6 +47,9 @@ public struct SystemSummary: Sendable {
         self.updatesAvailable = updatesAvailable
         self.outdatedFormulae = outdatedFormulae
         self.outdatedCasks = outdatedCasks
+        self.services = services
+        self.recentlyInstalled = recentlyInstalled
+        self.taps = taps
     }
 
     // MARK: Factory Method
@@ -49,10 +58,16 @@ public struct SystemSummary: Sendable {
     public static func current(
         formulae: [Formula],
         casks: [Cask],
-        services: [BrewServiceItem]
+        services: [BrewServiceItem],
+        taps: [Tap]
     ) -> SystemSummary {
         let outdatedFormulae = formulae.filter(\.outdated)
         let outdatedCasks = casks.filter(\.outdated)
+
+        let recentlyInstalled = formulae
+            .filter { $0.installTime != nil }
+            .sorted { ($0.installTime ?? .distantPast) > ($1.installTime ?? .distantPast) }
+            .prefix(5)
 
         return SystemSummary(
             totalFormulae: formulae.count,
@@ -61,7 +76,10 @@ public struct SystemSummary: Sendable {
             totalServices: services.count,
             updatesAvailable: outdatedFormulae.count + outdatedCasks.count,
             outdatedFormulae: outdatedFormulae,
-            outdatedCasks: outdatedCasks
+            outdatedCasks: outdatedCasks,
+            services: services,
+            recentlyInstalled: Array(recentlyInstalled),
+            taps: taps
         )
     }
 
@@ -75,7 +93,14 @@ public struct SystemSummary: Sendable {
             totalServices: 7,
             updatesAvailable: 5,
             outdatedFormulae: [.preview],
-            outdatedCasks: [.preview]
+            outdatedCasks: [.preview],
+            services: [
+                .preview,
+                BrewServiceItem(name: "redis", status: .stopped, user: nil, file: nil, exitCode: nil, pid: nil, registered: true),
+                BrewServiceItem(name: "nginx", status: .error, user: nil, file: nil, exitCode: 1, pid: nil, registered: true),
+            ],
+            recentlyInstalled: [.preview],
+            taps: [.preview]
         )
     }
 }

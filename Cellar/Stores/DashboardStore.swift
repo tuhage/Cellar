@@ -38,15 +38,18 @@ final class DashboardStore {
             async let loadedFormulae = Formula.all
             async let loadedCasks = Cask.all
             async let loadedServices = BrewServiceItem.all
+            async let loadedTaps = Tap.all
 
             let formulae = try await loadedFormulae
             let casks = try await loadedCasks
             let services = try await loadedServices
+            let taps = try await loadedTaps
 
             let loadedSummary = SystemSummary.current(
                 formulae: formulae,
                 casks: casks,
-                services: services
+                services: services,
+                taps: taps
             )
             summary = loadedSummary
             writeWidgetSnapshot(summary: loadedSummary, services: services)

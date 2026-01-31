@@ -4,7 +4,9 @@ import CellarCore
 // MARK: - DashboardView
 
 struct DashboardView: View {
+    @Binding var selection: SidebarItem?
     @State private var dashboardStore = DashboardStore()
+    @Environment(PackageStore.self) private var packageStore
 
     var body: some View {
         Group {
@@ -46,7 +48,16 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 statsSection(summary)
+                if !summary.services.isEmpty {
+                    servicesSection(summary)
+                }
                 quickActionsSection(summary)
+                if !summary.recentlyInstalled.isEmpty {
+                    recentlyInstalledSection(summary)
+                }
+                if !summary.taps.isEmpty {
+                    tapsSection(summary)
+                }
                 if summary.updatesAvailable > 0 {
                     outdatedSection(summary)
                 }
@@ -65,34 +76,112 @@ struct DashboardView: View {
                 columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
                 spacing: 12
             ) {
-                StatCardView(
-                    title: "Formulae",
-                    value: "\(summary.totalFormulae)",
-                    systemImage: "terminal",
-                    color: .blue
-                )
+                navigableCard(to: .formulae) {
+                    StatCardView(
+                        title: "Formulae",
+                        value: "\(summary.totalFormulae)",
+                        systemImage: "terminal",
+                        color: .blue
+                    )
+                }
 
-                StatCardView(
-                    title: "Casks",
-                    value: "\(summary.totalCasks)",
-                    systemImage: "macwindow",
-                    color: .purple
-                )
+                navigableCard(to: .casks) {
+                    StatCardView(
+                        title: "Casks",
+                        value: "\(summary.totalCasks)",
+                        systemImage: "macwindow",
+                        color: .purple
+                    )
+                }
 
-                StatCardView(
-                    title: "Services",
-                    value: "\(summary.runningServices)/\(summary.totalServices)",
-                    systemImage: "gearshape.2",
-                    color: .green
-                )
+                navigableCard(to: .services) {
+                    StatCardView(
+                        title: "Services",
+                        value: "\(summary.runningServices)/\(summary.totalServices)",
+                        systemImage: "gearshape.2",
+                        color: .green
+                    )
+                }
 
-                StatCardView(
-                    title: "Updates",
-                    value: "\(summary.updatesAvailable)",
-                    systemImage: "arrow.triangle.2.circlepath",
-                    color: summary.updatesAvailable > 0 ? .orange : .green
-                )
+                navigableCard(to: .outdated) {
+                    StatCardView(
+                        title: "Updates",
+                        value: "\(summary.updatesAvailable)",
+                        systemImage: "arrow.triangle.2.circlepath",
+                        color: summary.updatesAvailable > 0 ? .orange : .green
+                    )
+                }
             }
+        }
+    }
+
+    // MARK: - Services Section
+
+    private func servicesSection(_ summary: SystemSummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderView(
+                title: "Services at a Glance",
+                systemImage: "gearshape.2",
+                color: .green
+            ) {
+                Button {
+                    selection = .services
+                } label: {
+                    Text("See All")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.blue)
+            }
+
+            GroupBox {
+                VStack(spacing: 0) {
+                    ForEach(Array(summary.services.prefix(5))) { service in
+                        Button {
+                            selection = .services
+                        } label: {
+                            serviceRow(service)
+                        }
+                        .buttonStyle(.plain)
+
+                        if service.id != summary.services.prefix(5).last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func serviceRow(_ service: BrewServiceItem) -> some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(serviceStatusColor(service.status))
+                .frame(width: 8, height: 8)
+
+            Text(service.name)
+                .fontWeight(.medium)
+
+            Spacer()
+
+            Text(service.status.rawValue.capitalized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
+    }
+
+    private func serviceStatusColor(_ status: ServiceStatus) -> Color {
+        switch status {
+        case .started: .green
+        case .error: .red
+        case .stopped, .none, .unknown: .secondary
         }
     }
 
@@ -173,6 +262,143 @@ struct DashboardView: View {
         .opacity(isDisabled ? 0.5 : 1)
     }
 
+    // MARK: - Recently Installed Section
+
+    private func recentlyInstalledSection(_ summary: SystemSummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderView(
+                title: "Recently Installed",
+                systemImage: "clock.arrow.circlepath",
+                color: .blue
+            ) {
+                Button {
+                    selection = .formulae
+                } label: {
+                    Text("See All")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.blue)
+            }
+
+            GroupBox {
+                VStack(spacing: 0) {
+                    ForEach(summary.recentlyInstalled) { formula in
+                        Button {
+                            packageStore.selectedFormulaId = formula.id
+                            selection = .formulae
+                        } label: {
+                            recentlyInstalledRow(formula)
+                        }
+                        .buttonStyle(.plain)
+
+                        if formula.id != summary.recentlyInstalled.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func recentlyInstalledRow(_ formula: Formula) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "terminal")
+                .foregroundStyle(.blue)
+                .frame(width: 20)
+
+            Text(formula.name)
+                .fontWeight(.medium)
+
+            Spacer()
+
+            if let installTime = formula.installTime {
+                Text(relativeDate(installTime))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Taps Section
+
+    private func tapsSection(_ summary: SystemSummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderView(
+                title: "Taps",
+                systemImage: "spigot",
+                color: .teal
+            ) {
+                Button {
+                    selection = .taps
+                } label: {
+                    Text("See All")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.blue)
+            }
+
+            GroupBox {
+                VStack(spacing: 0) {
+                    ForEach(summary.taps) { tap in
+                        Button {
+                            selection = .taps
+                        } label: {
+                            tapRow(tap)
+                        }
+                        .buttonStyle(.plain)
+
+                        if tap.id != summary.taps.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tapRow(_ tap: Tap) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "spigot")
+                .foregroundStyle(.teal)
+                .frame(width: 20)
+
+            Text(tap.name)
+                .fontWeight(.medium)
+
+            if tap.official {
+                Text("Official")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.blue.gradient, in: Capsule())
+            }
+
+            Spacer()
+
+            Text("\(tap.totalPackages) packages")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
+    }
+
     // MARK: - Outdated Section
 
     private func outdatedSection(_ summary: SystemSummary) -> some View {
@@ -190,7 +416,14 @@ struct DashboardView: View {
             GroupBox {
                 VStack(spacing: 0) {
                     ForEach(Array(summary.outdatedFormulae.prefix(5))) { formula in
-                        outdatedFormulaRow(formula)
+                        Button {
+                            packageStore.selectedFormulaId = formula.id
+                            selection = .formulae
+                        } label: {
+                            outdatedFormulaRow(formula)
+                        }
+                        .buttonStyle(.plain)
+
                         if formula.id != summary.outdatedFormulae.prefix(5).last?.id
                             || !summary.outdatedCasks.isEmpty {
                             Divider()
@@ -198,7 +431,14 @@ struct DashboardView: View {
                     }
 
                     ForEach(Array(summary.outdatedCasks.prefix(5))) { cask in
-                        outdatedCaskRow(cask)
+                        Button {
+                            packageStore.selectedCaskId = cask.id
+                            selection = .casks
+                        } label: {
+                            outdatedCaskRow(cask)
+                        }
+                        .buttonStyle(.plain)
+
                         if cask.id != summary.outdatedCasks.prefix(5).last?.id {
                             Divider()
                         }
@@ -208,14 +448,20 @@ struct DashboardView: View {
                         + min(summary.outdatedCasks.count, 5)
                     if summary.updatesAvailable > totalShown {
                         Divider()
-                        HStack {
-                            Spacer()
-                            Text("and \(summary.updatesAvailable - totalShown) more\u{2026}")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
+                        Button {
+                            selection = .outdated
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Text("and \(summary.updatesAvailable - totalShown) more\u{2026}")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                            }
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.vertical, 8)
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -255,9 +501,14 @@ struct DashboardView: View {
                     .font(.callout.monospaced())
                     .foregroundStyle(.orange)
             }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
+        .contentShape(Rectangle())
     }
 
     private func outdatedCaskRow(_ cask: Cask) -> some View {
@@ -293,9 +544,14 @@ struct DashboardView: View {
                     .font(.callout.monospaced())
                     .foregroundStyle(.orange)
             }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Action Output
@@ -321,6 +577,48 @@ struct DashboardView: View {
             .padding()
         }
     }
+
+    // MARK: - Helpers
+
+    private func navigableCard<Content: View>(
+        to destination: SidebarItem,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Button {
+            selection = destination
+        } label: {
+            content()
+                .overlay(alignment: .topTrailing) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .padding(8)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(NavigableCardStyle())
+    }
+
+    private func relativeDate(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: .now)
+    }
+}
+
+// MARK: - Navigable Card Style
+
+private struct NavigableCardStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .brightness(isHovered ? 0.03 : 0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.15), value: isHovered)
+            .onHover { isHovered = $0 }
+    }
 }
 
 // MARK: - Quick Action Button Style
@@ -340,7 +638,8 @@ private struct QuickActionStyle: ButtonStyle {
 
 #Preview {
     NavigationStack {
-        DashboardView()
+        DashboardView(selection: .constant(.dashboard))
+            .environment(PackageStore())
     }
     .frame(width: 700, height: 600)
 }

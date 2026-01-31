@@ -9,7 +9,7 @@ struct ContentView: View {
             SidebarView(selection: $selection)
         } detail: {
             if let selection {
-                DetailView(item: selection)
+                DetailView(item: selection, selection: $selection)
             } else {
                 ContentUnavailableView(
                     "Select an Item",
@@ -24,11 +24,12 @@ struct ContentView: View {
 
 private struct DetailView: View {
     let item: SidebarItem
+    @Binding var selection: SidebarItem?
 
     var body: some View {
         switch item {
         case .dashboard:
-            DashboardView()
+            DashboardView(selection: $selection)
         case .formulae:
             FormulaListView()
         case .casks:
