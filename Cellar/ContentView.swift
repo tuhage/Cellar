@@ -41,10 +41,6 @@ private struct DetailView: View {
             SearchView()
         case .brewfile:
             BrewfileView()
-        case .health:
-            HealthCheckView()
-        case .security:
-            SecurityAlertView()
         case .dependencies:
             DependencyGraphView()
         case .resources:

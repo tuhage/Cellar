@@ -67,7 +67,7 @@ struct DependencyGraphView: View {
                     .frame(minWidth: 280, idealWidth: 350)
 
                 detailPanel
-                    .frame(minWidth: 300, idealWidth: 400)
+                    .frame(minWidth: 250, idealWidth: 320, maxWidth: 400)
             }
         }
     }
@@ -92,7 +92,7 @@ struct DependencyGraphView: View {
                     DependencyNodeRow(node: node)
                         .tag(node.name)
                 }
-                .listStyle(.inset(alternatesRowBackgrounds: true))
+                .listStyle(.inset)
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
@@ -101,7 +101,7 @@ struct DependencyGraphView: View {
     // MARK: - Stats Row
 
     private func statsRow(graph: DependencyGraph) -> some View {
-        HStack(spacing: 12) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             StatCardView(
                 title: "Packages",
                 value: "\(graph.totalPackages)",
@@ -155,8 +155,26 @@ struct DependencyGraphView: View {
 private struct DependencyNodeRow: View {
     let node: DependencyNode
 
+    private var nodeColor: Color {
+        if node.isOrphan { return .orange }
+        if node.isLeaf { return .green }
+        return .blue
+    }
+
+    private var nodeIcon: String {
+        if node.isOrphan { return "exclamationmark.triangle" }
+        if node.isLeaf { return "leaf" }
+        return "shippingbox"
+    }
+
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
+            Image(systemName: nodeIcon)
+                .font(.caption)
+                .foregroundStyle(nodeColor)
+                .frame(width: 28, height: 28)
+                .background(nodeColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(node.name)
                     .fontWeight(.medium)
@@ -188,7 +206,7 @@ private struct DependencyNodeRow: View {
                 StatusBadge(text: "Leaf", color: .green)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }
 
@@ -203,15 +221,30 @@ private struct DependencyDetailView: View {
     let node: DependencyNode
     let onNavigate: (String) -> Void
 
+    private var nodeColor: Color {
+        if node.isOrphan { return .orange }
+        if node.isLeaf { return .green }
+        return .blue
+    }
+
+    private var nodeIcon: String {
+        if node.isOrphan { return "exclamationmark.triangle" }
+        if node.isLeaf { return "leaf" }
+        return "shippingbox"
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 24) {
                 header
                 Divider()
+                infoSection
+                Divider()
                 dependenciesSection
+                Divider()
                 dependentsSection
             }
-            .padding()
+            .padding(24)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.background)
@@ -220,45 +253,70 @@ private struct DependencyDetailView: View {
     // MARK: Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "shippingbox")
-                    .font(.title2)
-                    .foregroundStyle(.tint)
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: nodeIcon)
+                .font(.title2)
+                .foregroundStyle(nodeColor)
+                .frame(width: 44, height: 44)
+                .background(nodeColor.opacity(0.1), in: Circle())
 
+            VStack(alignment: .leading, spacing: 6) {
                 Text(node.name)
-                    .font(.title2)
+                    .font(.largeTitle)
                     .fontWeight(.bold)
-            }
 
-            HStack(spacing: 8) {
-                if node.isOrphan {
-                    StatusBadge(text: "Orphan", color: .orange)
+                HStack(spacing: 8) {
+                    if node.isOrphan {
+                        StatusBadge(text: "Orphan", color: .orange)
+                    }
+                    if node.isLeaf {
+                        StatusBadge(text: "Leaf", color: .green)
+                    }
+                    if !node.isOrphan && !node.isLeaf {
+                        StatusBadge(text: "Intermediate", color: .blue)
+                    }
                 }
-                if node.isLeaf {
-                    StatusBadge(text: "Leaf", color: .green)
-                }
-                if !node.isOrphan && !node.isLeaf {
-                    StatusBadge(text: "Intermediate", color: .blue)
-                }
-
-                Text("\(node.connectionCount) connections")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
+    }
+
+    // MARK: Info Section
+
+    private var infoSection: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 10) {
+            GridRow {
+                Text("Connections")
+                    .foregroundStyle(.secondary)
+                    .gridColumnAlignment(.trailing)
+                Text("\(node.connectionCount)")
+            }
+            GridRow {
+                Text("Dependencies")
+                    .foregroundStyle(.secondary)
+                Text("\(node.dependencies.count)")
+            }
+            GridRow {
+                Text("Used By")
+                    .foregroundStyle(.secondary)
+                Text("\(node.dependents.count)")
+            }
+        }
+        .font(.callout)
     }
 
     // MARK: Dependencies Section
 
     private var dependenciesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(
+            SectionHeaderView(
                 title: "Dependencies",
-                count: node.dependencies.count,
                 systemImage: "arrow.down.circle",
                 color: .blue
-            )
+            ) {
+                Text("\(node.dependencies.count)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
             if node.dependencies.isEmpty {
                 Text("No dependencies \u{2014} this is a leaf package.")
@@ -266,8 +324,18 @@ private struct DependencyDetailView: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
             } else {
-                ForEach(node.dependencies, id: \.self) { dep in
-                    DependencyLinkButton(name: dep, onTap: onNavigate)
+                FlowLayout(spacing: 6) {
+                    ForEach(node.dependencies, id: \.self) { dep in
+                        Button { onNavigate(dep) } label: {
+                            Text(dep)
+                                .font(.callout)
+                                .fontDesign(.monospaced)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
@@ -277,12 +345,15 @@ private struct DependencyDetailView: View {
 
     private var dependentsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(
+            SectionHeaderView(
                 title: "Used By",
-                count: node.dependents.count,
                 systemImage: "arrow.up.circle",
                 color: .purple
-            )
+            ) {
+                Text("\(node.dependents.count)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
             if node.dependents.isEmpty {
                 Text("Nothing depends on this package.")
@@ -290,61 +361,21 @@ private struct DependencyDetailView: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
             } else {
-                ForEach(node.dependents, id: \.self) { dep in
-                    DependencyLinkButton(name: dep, onTap: onNavigate)
+                FlowLayout(spacing: 6) {
+                    ForEach(node.dependents, id: \.self) { dep in
+                        Button { onNavigate(dep) } label: {
+                            Text(dep)
+                                .font(.callout)
+                                .fontDesign(.monospaced)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
-    }
-
-    // MARK: Section Header
-
-    private func sectionHeader(
-        title: String,
-        count: Int,
-        systemImage: String,
-        color: Color
-    ) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage)
-                .foregroundStyle(color)
-            Text(title)
-                .fontWeight(.semibold)
-            Text("(\(count))")
-                .foregroundStyle(.secondary)
-        }
-        .font(.headline)
-    }
-}
-
-// MARK: - DependencyLinkButton
-
-/// A clickable row that navigates to a dependency/dependent node.
-private struct DependencyLinkButton: View {
-    let name: String
-    let onTap: (String) -> Void
-
-    var body: some View {
-        Button {
-            onTap(name)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "shippingbox")
-                    .font(.caption)
-                    .foregroundStyle(.tint)
-                Text(name)
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-            .contentShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
     }
 }
 

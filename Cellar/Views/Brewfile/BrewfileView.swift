@@ -3,211 +3,429 @@ import CellarCore
 
 // MARK: - BrewfileView
 
-/// Main Brewfile management view with a profile list on the left
-/// and a Brewfile content editor on the right.
+/// Section-based Brewfile management view with info banner, stats,
+/// quick actions, check results, and categorised package lists.
 struct BrewfileView: View {
     @Environment(BrewfileStore.self) private var store
 
     @State private var isAddingProfile = false
+    @State private var isEditingRaw = false
     @State private var newProfileName = ""
     @State private var newProfilePath = ""
-    @State private var showingImportOutput = false
 
     var body: some View {
-        @Bindable var store = store
-
         Group {
-            if store.isImporting, let stream = store.importStream {
-                importOutputView(stream: stream)
+            if let stream = store.actionStream {
+                actionOutputView(
+                    title: store.actionTitle ?? "Running",
+                    stream: stream
+                )
+            } else if store.selectedProfile != nil {
+                brewfileContent
             } else {
-                mainContent
+                emptyStateView
             }
         }
         .navigationTitle("Brewfile")
         .toolbar { toolbarContent }
         .sheet(isPresented: $isAddingProfile) { addProfileSheet }
-        .task { store.loadProfiles() }
-    }
-
-    // MARK: - Main Content
-
-    private var mainContent: some View {
-        HSplitView {
-            profileList
-                .frame(minWidth: 200, idealWidth: 240, maxWidth: 300)
-            editorPanel
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    // MARK: - Profile List
-
-    private var profileList: some View {
-        @Bindable var store = store
-
-        return VStack(spacing: 0) {
-            List(selection: $store.selectedProfileId) {
-                ForEach(store.profiles) { profile in
-                    profileRow(profile)
-                        .tag(profile.id)
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                store.deleteProfile(profile)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                }
-            }
-            .listStyle(.sidebar)
-            .onChange(of: store.selectedProfileId) { _, newValue in
-                if let newValue,
-                   let profile = store.profiles.first(where: { $0.id == newValue }) {
-                    store.loadBrewfileContent(for: profile)
-                }
-            }
-
-            Divider()
-
-            HStack {
-                Button {
-                    newProfileName = ""
-                    newProfilePath = defaultBrewfilePath()
-                    isAddingProfile = true
-                } label: {
-                    Label("Add Profile", systemImage: "plus")
-                }
-                .buttonStyle(.borderless)
-
-                Spacer()
-
-                if let profile = store.selectedProfile {
-                    Button(role: .destructive) {
-                        store.deleteProfile(profile)
-                    } label: {
-                        Label("Delete", systemImage: "minus")
-                    }
-                    .buttonStyle(.borderless)
-                }
-            }
-            .padding(8)
-        }
-    }
-
-    private func profileRow(_ profile: BrewfileProfile) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(profile.name)
-                .fontWeight(.medium)
-            if let lastExported = profile.lastExported {
-                Text("Exported \(lastExported, format: .relative(presentation: .named))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("Never exported")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+        .sheet(isPresented: $isEditingRaw) { rawEditorSheet }
+        .task {
+            store.loadProfiles()
+            store.ensureDefaultProfile()
+            if store.selectedProfileId == nil, let first = store.profiles.first {
+                store.selectProfile(first.id)
             }
         }
     }
 
-    // MARK: - Editor Panel
+    // MARK: - Content
 
-    @ViewBuilder
-    private var editorPanel: some View {
-        if let profile = store.selectedProfile {
-            editorContent(for: profile)
-        } else {
-            emptySelection
+    private var brewfileContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                infoBanner
+                if store.profiles.count > 1 {
+                    profilePickerSection
+                }
+                statsSection
+                quickActionsSection
+                if let result = store.checkResult {
+                    checkResultBanner(result)
+                }
+                packageListSections
+            }
+            .padding(24)
         }
     }
 
-    private func editorContent(for profile: BrewfileProfile) -> some View {
-        @Bindable var store = store
+    // MARK: - Info Banner
 
-        return VStack(spacing: 0) {
-            editorHeader(for: profile)
-            Divider()
-            TextEditor(text: $store.brewfileContent)
-                .font(.system(.body, design: .monospaced))
-                .scrollContentBackground(.hidden)
-                .padding(8)
-
-            Divider()
-            editorFooter(for: profile)
-        }
-    }
-
-    private func editorHeader(for profile: BrewfileProfile) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "doc.text")
-                .font(.title3)
+    private var infoBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "doc.text.fill")
+                .font(.largeTitle)
                 .foregroundStyle(.blue)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(profile.name)
+                Text("Brewfile")
                     .font(.headline)
-                Text(profile.path)
-                    .font(.caption)
+
+                Text("A Brewfile lists all your Homebrew packages. Use it to back up your setup or migrate to another Mac.")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+
+                if let profile = store.selectedProfile {
+                    HStack(spacing: 8) {
+                        Text(profile.path)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        if let lastExported = profile.lastExported {
+                            Text("Exported \(lastExported, format: .relative(presentation: .named))")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
             }
+
             Spacer()
+
             if store.isLoading {
                 ProgressView()
                     .controlSize(.small)
             }
         }
-        .padding()
+        .padding(12)
+        .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    private func editorFooter(for profile: BrewfileProfile) -> some View {
-        HStack {
-            let lineCount = store.brewfileContent.components(separatedBy: "\n").count
-            Text("\(lineCount) lines")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(.fill.tertiary, in: Capsule())
+    // MARK: - Profile Picker
+
+    private var profilePickerSection: some View {
+        HStack(spacing: 8) {
+            Picker("Profile", selection: Binding(
+                get: { store.selectedProfileId },
+                set: { store.selectProfile($0) }
+            )) {
+                ForEach(store.profiles) { profile in
+                    Text(profile.name).tag(Optional(profile.id))
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: 200)
+
+            Menu {
+                Button {
+                    newProfileName = ""
+                    newProfilePath = defaultBrewfilePath()
+                    isAddingProfile = true
+                } label: {
+                    Label("New Profile", systemImage: "plus")
+                }
+
+                if let profile = store.selectedProfile, store.profiles.count > 1 {
+                    Divider()
+                    Button(role: .destructive) {
+                        store.deleteProfile(profile)
+                        if let first = store.profiles.first {
+                            store.selectProfile(first.id)
+                        }
+                    } label: {
+                        Label("Delete \"\(profile.name)\"", systemImage: "trash")
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Stats Section
+
+    private var statsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderView(title: "Contents", systemImage: "tray.full.fill", color: .secondary) {
+                StatusBadge(
+                    text: "\(store.parsedContent.totalItems) items",
+                    color: store.parsedContent.isEmpty ? .secondary : .blue
+                )
+            }
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
+                spacing: 12
+            ) {
+                StatCardView(
+                    title: "Taps",
+                    value: "\(store.parsedContent.taps.count)",
+                    systemImage: "spigot",
+                    color: .gray
+                )
+
+                StatCardView(
+                    title: "Formulae",
+                    value: "\(store.parsedContent.formulae.count)",
+                    systemImage: "terminal",
+                    color: .blue
+                )
+
+                StatCardView(
+                    title: "Casks",
+                    value: "\(store.parsedContent.casks.count)",
+                    systemImage: "macwindow",
+                    color: .purple
+                )
+            }
+        }
+    }
+
+    // MARK: - Quick Actions Section
+
+    private var quickActionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderView(title: "Actions", systemImage: "bolt.fill", color: .secondary)
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
+                spacing: 12
+            ) {
+                quickActionButton(
+                    title: "Export",
+                    subtitle: "Save current packages to Brewfile",
+                    systemImage: "square.and.arrow.up.fill",
+                    color: .blue
+                ) {
+                    guard let profile = store.selectedProfile else { return }
+                    Task { await store.exportBrewfile(to: profile) }
+                }
+
+                quickActionButton(
+                    title: "Install",
+                    subtitle: "Install all packages from Brewfile",
+                    systemImage: "square.and.arrow.down.fill",
+                    color: .green
+                ) {
+                    guard let profile = store.selectedProfile else { return }
+                    store.beginInstall(from: profile)
+                }
+
+                quickActionButton(
+                    title: "Check",
+                    subtitle: "Verify all packages are installed",
+                    systemImage: "checkmark.shield.fill",
+                    color: .orange
+                ) {
+                    guard let profile = store.selectedProfile else { return }
+                    Task { await store.checkBrewfile(for: profile) }
+                }
+
+                quickActionButton(
+                    title: "Cleanup",
+                    subtitle: "Remove packages not in Brewfile",
+                    systemImage: "trash.circle.fill",
+                    color: .red
+                ) {
+                    guard let profile = store.selectedProfile else { return }
+                    store.cleanupBrewfile(for: profile)
+                }
+            }
+        }
+    }
+
+    private func quickActionButton(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isDisabled = store.isLoading || store.isPerformingAction || store.isChecking
+
+        return Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(color.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.subheadline.weight(.medium))
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(BrewfileQuickActionStyle())
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.5 : 1)
+    }
+
+    // MARK: - Check Result Banner
+
+    private func checkResultBanner(_ result: String) -> some View {
+        let isSuccess = result.localizedCaseInsensitiveContains("satisfied")
+            || result.localizedCaseInsensitiveContains("dependencies are satisfied")
+        let bannerColor: Color = isSuccess ? .green : .orange
+
+        return HStack(spacing: 12) {
+            Image(systemName: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .font(.title2)
+                .foregroundStyle(bannerColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isSuccess ? "All Satisfied" : "Issues Found")
+                    .font(.headline)
+
+                Text(result)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
             Spacer()
 
-            Button("Save") {
-                store.saveBrewfileContent(for: profile)
+            Button {
+                store.checkResult = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.plain)
         }
-        .padding(8)
+        .padding(12)
+        .background(bannerColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    private var emptySelection: some View {
+    // MARK: - Package List Sections
+
+    @ViewBuilder
+    private var packageListSections: some View {
+        if store.parsedContent.isEmpty {
+            emptyPackagesView
+        } else {
+            if !store.parsedContent.taps.isEmpty {
+                packageSection(
+                    title: "Taps",
+                    systemImage: "spigot",
+                    color: .gray,
+                    entries: store.parsedContent.taps
+                )
+            }
+
+            if !store.parsedContent.formulae.isEmpty {
+                packageSection(
+                    title: "Formulae",
+                    systemImage: "terminal",
+                    color: .blue,
+                    entries: store.parsedContent.formulae
+                )
+            }
+
+            if !store.parsedContent.casks.isEmpty {
+                packageSection(
+                    title: "Casks",
+                    systemImage: "macwindow",
+                    color: .purple,
+                    entries: store.parsedContent.casks
+                )
+            }
+        }
+    }
+
+    private func packageSection(
+        title: String,
+        systemImage: String,
+        color: Color,
+        entries: [BrewfileContent.Entry]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderView(title: title, systemImage: systemImage, color: color) {
+                StatusBadge(text: "\(entries.count)", color: color)
+            }
+
+            GroupBox {
+                VStack(spacing: 0) {
+                    ForEach(entries) { entry in
+                        HStack(spacing: 8) {
+                            Image(systemName: systemImage)
+                                .foregroundStyle(color)
+                                .frame(width: 20)
+
+                            Text(entry.name)
+                                .fontWeight(.medium)
+
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 4)
+
+                        if entry.id != entries.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var emptyPackagesView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeaderView(title: "Packages", systemImage: "shippingbox", color: .secondary)
+
+            ContentUnavailableView(
+                "No Packages",
+                systemImage: "doc.text",
+                description: Text("Use Export to save your current packages to this Brewfile.")
+            )
+        }
+    }
+
+    // MARK: - Empty State
+
+    private var emptyStateView: some View {
         ContentUnavailableView(
-            "Select a Profile",
+            "No Profile Selected",
             systemImage: "doc.text",
-            description: Text("Choose a Brewfile profile from the list or create a new one.")
+            description: Text("Create a Brewfile profile to get started.")
         )
     }
 
-    // MARK: - Import Output
+    // MARK: - Action Output
 
-    private func importOutputView(stream: AsyncThrowingStream<String, Error>) -> some View {
+    private func actionOutputView(
+        title: String,
+        stream: AsyncThrowingStream<String, Error>
+    ) -> some View {
         VStack(spacing: 0) {
-            ProcessOutputView(
-                title: "Installing from Brewfile",
-                stream: stream
-            )
+            ProcessOutputView(title: title, stream: stream)
 
             Divider()
 
             HStack {
                 Spacer()
                 Button("Done") {
-                    store.endImport()
+                    store.dismissAction()
+                    if let profile = store.selectedProfile {
+                        store.loadBrewfileContent(for: profile)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
+                .keyboardShortcut(.defaultAction)
             }
             .padding()
         }
@@ -219,22 +437,77 @@ struct BrewfileView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
-                guard let profile = store.selectedProfile else { return }
-                Task { await store.exportBrewfile(to: profile) }
+                isEditingRaw = true
             } label: {
-                Label("Export Current", systemImage: "square.and.arrow.up")
+                Label("Edit Raw", systemImage: "pencil")
             }
-            .disabled(store.selectedProfile == nil || store.isLoading)
-            .help("Export current Homebrew packages to this Brewfile")
+            .disabled(store.selectedProfile == nil)
+            .help("Edit raw Brewfile content")
 
-            Button {
-                guard let profile = store.selectedProfile else { return }
-                store.beginImport(from: profile)
-            } label: {
-                Label("Import / Install", systemImage: "square.and.arrow.down")
+            if store.profiles.count <= 1 {
+                Button {
+                    newProfileName = ""
+                    newProfilePath = defaultBrewfilePath()
+                    isAddingProfile = true
+                } label: {
+                    Label("New Profile", systemImage: "plus")
+                }
+                .help("Create a new Brewfile profile")
             }
-            .disabled(store.selectedProfile == nil || store.isLoading || store.isImporting)
-            .help("Install all packages from this Brewfile")
+        }
+    }
+
+    // MARK: - Raw Editor Sheet
+
+    private var rawEditorSheet: some View {
+        NavigationStack {
+            rawEditorContent
+                .navigationTitle("Edit Brewfile")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            // Revert changes
+                            if let profile = store.selectedProfile {
+                                store.loadBrewfileContent(for: profile)
+                            }
+                            isEditingRaw = false
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            if let profile = store.selectedProfile {
+                                store.saveBrewfileContent(for: profile)
+                            }
+                            isEditingRaw = false
+                        }
+                    }
+                }
+        }
+        .frame(minWidth: 500, minHeight: 400)
+    }
+
+    private var rawEditorContent: some View {
+        @Bindable var store = store
+
+        return VStack(spacing: 0) {
+            TextEditor(text: $store.brewfileContent)
+                .font(.system(.body, design: .monospaced))
+                .scrollContentBackground(.hidden)
+                .padding(8)
+
+            Divider()
+
+            HStack {
+                let lineCount = store.brewfileContent.components(separatedBy: "\n").count
+                Text("\(lineCount) lines")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.fill.tertiary, in: Capsule())
+                Spacer()
+            }
+            .padding(8)
         }
     }
 
@@ -284,6 +557,19 @@ struct BrewfileView: View {
     }
 }
 
+// MARK: - Quick Action Button Style
+
+private struct BrewfileQuickActionStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(configuration.isPressed ? .tertiary : .quaternary)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -291,5 +577,5 @@ struct BrewfileView: View {
         BrewfileView()
             .environment(BrewfileStore())
     }
-    .frame(width: 800, height: 600)
+    .frame(width: 700, height: 600)
 }

@@ -109,12 +109,23 @@ struct MaintenanceView: View {
     private var reportsSection: some View {
         Section {
             if store.reports.isEmpty {
-                ContentUnavailableView(
-                    "No Reports",
-                    systemImage: "doc.text",
-                    description: Text("Maintenance reports will appear here after tasks run.")
-                )
-                .frame(minHeight: 120)
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.text")
+                        .font(.title3)
+                        .foregroundStyle(.tertiary)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("No Reports Yet")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Text("Run a cleanup or health check to generate a report.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
             } else {
                 ForEach(store.reports) { report in
                     MaintenanceReportRow(report: report)
@@ -172,50 +183,52 @@ private struct MaintenanceReportRow: View {
             HStack(alignment: .top, spacing: 10) {
                 let iconColor: Color = report.type == .cleanup ? .orange : .green
                 Image(systemName: report.type.icon)
-                    .font(.callout)
-                    .foregroundStyle(iconColor)
-                    .frame(width: 32, height: 32)
-                    .background(iconColor.opacity(0.1), in: Circle())
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(iconColor.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(report.type.title)
-                        .fontWeight(.medium)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(report.type.title)
+                            .fontWeight(.medium)
+
+                        Spacer()
+
+                        Text(report.date, style: .relative)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
 
                     Text(report.summary)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(isExpanded ? nil : 2)
-
-                    Text(report.date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
                 }
 
-                Spacer()
-
                 if report.details != nil {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isExpanded.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
+                    Image(systemName: "chevron.right")
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard report.details != nil else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
                 }
             }
 
             if isExpanded, let details = report.details {
                 Text(details)
-                    .font(.caption)
+                    .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                    .padding(.leading, 36)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .padding(.leading, 38)
                     .textSelection(.enabled)
             }
         }

@@ -8,8 +8,6 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
     case outdated
     case search
     case brewfile
-    case health
-    case security
     case dependencies
     case resources
     case projects
@@ -26,8 +24,6 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .outdated: "Outdated"
         case .search: "Search"
         case .brewfile: "Brewfile"
-        case .health: "Health"
-        case .security: "Security"
         case .dependencies: "Dependencies"
         case .resources: "Resources"
         case .projects: "Projects"
@@ -44,8 +40,6 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .outdated: "arrow.triangle.2.circlepath"
         case .search: "magnifyingglass"
         case .brewfile: "doc.text"
-        case .health: "heart.text.square"
-        case .security: "shield.checkered"
         case .dependencies: "point.3.connected.trianglepath.dotted"
         case .resources: "gauge.with.dots.needle.67percent"
         case .projects: "hammer"
@@ -59,7 +53,7 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .formulae, .casks, .outdated, .search: .packages
         case .services: .services
         case .brewfile, .dependencies: .management
-        case .health, .security, .resources: .monitoring
+        case .resources: .monitoring
         case .projects, .maintenance: .tools
         }
     }

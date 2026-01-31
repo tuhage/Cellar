@@ -45,20 +45,24 @@ struct ProjectListView: View {
         @Bindable var store = store
 
         return VStack(spacing: 0) {
-            List(selection: $store.selectedProjectId) {
-                ForEach(store.projects) { project in
-                    projectRow(project)
-                        .tag(project.id)
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                store.delete(project)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+            if store.projects.isEmpty {
+                emptyProjectList
+            } else {
+                List(selection: $store.selectedProjectId) {
+                    ForEach(store.projects) { project in
+                        projectRow(project)
+                            .tag(project.id)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    store.delete(project)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
-                        }
+                    }
                 }
+                .listStyle(.sidebar)
             }
-            .listStyle(.sidebar)
 
             Divider()
 
@@ -87,6 +91,23 @@ struct ProjectListView: View {
         }
     }
 
+    private var emptyProjectList: some View {
+        VStack(spacing: 8) {
+            Spacer()
+            Image(systemName: "folder.badge.gearshape")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+            Text("No Projects")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text("Add a project to get started.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private func projectRow(_ project: ProjectEnvironment) -> some View {
         HStack(spacing: 10) {
             Circle()
@@ -103,11 +124,17 @@ struct ProjectListView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
                     .fontWeight(.medium)
-                Text(project.path)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+
+                HStack(spacing: 6) {
+                    if !project.services.isEmpty {
+                        Label("\(project.services.count)", systemImage: "gearshape.2")
+                    }
+                    if !project.packages.isEmpty {
+                        Label("\(project.packages.count)", systemImage: "terminal")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
     }
@@ -116,16 +143,92 @@ struct ProjectListView: View {
 
     @ViewBuilder
     private var detailPanel: some View {
-        if let project = store.selectedProject {
+        if store.projects.isEmpty {
+            onboardingView
+        } else if let project = store.selectedProject {
             projectDetail(project)
         } else {
             ContentUnavailableView(
                 "Select a Project",
                 systemImage: "hammer",
-                description: Text("Choose a project from the list or create a new one.")
+                description: Text("Choose a project from the list to manage its services and packages.")
             )
         }
     }
+
+    // MARK: - Onboarding
+
+    private var onboardingView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "hammer.circle")
+                .font(.system(size: 48))
+                .foregroundStyle(.tint)
+
+            VStack(spacing: 8) {
+                Text("Project Environments")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("Define which Homebrew services and packages each of your projects needs. Activate a project to start all its services at once.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                featureRow(
+                    icon: "gearshape.2",
+                    color: .blue,
+                    title: "Service Management",
+                    description: "Assign brew services (PostgreSQL, Redis, etc.) to a project and start/stop them together."
+                )
+                featureRow(
+                    icon: "terminal",
+                    color: .green,
+                    title: "Package Tracking",
+                    description: "List the formulae your project requires and check if any are missing."
+                )
+                featureRow(
+                    icon: "play.circle",
+                    color: .orange,
+                    title: "One-Click Activation",
+                    description: "Activate a project to start all its services. Deactivate to stop them when you're done."
+                )
+            }
+            .frame(maxWidth: 420)
+
+            Button {
+                newProjectName = ""
+                newProjectPath = ""
+                isAddingProject = true
+            } label: {
+                Label("Create Your First Project", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func featureRow(icon: String, color: Color, title: String, description: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(color)
+                .frame(width: 28, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .fontWeight(.medium)
+                Text(description)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: - Project Detail
 
     private func projectDetail(_ project: ProjectEnvironment) -> some View {
         VStack(spacing: 0) {
@@ -175,6 +278,7 @@ struct ProjectListView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.red)
+                .help("Stop all services for this project")
             } else {
                 Button {
                     Task { await store.activate(project) }
@@ -182,14 +286,22 @@ struct ProjectListView: View {
                     Label("Activate", systemImage: "play.circle")
                 }
                 .buttonStyle(.borderedProminent)
+                .help("Start all services for this project")
             }
         }
-        .disabled(store.isLoading)
+        .disabled(store.isLoading || project.services.isEmpty)
         .controlSize(.regular)
     }
 
     private func projectDetailBody(_ project: ProjectEnvironment) -> some View {
         List {
+            if let errorMessage = store.errorMessage {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                }
+            }
+
             if !missingPackages.isEmpty {
                 Section {
                     ForEach(missingPackages, id: \.self) { name in
@@ -215,10 +327,15 @@ struct ProjectListView: View {
             }
 
             // Services section
-            Section("Services (\(project.services.count))") {
+            Section {
                 if project.services.isEmpty {
-                    Text("No services configured")
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                        Text("Add brew services this project needs (e.g. postgresql@16, redis).")
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    }
                 } else {
                     ForEach(project.services, id: \.self) { serviceName in
                         HStack {
@@ -234,22 +351,32 @@ struct ProjectListView: View {
                         }
                     }
                 }
+            } header: {
+                Label("Services (\(project.services.count))", systemImage: "gearshape.2")
+            } footer: {
+                if !project.services.isEmpty {
+                    Text("These services will be started when you activate the project.")
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             // Packages section
-            Section("Packages (\(project.packages.count))") {
+            Section {
                 if project.packages.isEmpty {
-                    Text("No packages configured")
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                        Text("Add formulae this project depends on (e.g. node, python@3.12).")
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    }
                 } else {
                     ForEach(project.packages, id: \.self) { packageName in
                         HStack {
                             Label(packageName, systemImage: "terminal")
 
                             if missingPackages.contains(packageName) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.orange)
-                                    .font(.caption)
+                                StatusBadge(text: "Missing", color: .orange, icon: "exclamationmark.triangle")
                             }
 
                             Spacer()
@@ -264,11 +391,23 @@ struct ProjectListView: View {
                         }
                     }
                 }
+            } header: {
+                Label("Packages (\(project.packages.count))", systemImage: "terminal")
+            } footer: {
+                if !project.packages.isEmpty {
+                    Text("Use the Check Packages button to verify these are installed.")
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             // Auto-start toggle
-            Section("Settings") {
+            Section {
                 autoStartToggle(for: project)
+            } header: {
+                Label("Settings", systemImage: "gear")
+            } footer: {
+                Text("When enabled, services start automatically each time you activate this project.")
+                    .foregroundStyle(.tertiary)
             }
         }
         .task(id: project.id) {
@@ -301,7 +440,7 @@ struct ProjectListView: View {
                 Label("Add Service", systemImage: "gearshape.2")
             }
             .disabled(store.selectedProject == nil)
-            .help("Add a service to this project")
+            .help("Add a brew service to this project")
 
             Button {
                 newPackageName = ""
@@ -310,7 +449,7 @@ struct ProjectListView: View {
                 Label("Add Package", systemImage: "plus.square")
             }
             .disabled(store.selectedProject == nil)
-            .help("Add a required package to this project")
+            .help("Add a required formula to this project")
 
             Button {
                 guard let project = store.selectedProject else { return }
@@ -321,7 +460,7 @@ struct ProjectListView: View {
                 Label("Check Packages", systemImage: "checkmark.circle")
             }
             .disabled(store.selectedProject == nil || store.isLoading)
-            .help("Check for missing packages")
+            .help("Check which required packages are not installed")
         }
     }
 
@@ -332,9 +471,14 @@ struct ProjectListView: View {
             Text("New Project")
                 .font(.headline)
 
+            Text("Define a project environment to group related brew services and packages together.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
             Form {
-                TextField("Name", text: $newProjectName)
-                TextField("Project Path", text: $newProjectPath)
+                TextField("Name", text: $newProjectName, prompt: Text("e.g. My Web App"))
+                TextField("Path", text: $newProjectPath, prompt: Text("e.g. /Users/you/Projects/myapp"))
             }
             .formStyle(.grouped)
 
@@ -361,7 +505,7 @@ struct ProjectListView: View {
             }
         }
         .padding()
-        .frame(width: 420)
+        .frame(width: 440)
     }
 
     // MARK: - Add Service Sheet
@@ -371,8 +515,13 @@ struct ProjectListView: View {
             Text("Add Service")
                 .font(.headline)
 
+            Text("Enter the name of a brew service this project needs running.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
             Form {
-                TextField("Service Name (e.g. postgresql@16)", text: $newServiceName)
+                TextField("Service Name", text: $newServiceName, prompt: Text("e.g. postgresql@16"))
             }
             .formStyle(.grouped)
 
@@ -396,7 +545,7 @@ struct ProjectListView: View {
             }
         }
         .padding()
-        .frame(width: 380)
+        .frame(width: 400)
     }
 
     // MARK: - Add Package Sheet
@@ -406,8 +555,13 @@ struct ProjectListView: View {
             Text("Add Package")
                 .font(.headline)
 
+            Text("Enter the name of a formula this project depends on.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
             Form {
-                TextField("Package Name (e.g. node)", text: $newPackageName)
+                TextField("Formula Name", text: $newPackageName, prompt: Text("e.g. node"))
             }
             .formStyle(.grouped)
 
@@ -431,7 +585,7 @@ struct ProjectListView: View {
             }
         }
         .padding()
-        .frame(width: 380)
+        .frame(width: 400)
     }
 }
 

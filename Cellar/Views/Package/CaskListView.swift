@@ -12,33 +12,42 @@ struct CaskListView: View {
     var body: some View {
         @Bindable var store = store
 
-        Group {
-            if store.isLoading && store.casks.isEmpty {
-                LoadingView(message: "Loading casks\u{2026}")
-            } else if let errorMessage = store.errorMessage, store.casks.isEmpty {
-                ErrorView(message: errorMessage) {
-                    Task { await store.loadCasks() }
-                }
-            } else if store.filteredCasks.isEmpty {
-                if store.searchQuery.isEmpty {
-                    EmptyStateView(
-                        title: "No Casks",
-                        systemImage: "macwindow",
-                        description: "No installed casks found."
-                    )
+        VStack(spacing: 0) {
+            searchBar(prompt: "Filter casks", text: $store.searchText)
+
+            Divider()
+
+            Group {
+                if store.isLoading && store.casks.isEmpty {
+                    LoadingView(message: "Loading casks\u{2026}")
+                } else if let errorMessage = store.errorMessage, store.casks.isEmpty {
+                    ErrorView(message: errorMessage) {
+                        Task { await store.loadCasks() }
+                    }
+                } else if store.filteredCasks.isEmpty {
+                    if store.searchQuery.isEmpty && store.searchText.isEmpty {
+                        EmptyStateView(
+                            title: "No Casks",
+                            systemImage: "macwindow",
+                            description: "No installed casks found."
+                        )
+                    } else {
+                        EmptyStateView(
+                            title: "No Results",
+                            systemImage: "magnifyingglass",
+                            description: "No casks match \"\(store.searchText)\"."
+                        )
+                    }
                 } else {
-                    EmptyStateView(
-                        title: "No Results",
-                        systemImage: "magnifyingglass",
-                        description: "No casks match \"\(store.searchQuery)\"."
-                    )
+                    caskTable
                 }
-            } else {
-                caskTable
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Casks")
-        .searchable(text: $store.searchQuery, prompt: "Filter casks")
+        .onChange(of: store.searchText) {
+            store.debounceSearch()
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -54,6 +63,29 @@ struct CaskListView: View {
                 await store.loadCasks()
             }
         }
+    }
+
+    // MARK: - Search Bar
+
+    private func searchBar(prompt: String, text: Binding<String>) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(prompt, text: text)
+                .textFieldStyle(.plain)
+            if !text.wrappedValue.isEmpty {
+                Button {
+                    text.wrappedValue = ""
+                    store.debounceSearch()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Table

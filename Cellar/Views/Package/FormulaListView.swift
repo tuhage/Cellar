@@ -12,33 +12,42 @@ struct FormulaListView: View {
     var body: some View {
         @Bindable var store = store
 
-        Group {
-            if store.isLoading && store.formulae.isEmpty {
-                LoadingView(message: "Loading formulae\u{2026}")
-            } else if let errorMessage = store.errorMessage, store.formulae.isEmpty {
-                ErrorView(message: errorMessage) {
-                    Task { await store.loadFormulae() }
-                }
-            } else if store.filteredFormulae.isEmpty {
-                if store.searchQuery.isEmpty {
-                    EmptyStateView(
-                        title: "No Formulae",
-                        systemImage: "shippingbox",
-                        description: "No installed formulae found."
-                    )
+        VStack(spacing: 0) {
+            searchBar(prompt: "Filter formulae", text: $store.searchText)
+
+            Divider()
+
+            Group {
+                if store.isLoading && store.formulae.isEmpty {
+                    LoadingView(message: "Loading formulae\u{2026}")
+                } else if let errorMessage = store.errorMessage, store.formulae.isEmpty {
+                    ErrorView(message: errorMessage) {
+                        Task { await store.loadFormulae() }
+                    }
+                } else if store.filteredFormulae.isEmpty {
+                    if store.searchQuery.isEmpty && store.searchText.isEmpty {
+                        EmptyStateView(
+                            title: "No Formulae",
+                            systemImage: "shippingbox",
+                            description: "No installed formulae found."
+                        )
+                    } else {
+                        EmptyStateView(
+                            title: "No Results",
+                            systemImage: "magnifyingglass",
+                            description: "No formulae match \"\(store.searchText)\"."
+                        )
+                    }
                 } else {
-                    EmptyStateView(
-                        title: "No Results",
-                        systemImage: "magnifyingglass",
-                        description: "No formulae match \"\(store.searchQuery)\"."
-                    )
+                    formulaTable
                 }
-            } else {
-                formulaTable
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Formulae")
-        .searchable(text: $store.searchQuery, prompt: "Filter formulae")
+        .onChange(of: store.searchText) {
+            store.debounceSearch()
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -54,6 +63,29 @@ struct FormulaListView: View {
                 await store.loadFormulae()
             }
         }
+    }
+
+    // MARK: - Search Bar
+
+    private func searchBar(prompt: String, text: Binding<String>) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(prompt, text: text)
+                .textFieldStyle(.plain)
+            if !text.wrappedValue.isEmpty {
+                Button {
+                    text.wrappedValue = ""
+                    store.debounceSearch()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Table
