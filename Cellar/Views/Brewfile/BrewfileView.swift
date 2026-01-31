@@ -11,7 +11,6 @@ struct BrewfileView: View {
     @State private var isAddingProfile = false
     @State private var isEditingRaw = false
     @State private var isConfirmingDeleteProfile = false
-    @State private var alsoDeleteFile = false
     @State private var newProfileName = ""
     @State private var newProfilePath = ""
     @State private var newProfileMode: BrewfileCreationMode = .empty
@@ -35,27 +34,34 @@ struct BrewfileView: View {
         .toolbar { toolbarContent }
         .sheet(isPresented: $isAddingProfile) { addProfileSheet }
         .sheet(isPresented: $isEditingRaw) { rawEditorSheet }
-        .alert(
+        .confirmationDialog(
             "Delete \"\(store.selectedProfile?.name ?? "Profile")\"?",
-            isPresented: $isConfirmingDeleteProfile
+            isPresented: $isConfirmingDeleteProfile,
+            titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
+            Button("Delete Profile Only", role: .destructive) {
                 guard let profile = store.selectedProfile else { return }
-                if alsoDeleteFile {
-                    store.deleteBrewfile(for: profile)
-                }
                 store.deleteProfile(profile)
                 if let first = store.profiles.first {
                     store.selectProfile(first.id)
                 }
-                alsoDeleteFile = false
             }
-            Button("Cancel", role: .cancel) {
-                alsoDeleteFile = false
+
+            if store.brewfileExistsOnDisk {
+                Button("Delete Profile and Brewfile", role: .destructive) {
+                    guard let profile = store.selectedProfile else { return }
+                    store.deleteBrewfile(for: profile)
+                    store.deleteProfile(profile)
+                    if let first = store.profiles.first {
+                        store.selectProfile(first.id)
+                    }
+                }
             }
+
+            Button("Cancel", role: .cancel) {}
         } message: {
             if let profile = store.selectedProfile {
-                Text("This will remove the profile. You can also delete the Brewfile at \(profile.path).")
+                Text("The profile \"\(profile.name)\" will be removed. You can also delete the Brewfile at \(profile.path).")
             }
         }
         .task {
@@ -160,7 +166,6 @@ struct BrewfileView: View {
                 Divider()
 
                 Button(role: .destructive) {
-                    alsoDeleteFile = false
                     isConfirmingDeleteProfile = true
                 } label: {
                     Label("Delete Profile", systemImage: "trash")
@@ -566,27 +571,32 @@ struct BrewfileView: View {
 
     private var addProfileSheet: some View {
         VStack(spacing: 16) {
-            Text("New Brewfile Profile")
+            Text("New Profile")
                 .font(.headline)
 
             Form {
                 TextField("Name", text: $newProfileName)
-                TextField("File Path", text: $newProfilePath)
 
-                Picker("Contents", selection: $newProfileMode) {
-                    ForEach(BrewfileCreationMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+                HStack {
+                    TextField("Location", text: $newProfilePath)
+                    Button("Browse...") {
+                        showFilePicker()
                     }
                 }
-                .pickerStyle(.radioGroup)
 
-                switch newProfileMode {
-                case .empty:
-                    Text("Creates an empty Brewfile with a comment header.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                case .generate:
-                    Text("Generates a Brewfile from your currently installed packages.")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Contents")
+                        .font(.subheadline.weight(.medium))
+
+                    Picker("Contents", selection: $newProfileMode) {
+                        ForEach(BrewfileCreationMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                    .labelsHidden()
+
+                    Text(newProfileMode.description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -623,6 +633,23 @@ struct BrewfileView: View {
 
     private func defaultBrewfilePath() -> String {
         "\(NSHomeDirectory())/Brewfile"
+    }
+
+    private func showFilePicker() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Brewfile Location"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory())
+
+        if panel.runModal() == .OK, let url = panel.url {
+            if url.hasDirectoryPath {
+                newProfilePath = url.appendingPathComponent("Brewfile").path
+            } else {
+                newProfilePath = url.path
+            }
+        }
     }
 }
 

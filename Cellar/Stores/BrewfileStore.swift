@@ -9,6 +9,20 @@ enum BrewfileCreationMode: String, CaseIterable, Identifiable {
     case generate = "Generate from System"
 
     var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .empty: "Empty"
+        case .generate: "Generate from system"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .empty: "Start with an empty Brewfile."
+        case .generate: "Export currently installed packages."
+        }
+    }
 }
 
 // MARK: - BrewfileStore
