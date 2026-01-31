@@ -53,20 +53,14 @@ struct ResourceMonitorView: View {
 
     private var diskUsageSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Disk Usage")
-                .font(.headline)
+            SectionHeaderView(title: "Disk Usage", systemImage: "internaldrive", color: .blue)
+
+            diskOverviewCard
 
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 140, maximum: 200), spacing: 16)],
-                spacing: 16
+                columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+                spacing: 12
             ) {
-                StatCardView(
-                    title: "Homebrew Total",
-                    value: store.diskUsage?.homebrewTotal ?? "--",
-                    systemImage: "internaldrive",
-                    color: .blue
-                )
-
                 StatCardView(
                     title: "Cellar",
                     value: store.diskUsage?.cellarSize ?? "--",
@@ -84,16 +78,102 @@ struct ResourceMonitorView: View {
         }
     }
 
+    private var diskOverviewCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                Image(systemName: "internaldrive.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(.blue.gradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Homebrew Total")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(store.diskUsage?.homebrewTotal ?? "--")
+                        .font(.system(.title, design: .rounded, weight: .bold))
+                        .contentTransition(.numericText())
+                }
+
+                Spacer()
+            }
+
+            if let diskUsage = store.diskUsage {
+                storageBreakdownBar(diskUsage: diskUsage)
+            }
+        }
+        .padding(16)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func storageBreakdownBar(diskUsage: DiskUsage) -> some View {
+        let total = parseSizeToMB(diskUsage.homebrewTotal) ?? 1
+        let cellar = parseSizeToMB(diskUsage.cellarSize) ?? 0
+        let cache = parseSizeToMB(diskUsage.cacheSize) ?? 0
+        let other = max(total - cellar - cache, 0)
+
+        let cellarFraction = total > 0 ? cellar / total : 0
+        let cacheFraction = total > 0 ? cache / total : 0
+
+        VStack(spacing: 8) {
+            GeometryReader { geometry in
+                HStack(spacing: 2) {
+                    if cellarFraction > 0 {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.purple)
+                            .frame(width: max(geometry.size.width * cellarFraction, 4))
+                    }
+                    if cacheFraction > 0 {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.orange)
+                            .frame(width: max(geometry.size.width * cacheFraction, 4))
+                    }
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.08))
+                }
+            }
+            .frame(height: 8)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            HStack(spacing: 16) {
+                breakdownLegendItem(color: .purple, label: "Cellar", value: diskUsage.cellarSize)
+                breakdownLegendItem(color: .orange, label: "Cache", value: diskUsage.cacheSize)
+                if other > 0.5 {
+                    breakdownLegendItem(
+                        color: Color.primary.opacity(0.08),
+                        label: "Other",
+                        value: formatMB(other)
+                    )
+                }
+                Spacer()
+            }
+        }
+    }
+
+    private func breakdownLegendItem(color: Color, label: String, value: String) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption.weight(.medium))
+        }
+    }
+
     // MARK: - Service Resource Section
 
     private var serviceResourceSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Service Resources")
-                    .font(.headline)
-
-                Spacer()
-
+            SectionHeaderView(
+                title: "Service Resources",
+                systemImage: "gauge.with.dots.needle.33percent",
+                color: .green
+            ) {
                 if !store.usages.isEmpty {
                     Text("\(store.usages.count) running")
                         .font(.subheadline)
@@ -102,19 +182,32 @@ struct ResourceMonitorView: View {
             }
 
             if store.sortedUsages.isEmpty {
-                GroupBox {
-                    EmptyStateView(
-                        title: "No Running Services",
-                        systemImage: "gauge.with.dots.needle.0percent",
-                        description: "Start a Homebrew service to see its resource usage."
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 150)
-                }
+                serviceEmptyState
             } else {
-                resourceTable
                 resourceSummary
+                resourceTable
             }
         }
+    }
+
+    private var serviceEmptyState: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "gauge.with.dots.needle.0percent")
+                .font(.system(size: 24))
+                .foregroundStyle(.tertiary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("No Running Services")
+                    .font(.subheadline.weight(.medium))
+                Text("Start a Homebrew service to see its resource usage.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - Resource Table
@@ -215,6 +308,25 @@ struct ResourceMonitorView: View {
 
     private func formatMemory(_ mb: Double) -> String {
         String(format: "%.1f MB", mb)
+    }
+
+    private func formatMB(_ mb: Double) -> String {
+        if mb >= 1024 {
+            return String(format: "%.1f GB", mb / 1024.0)
+        }
+        return String(format: "%.0f MB", mb)
+    }
+
+    private func parseSizeToMB(_ sizeString: String) -> Double? {
+        let parts = sizeString.split(separator: " ")
+        guard parts.count == 2, let value = Double(parts[0]) else { return nil }
+        switch parts[1] {
+        case "KB": return value / 1024.0
+        case "MB": return value
+        case "GB": return value * 1024.0
+        case "TB": return value * 1024.0 * 1024.0
+        default: return nil
+        }
     }
 
     private func cpuColor(for percent: Double) -> Color {

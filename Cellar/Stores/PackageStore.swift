@@ -21,9 +21,7 @@ final class PackageStore {
 
     var isLoading = false
     var errorMessage: String?
-    var searchText = ""
-    private(set) var searchQuery = ""
-    @ObservationIgnored private var debounceTask: Task<Void, Never>?
+    var searchQuery = ""
     var selectedFormulaId: String?
     var selectedCaskId: String?
 
@@ -59,21 +57,6 @@ final class PackageStore {
 
     var totalOutdated: Int {
         outdatedFormulae.count + outdatedCasks.count
-    }
-
-    // MARK: Search
-
-    func debounceSearch() {
-        debounceTask?.cancel()
-        if searchText.isEmpty {
-            searchQuery = ""
-            return
-        }
-        debounceTask = Task {
-            try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            searchQuery = searchText
-        }
     }
 
     // MARK: Actions

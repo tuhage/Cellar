@@ -93,6 +93,20 @@ public nonisolated final class BrewService: Sendable {
         try await runChecked(["services", "restart", name])
     }
 
+    // MARK: - Taps
+
+    public func listTapsData() async throws -> Data {
+        try await runJSON(["tap-info", "--json", "--installed"])
+    }
+
+    public func addTap(_ name: String) -> AsyncThrowingStream<String, Error> {
+        process.stream(["tap", name])
+    }
+
+    public func removeTap(_ name: String) async throws {
+        try await runChecked(["untap", name])
+    }
+
     // MARK: - Generic Stream
 
     public func streamCommand(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {

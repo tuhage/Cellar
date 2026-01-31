@@ -2,12 +2,13 @@ import SwiftUI
 
 enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
     case dashboard
+    case search
     case formulae
     case casks
     case services
     case outdated
-    case search
     case brewfile
+    case taps
     case dependencies
     case resources
     case projects
@@ -24,6 +25,7 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .outdated: "Outdated"
         case .search: "Search"
         case .brewfile: "Brewfile"
+        case .taps: "Taps"
         case .dependencies: "Dependencies"
         case .resources: "Resources"
         case .projects: "Projects"
@@ -40,6 +42,7 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .outdated: "arrow.triangle.2.circlepath"
         case .search: "magnifyingglass"
         case .brewfile: "doc.text"
+        case .taps: "spigot"
         case .dependencies: "point.3.connected.trianglepath.dotted"
         case .resources: "gauge.with.dots.needle.67percent"
         case .projects: "hammer"
@@ -52,7 +55,7 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .dashboard: .general
         case .formulae, .casks, .outdated, .search: .packages
         case .services: .services
-        case .brewfile, .dependencies: .management
+        case .brewfile, .taps, .dependencies: .management
         case .resources: .monitoring
         case .projects, .maintenance: .tools
         }

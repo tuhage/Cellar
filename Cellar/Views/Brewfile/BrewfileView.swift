@@ -10,8 +10,10 @@ struct BrewfileView: View {
 
     @State private var isAddingProfile = false
     @State private var isEditingRaw = false
+    @State private var isConfirmingDeleteBrewfile = false
     @State private var newProfileName = ""
     @State private var newProfilePath = ""
+    @State private var newProfileMode: BrewfileCreationMode = .empty
 
     var body: some View {
         Group {
@@ -20,8 +22,10 @@ struct BrewfileView: View {
                     title: store.actionTitle ?? "Running",
                     stream: stream
                 )
-            } else if store.selectedProfile != nil {
+            } else if store.selectedProfile != nil, store.brewfileExistsOnDisk {
                 brewfileContent
+            } else if store.selectedProfile != nil {
+                noBrewfileOnDiskView
             } else {
                 emptyStateView
             }
@@ -30,6 +34,18 @@ struct BrewfileView: View {
         .toolbar { toolbarContent }
         .sheet(isPresented: $isAddingProfile) { addProfileSheet }
         .sheet(isPresented: $isEditingRaw) { rawEditorSheet }
+        .alert(
+            "Delete Brewfile?",
+            isPresented: $isConfirmingDeleteBrewfile
+        ) {
+            Button("Delete", role: .destructive) {
+                guard let profile = store.selectedProfile else { return }
+                store.deleteBrewfile(for: profile)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete the Brewfile from disk. The profile will be kept.")
+        }
         .task {
             store.loadProfiles()
             store.ensureDefaultProfile()
@@ -122,9 +138,19 @@ struct BrewfileView: View {
                 Button {
                     newProfileName = ""
                     newProfilePath = defaultBrewfilePath()
+                    newProfileMode = .empty
                     isAddingProfile = true
                 } label: {
                     Label("New Profile", systemImage: "plus")
+                }
+
+                if store.brewfileExistsOnDisk {
+                    Divider()
+                    Button(role: .destructive) {
+                        isConfirmingDeleteBrewfile = true
+                    } label: {
+                        Label("Delete Brewfile", systemImage: "doc.fill.badge.minus")
+                    }
                 }
 
                 if let profile = store.selectedProfile, store.profiles.count > 1 {
@@ -197,9 +223,9 @@ struct BrewfileView: View {
                 spacing: 12
             ) {
                 quickActionButton(
-                    title: "Export",
-                    subtitle: "Save current packages to Brewfile",
-                    systemImage: "square.and.arrow.up.fill",
+                    title: "Sync",
+                    subtitle: "Export current packages to Brewfile",
+                    systemImage: "arrow.triangle.2.circlepath",
                     color: .blue
                 ) {
                     guard let profile = store.selectedProfile else { return }
@@ -389,8 +415,32 @@ struct BrewfileView: View {
             ContentUnavailableView(
                 "No Packages",
                 systemImage: "doc.text",
-                description: Text("Use Export to save your current packages to this Brewfile.")
+                description: Text(
+                    store.brewfileExistsOnDisk
+                        ? "This Brewfile is empty. Use Sync to populate it from your current packages."
+                        : "No Brewfile found on disk. Use Sync to create one from your current packages."
+                )
             )
+        }
+    }
+
+    // MARK: - No Brewfile on Disk
+
+    private var noBrewfileOnDiskView: some View {
+        ContentUnavailableView {
+            Label("No Brewfile", systemImage: "doc.text")
+        } description: {
+            if let profile = store.selectedProfile {
+                Text("No Brewfile found at \(profile.path)")
+            }
+        } actions: {
+            Button {
+                guard let profile = store.selectedProfile else { return }
+                Task { await store.exportBrewfile(to: profile) }
+            } label: {
+                Text("Generate from System")
+            }
+            .buttonStyle(.borderedProminent)
         }
     }
 
@@ -445,9 +495,19 @@ struct BrewfileView: View {
             .help("Edit raw Brewfile content")
 
             if store.profiles.count <= 1 {
+                if store.brewfileExistsOnDisk {
+                    Button(role: .destructive) {
+                        isConfirmingDeleteBrewfile = true
+                    } label: {
+                        Label("Delete Brewfile", systemImage: "trash")
+                    }
+                    .help("Delete the Brewfile from disk")
+                }
+
                 Button {
                     newProfileName = ""
                     newProfilePath = defaultBrewfilePath()
+                    newProfileMode = .empty
                     isAddingProfile = true
                 } label: {
                     Label("New Profile", systemImage: "plus")
@@ -521,6 +581,24 @@ struct BrewfileView: View {
             Form {
                 TextField("Name", text: $newProfileName)
                 TextField("File Path", text: $newProfilePath)
+
+                Picker("Contents", selection: $newProfileMode) {
+                    ForEach(BrewfileCreationMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+
+                switch newProfileMode {
+                case .empty:
+                    Text("Creates an empty Brewfile with a comment header.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                case .generate:
+                    Text("Generates a Brewfile from your currently installed packages.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .formStyle(.grouped)
 
@@ -536,7 +614,7 @@ struct BrewfileView: View {
                     let name = newProfileName.trimmingCharacters(in: .whitespaces)
                     let path = newProfilePath.trimmingCharacters(in: .whitespaces)
                     guard !name.isEmpty, !path.isEmpty else { return }
-                    store.createProfile(name: name, path: path)
+                    store.createProfile(name: name, path: path, mode: newProfileMode)
                     isAddingProfile = false
                 }
                 .keyboardShortcut(.defaultAction)

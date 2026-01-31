@@ -49,6 +49,11 @@ final class BrewfileStore {
 
     var isPerformingAction: Bool { actionStream != nil }
 
+    var brewfileExistsOnDisk: Bool {
+        guard let profile = selectedProfile else { return false }
+        return FileManager.default.fileExists(atPath: profile.path)
+    }
+
     // MARK: Dependencies
 
     private let persistence = PersistenceService()
@@ -81,13 +86,29 @@ final class BrewfileStore {
     }
 
     /// Creates a new profile and selects it.
-    func createProfile(name: String, path: String) {
+    func createProfile(name: String, path: String, mode: BrewfileCreationMode = .empty) {
         let profile = BrewfileProfile(name: name, path: path)
         profiles.append(profile)
         selectedProfileId = profile.id
         brewfileContent = ""
         parsedContent = .empty
         saveProfiles()
+
+        switch mode {
+        case .empty:
+            let url = URL(fileURLWithPath: path)
+            let parentDir = url.deletingLastPathComponent()
+            do {
+                try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+                let header = "# Brewfile\n# Created \(Date().formatted(date: .abbreviated, time: .omitted))\n"
+                try header.write(to: url, atomically: true, encoding: .utf8)
+                loadBrewfileContent(for: profile)
+            } catch {
+                errorMessage = "Failed to create Brewfile: \(error.localizedDescription)"
+            }
+        case .generate:
+            Task { await exportBrewfile(to: profile) }
+        }
     }
 
     /// Deletes a profile. Clears the selection if the deleted profile was selected.
@@ -100,6 +121,18 @@ final class BrewfileStore {
             checkResult = nil
         }
         saveProfiles()
+    }
+
+    /// Deletes the Brewfile from disk without removing the profile metadata.
+    func deleteBrewfile(for profile: BrewfileProfile) {
+        do {
+            try FileManager.default.removeItem(atPath: profile.path)
+            brewfileContent = ""
+            parsedContent = .empty
+            checkResult = nil
+        } catch {
+            errorMessage = "Failed to delete Brewfile: \(error.localizedDescription)"
+        }
     }
 
     /// Selects a profile by ID and loads its content.

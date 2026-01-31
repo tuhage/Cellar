@@ -35,6 +35,13 @@ struct SearchView: View {
         .onSubmit(of: .search) {
             search()
         }
+        .task(id: query) {
+            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            search()
+        }
     }
 
     // MARK: - Prompt

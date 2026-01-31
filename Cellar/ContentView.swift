@@ -41,6 +41,8 @@ private struct DetailView: View {
             SearchView()
         case .brewfile:
             BrewfileView()
+        case .taps:
+            TapListView()
         case .dependencies:
             DependencyGraphView()
         case .resources:
@@ -59,6 +61,7 @@ private struct DetailView: View {
         .environment(ServiceStore())
         .environment(DependencyStore())
         .environment(BrewfileStore())
+        .environment(TapStore())
         .environment(ResourceStore())
         .environment(ProjectStore())
         .environment(MaintenanceStore())
