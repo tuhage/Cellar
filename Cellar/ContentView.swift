@@ -38,8 +38,6 @@ private struct DetailView: View {
             ServiceListView()
         case .outdated:
             OutdatedView()
-        case .search:
-            SearchView()
         case .brewfile:
             BrewfileView()
         case .taps:
@@ -67,4 +65,3 @@ private struct DetailView: View {
         .environment(ProjectStore())
         .environment(MaintenanceStore())
 }
-

@@ -2,11 +2,10 @@ import SwiftUI
 
 enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
     case dashboard
-    case search
     case formulae
     case casks
-    case services
     case outdated
+    case services
     case brewfile
     case taps
     case dependencies
@@ -23,7 +22,6 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .casks: "Casks"
         case .services: "Services"
         case .outdated: "Outdated"
-        case .search: "Search"
         case .brewfile: "Brewfile"
         case .taps: "Taps"
         case .dependencies: "Dependencies"
@@ -40,7 +38,6 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         case .casks: "macwindow"
         case .services: "gearshape.2"
         case .outdated: "arrow.triangle.2.circlepath"
-        case .search: "magnifyingglass"
         case .brewfile: "doc.text"
         case .taps: "spigot"
         case .dependencies: "point.3.connected.trianglepath.dotted"
@@ -53,11 +50,10 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
     var section: SidebarSection {
         switch self {
         case .dashboard: .general
-        case .formulae, .casks, .outdated, .search: .packages
+        case .formulae, .casks, .outdated: .packages
         case .services: .services
-        case .brewfile, .taps, .dependencies: .management
-        case .resources: .monitoring
-        case .projects, .maintenance: .tools
+        case .brewfile, .taps: .management
+        case .dependencies, .resources, .projects, .maintenance: .tools
         }
     }
 
@@ -71,7 +67,6 @@ enum SidebarSection: String, Identifiable, CaseIterable, Sendable {
     case packages
     case services
     case management
-    case monitoring
     case tools
 
     var id: String { rawValue }
@@ -82,7 +77,6 @@ enum SidebarSection: String, Identifiable, CaseIterable, Sendable {
         case .packages: "Packages"
         case .services: "Services"
         case .management: "Management"
-        case .monitoring: "Monitoring"
         case .tools: "Tools"
         }
     }

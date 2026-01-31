@@ -60,36 +60,14 @@ final class DashboardStore {
     }
 
     func upgradeAll() {
-        actionTitle = "Upgrading All Packages"
-        actionStream = AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for try await line in self.service.upgradeAll() {
-                        continuation.yield(line)
-                    }
-                    continuation.finish()
-                    await self.load()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
+        performStreamingAction(title: "Upgrading All Packages", reloadAfter: true) {
+            self.service.upgradeAll()
         }
     }
 
     func cleanup() {
-        actionTitle = "Cleaning Up"
-        actionStream = AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for try await line in self.service.cleanup() {
-                        continuation.yield(line)
-                    }
-                    continuation.finish()
-                    await self.load()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
+        performStreamingAction(title: "Cleaning Up", reloadAfter: true) {
+            self.service.cleanup()
         }
     }
 
@@ -102,6 +80,29 @@ final class DashboardStore {
                     let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
                     continuation.yield(message.isEmpty ? "Your system is ready to brew." : message)
                     continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    // MARK: Private
+
+    private func performStreamingAction(
+        title: String,
+        reloadAfter: Bool,
+        stream: @escaping @Sendable () -> AsyncThrowingStream<String, Error>
+    ) {
+        actionTitle = title
+        actionStream = AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await line in stream() {
+                        continuation.yield(line)
+                    }
+                    continuation.finish()
+                    if reloadAfter { await self.load() }
                 } catch {
                     continuation.finish(throwing: error)
                 }

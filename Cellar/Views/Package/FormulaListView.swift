@@ -9,6 +9,10 @@ struct FormulaListView: View {
         KeyPathComparator(\.name)
     ]
 
+    private var isSearching: Bool {
+        !store.searchQuery.isEmpty
+    }
+
     var body: some View {
         @Bindable var store = store
 
@@ -19,26 +23,20 @@ struct FormulaListView: View {
                 ErrorView(message: errorMessage) {
                     Task { await store.loadFormulae() }
                 }
-            } else if store.filteredFormulae.isEmpty {
-                if store.searchQuery.isEmpty {
-                    EmptyStateView(
-                        title: "No Formulae",
-                        systemImage: "shippingbox",
-                        description: "No installed formulae found."
-                    )
-                } else {
-                    EmptyStateView(
-                        title: "No Results",
-                        systemImage: "magnifyingglass",
-                        description: "No formulae match \"\(store.searchQuery)\"."
-                    )
-                }
+            } else if isSearching {
+                searchResultsList
+            } else if store.formulae.isEmpty {
+                EmptyStateView(
+                    title: "No Formulae",
+                    systemImage: "shippingbox",
+                    description: "No installed formulae found."
+                )
             } else {
                 formulaTable
             }
         }
         .navigationTitle("Formulae")
-        .searchable(text: $store.searchQuery, prompt: "Filter formulae")
+        .searchable(text: $store.searchQuery, prompt: "Search formulae")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -53,6 +51,128 @@ struct FormulaListView: View {
             if store.formulae.isEmpty {
                 await store.loadFormulae()
             }
+        }
+        .task(id: store.searchQuery) {
+            guard !store.searchQuery.isEmpty else {
+                store.searchResultFormulae = []
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await store.searchRemoteFormulae()
+        }
+    }
+
+    // MARK: - Search Results
+
+    private var searchResultsList: some View {
+        List {
+            if !store.filteredFormulae.isEmpty {
+                Section {
+                    ForEach(store.filteredFormulae) { formula in
+                        installedFormulaRow(formula)
+                            .contextMenu { formulaContextMenu(for: formula) }
+                    }
+                } header: {
+                    HStack {
+                        Label("Installed", systemImage: "checkmark.circle.fill")
+                        Spacer()
+                        Text("\(store.filteredFormulae.count)")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
+            }
+
+            if store.isSearchingFormulae {
+                Section("Available") {
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Searching Homebrew\u{2026}")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if !store.availableFormulae.isEmpty {
+                Section {
+                    ForEach(store.availableFormulae) { formula in
+                        availableFormulaRow(formula)
+                    }
+                } header: {
+                    HStack {
+                        Label("Available", systemImage: "arrow.down.circle")
+                        Spacer()
+                        Text("\(store.availableFormulae.count)")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
+            }
+
+            if store.filteredFormulae.isEmpty
+                && store.availableFormulae.isEmpty
+                && !store.isSearchingFormulae {
+                ContentUnavailableView(
+                    "No Results",
+                    systemImage: "magnifyingglass",
+                    description: Text("No formulae match \"\(store.searchQuery)\".")
+                )
+                .listRowSeparator(.hidden)
+            }
+        }
+    }
+
+    private func installedFormulaRow(_ formula: Formula) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(formula.name)
+                    .fontWeight(.medium)
+
+                if let desc = formula.desc {
+                    Text(desc)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Text(formula.version)
+                .foregroundStyle(.secondary)
+                .font(.body.monospaced())
+
+            HStack(spacing: 6) {
+                if formula.outdated {
+                    StatusBadge(text: "Outdated", color: .orange)
+                }
+                if formula.pinned {
+                    StatusBadge(text: "Pinned", color: .blue)
+                }
+            }
+        }
+    }
+
+    private func availableFormulaRow(_ formula: Formula) -> some View {
+        HStack {
+            Text(formula.name)
+                .fontWeight(.medium)
+
+            Spacer()
+
+            Button {
+                Task { await store.installFormula(name: formula.name) }
+            } label: {
+                if store.installingPackages.contains(formula.name) {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Label("Install", systemImage: "arrow.down.circle")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(store.installingPackages.contains(formula.name))
         }
     }
 

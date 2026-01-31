@@ -118,25 +118,20 @@ struct DashboardView: View {
     // MARK: - Services Section
 
     private func servicesSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let items = Array(summary.services.prefix(5))
+
+        return VStack(alignment: .leading, spacing: 12) {
             SectionHeaderView(
                 title: "Services at a Glance",
                 systemImage: "gearshape.2",
                 color: .green
             ) {
-                Button {
-                    selection = .services
-                } label: {
-                    Text("See All")
-                        .font(.subheadline)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.blue)
+                seeAllButton(to: .services)
             }
 
             GroupBox {
                 VStack(spacing: 0) {
-                    ForEach(Array(summary.services.prefix(5))) { service in
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, service in
                         Button {
                             selection = .services
                         } label: {
@@ -144,7 +139,7 @@ struct DashboardView: View {
                         }
                         .buttonStyle(.plain)
 
-                        if service.id != summary.services.prefix(5).last?.id {
+                        if index < items.count - 1 {
                             Divider()
                         }
                     }
@@ -271,19 +266,12 @@ struct DashboardView: View {
                 systemImage: "clock.arrow.circlepath",
                 color: .blue
             ) {
-                Button {
-                    selection = .formulae
-                } label: {
-                    Text("See All")
-                        .font(.subheadline)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.blue)
+                seeAllButton(to: .formulae)
             }
 
             GroupBox {
                 VStack(spacing: 0) {
-                    ForEach(summary.recentlyInstalled) { formula in
+                    ForEach(Array(summary.recentlyInstalled.enumerated()), id: \.element.id) { index, formula in
                         Button {
                             packageStore.selectedFormulaId = formula.id
                             selection = .formulae
@@ -292,7 +280,7 @@ struct DashboardView: View {
                         }
                         .buttonStyle(.plain)
 
-                        if formula.id != summary.recentlyInstalled.last?.id {
+                        if index < summary.recentlyInstalled.count - 1 {
                             Divider()
                         }
                     }
@@ -313,7 +301,7 @@ struct DashboardView: View {
             Spacer()
 
             if let installTime = formula.installTime {
-                Text(relativeDate(installTime))
+                Text(Self.relativeDateFormatter.localizedString(for: installTime, relativeTo: .now))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -336,19 +324,12 @@ struct DashboardView: View {
                 systemImage: "spigot",
                 color: .teal
             ) {
-                Button {
-                    selection = .taps
-                } label: {
-                    Text("See All")
-                        .font(.subheadline)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.blue)
+                seeAllButton(to: .taps)
             }
 
             GroupBox {
                 VStack(spacing: 0) {
-                    ForEach(summary.taps) { tap in
+                    ForEach(Array(summary.taps.enumerated()), id: \.element.id) { index, tap in
                         Button {
                             selection = .taps
                         } label: {
@@ -356,7 +337,7 @@ struct DashboardView: View {
                         }
                         .buttonStyle(.plain)
 
-                        if tap.id != summary.taps.last?.id {
+                        if index < summary.taps.count - 1 {
                             Divider()
                         }
                     }
@@ -402,7 +383,12 @@ struct DashboardView: View {
     // MARK: - Outdated Section
 
     private func outdatedSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let formulae = Array(summary.outdatedFormulae.prefix(5))
+        let casks = Array(summary.outdatedCasks.prefix(5))
+        let totalShown = formulae.count + casks.count
+        let remaining = summary.updatesAvailable - totalShown
+
+        return VStack(alignment: .leading, spacing: 12) {
             SectionHeaderView(
                 title: "Outdated Packages",
                 systemImage: "arrow.triangle.2.circlepath",
@@ -415,45 +401,55 @@ struct DashboardView: View {
 
             GroupBox {
                 VStack(spacing: 0) {
-                    ForEach(Array(summary.outdatedFormulae.prefix(5))) { formula in
+                    ForEach(Array(formulae.enumerated()), id: \.element.id) { index, formula in
                         Button {
                             packageStore.selectedFormulaId = formula.id
                             selection = .formulae
                         } label: {
-                            outdatedFormulaRow(formula)
+                            outdatedRow(
+                                name: formula.name,
+                                description: formula.desc,
+                                systemImage: "terminal",
+                                iconColor: .blue,
+                                currentVersion: formula.version,
+                                targetVersion: "latest"
+                            )
                         }
                         .buttonStyle(.plain)
 
-                        if formula.id != summary.outdatedFormulae.prefix(5).last?.id
-                            || !summary.outdatedCasks.isEmpty {
+                        if index < formulae.count - 1 || !casks.isEmpty || remaining > 0 {
                             Divider()
                         }
                     }
 
-                    ForEach(Array(summary.outdatedCasks.prefix(5))) { cask in
+                    ForEach(Array(casks.enumerated()), id: \.element.id) { index, cask in
                         Button {
                             packageStore.selectedCaskId = cask.id
                             selection = .casks
                         } label: {
-                            outdatedCaskRow(cask)
+                            outdatedRow(
+                                name: cask.displayName,
+                                description: cask.desc,
+                                systemImage: "macwindow",
+                                iconColor: .purple,
+                                currentVersion: cask.installed ?? cask.version,
+                                targetVersion: cask.version
+                            )
                         }
                         .buttonStyle(.plain)
 
-                        if cask.id != summary.outdatedCasks.prefix(5).last?.id {
+                        if index < casks.count - 1 || remaining > 0 {
                             Divider()
                         }
                     }
 
-                    let totalShown = min(summary.outdatedFormulae.count, 5)
-                        + min(summary.outdatedCasks.count, 5)
-                    if summary.updatesAvailable > totalShown {
-                        Divider()
+                    if remaining > 0 {
                         Button {
                             selection = .outdated
                         } label: {
                             HStack {
                                 Spacer()
-                                Text("and \(summary.updatesAvailable - totalShown) more\u{2026}")
+                                Text("and \(remaining) more\u{2026}")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
@@ -468,18 +464,25 @@ struct DashboardView: View {
         }
     }
 
-    private func outdatedFormulaRow(_ formula: Formula) -> some View {
+    private func outdatedRow(
+        name: String,
+        description: String?,
+        systemImage: String,
+        iconColor: Color,
+        currentVersion: String,
+        targetVersion: String
+    ) -> some View {
         HStack {
-            Image(systemName: "terminal")
-                .foregroundStyle(.blue)
+            Image(systemName: systemImage)
+                .foregroundStyle(iconColor)
                 .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(formula.name)
+                Text(name)
                     .fontWeight(.medium)
 
-                if let desc = formula.desc {
-                    Text(desc)
+                if let description {
+                    Text(description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -489,7 +492,7 @@ struct DashboardView: View {
             Spacer()
 
             HStack(spacing: 4) {
-                Text(formula.version)
+                Text(currentVersion)
                     .font(.callout.monospaced())
                     .foregroundStyle(.secondary)
 
@@ -497,50 +500,7 @@ struct DashboardView: View {
                     .font(.caption2)
                     .foregroundStyle(.orange)
 
-                Text("latest")
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.orange)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
-        .contentShape(Rectangle())
-    }
-
-    private func outdatedCaskRow(_ cask: Cask) -> some View {
-        HStack {
-            Image(systemName: "macwindow")
-                .foregroundStyle(.purple)
-                .frame(width: 20)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(cask.displayName)
-                    .fontWeight(.medium)
-
-                if let desc = cask.desc {
-                    Text(desc)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer()
-
-            HStack(spacing: 4) {
-                Text(cask.installed ?? cask.version)
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.secondary)
-
-                Image(systemName: "arrow.right")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-
-                Text(cask.version)
+                Text(targetVersion)
                     .font(.callout.monospaced())
                     .foregroundStyle(.orange)
             }
@@ -599,11 +559,22 @@ struct DashboardView: View {
         .buttonStyle(NavigableCardStyle())
     }
 
-    private func relativeDate(_ date: Date) -> String {
+    private func seeAllButton(to destination: SidebarItem) -> some View {
+        Button {
+            selection = destination
+        } label: {
+            Text("See All")
+                .font(.subheadline)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.blue)
+    }
+
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: .now)
-    }
+        return formatter
+    }()
 }
 
 // MARK: - Navigable Card Style

@@ -17,7 +17,7 @@ enum BrewfileCreationMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var description: String {
+    var subtitle: String {
         switch self {
         case .empty: "Start with an empty Brewfile."
         case .generate: "Export currently installed packages."
@@ -104,8 +104,7 @@ final class BrewfileStore {
         let profile = BrewfileProfile(name: name, path: path)
         profiles.append(profile)
         selectedProfileId = profile.id
-        brewfileContent = ""
-        parsedContent = .empty
+        resetContent()
         saveProfiles()
 
         switch mode {
@@ -130,9 +129,7 @@ final class BrewfileStore {
         profiles.removeAll { $0.id == profile.id }
         if selectedProfileId == profile.id {
             selectedProfileId = nil
-            brewfileContent = ""
-            parsedContent = .empty
-            checkResult = nil
+            resetContent()
         }
         saveProfiles()
     }
@@ -141,9 +138,7 @@ final class BrewfileStore {
     func deleteBrewfile(for profile: BrewfileProfile) {
         do {
             try FileManager.default.removeItem(atPath: profile.path)
-            brewfileContent = ""
-            parsedContent = .empty
-            checkResult = nil
+            resetContent()
         } catch {
             errorMessage = "Failed to delete Brewfile: \(error.localizedDescription)"
         }
@@ -156,8 +151,7 @@ final class BrewfileStore {
         if let id, let profile = profiles.first(where: { $0.id == id }) {
             loadBrewfileContent(for: profile)
         } else {
-            brewfileContent = ""
-            parsedContent = .empty
+            resetContent()
         }
     }
 
@@ -246,6 +240,13 @@ final class BrewfileStore {
     }
 
     // MARK: - Content
+
+    /// Resets all content state to empty.
+    private func resetContent() {
+        brewfileContent = ""
+        parsedContent = .empty
+        checkResult = nil
+    }
 
     /// Reads the Brewfile content from disk for display in the editor.
     func loadBrewfileContent(for profile: BrewfileProfile) {

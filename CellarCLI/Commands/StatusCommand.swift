@@ -13,7 +13,7 @@ enum StatusCommand {
         let casks = try await JSONDecoder().decode(BrewJSONResponse.self, from: casksData).casks ?? []
         let services = try await JSONDecoder().decode([BrewServiceItem].self, from: servicesData)
 
-        let summary = SystemSummary.current(formulae: formulae, casks: casks, services: services)
+        let summary = SystemSummary.current(formulae: formulae, casks: casks, services: services, taps: [])
 
         TerminalOutput.printHeader("Cellar Status")
         print("")

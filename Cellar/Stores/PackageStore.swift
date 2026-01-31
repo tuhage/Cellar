@@ -25,6 +25,14 @@ final class PackageStore {
     var selectedFormulaId: String?
     var selectedCaskId: String?
 
+    // MARK: Remote Search
+
+    var searchResultFormulae: [Formula] = []
+    var searchResultCasks: [Cask] = []
+    var isSearchingFormulae = false
+    var isSearchingCasks = false
+    var installingPackages: Set<String> = []
+
     // MARK: Computed
 
     var filteredFormulae: [Formula] {
@@ -57,6 +65,16 @@ final class PackageStore {
 
     var totalOutdated: Int {
         outdatedFormulae.count + outdatedCasks.count
+    }
+
+    var availableFormulae: [Formula] {
+        let installedNames = Set(formulae.map(\.name))
+        return searchResultFormulae.filter { !installedNames.contains($0.name) }
+    }
+
+    var availableCasks: [Cask] {
+        let installedTokens = Set(casks.map(\.token))
+        return searchResultCasks.filter { !installedTokens.contains($0.token) }
     }
 
     // MARK: Actions
@@ -211,5 +229,62 @@ final class PackageStore {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: Remote Search
+
+    func searchRemoteFormulae() async {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else {
+            searchResultFormulae = []
+            return
+        }
+        isSearchingFormulae = true
+        do {
+            searchResultFormulae = try await Formula.search(for: query)
+        } catch {
+            searchResultFormulae = []
+        }
+        isSearchingFormulae = false
+    }
+
+    func searchRemoteCasks() async {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else {
+            searchResultCasks = []
+            return
+        }
+        isSearchingCasks = true
+        do {
+            searchResultCasks = try await Cask.search(for: query)
+        } catch {
+            searchResultCasks = []
+        }
+        isSearchingCasks = false
+    }
+
+    // MARK: Install
+
+    func installFormula(name: String) async {
+        installingPackages.insert(name)
+        do {
+            let service = BrewService()
+            for try await _ in service.install(name, isCask: false) {}
+            formulae = try await Formula.all
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        installingPackages.remove(name)
+    }
+
+    func installCask(_ cask: Cask) async {
+        installingPackages.insert(cask.token)
+        do {
+            try await cask.install()
+            casks = try await Cask.all
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        installingPackages.remove(cask.token)
     }
 }

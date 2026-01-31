@@ -66,7 +66,7 @@ public struct SystemSummary: Sendable {
 
         let recentlyInstalled = formulae
             .filter { $0.installTime != nil }
-            .sorted { ($0.installTime ?? .distantPast) > ($1.installTime ?? .distantPast) }
+            .sorted { $0.installTime! > $1.installTime! }
             .prefix(5)
 
         return SystemSummary(
