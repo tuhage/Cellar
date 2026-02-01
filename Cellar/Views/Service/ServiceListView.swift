@@ -12,7 +12,7 @@ struct ServiceListView: View {
     var body: some View {
         Group {
             if store.isLoading && store.services.isEmpty {
-                servicesSkeleton
+                LoadingView(message: "Loading Services\u{2026}")
             } else if let errorMessage = store.errorMessage, store.services.isEmpty {
                 ErrorView(message: errorMessage) {
                     Task { await store.load() }
@@ -30,12 +30,9 @@ struct ServiceListView: View {
         .navigationTitle("Services")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await store.load(forceRefresh: true) }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                RefreshToolbarButton(isLoading: store.isLoading) {
+                    await store.load(forceRefresh: true)
                 }
-                .disabled(store.isLoading)
             }
 
             ToolbarItem(placement: .status) {
@@ -43,42 +40,14 @@ struct ServiceListView: View {
                     Text("\(store.runningCount) running")
                         .font(.callout)
                         .foregroundStyle(.green)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
                         .background(.green.opacity(0.1), in: Capsule())
                 }
             }
         }
         .task {
             await store.load()
-        }
-    }
-
-    // MARK: - Skeleton
-
-    private var servicesSkeleton: some View {
-        SkeletonListView(rowCount: 6) {
-            HStack(spacing: 12) {
-                Text("service-name")
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(.secondary)
-                        .frame(width: 8, height: 8)
-                    Text("Running")
-                        .font(.callout)
-                }
-
-                Text("12345")
-                    .font(.body.monospaced())
-                    .foregroundStyle(.secondary)
-
-                Text("username")
-            }
-            .padding(.vertical, 2)
         }
     }
 

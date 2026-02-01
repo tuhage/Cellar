@@ -64,6 +64,30 @@ public nonisolated final class PersistenceService: Sendable {
         try? save(entry, to: fileName)
     }
 
+    /// Checks whether a fresh fetch is needed, restoring cached data when the
+    /// in-memory collection is empty.
+    ///
+    /// - Parameters:
+    ///   - current: The in-memory data. If empty, the cache is restored into it.
+    ///   - fileName: The cache file to read from.
+    ///   - maxAge: Maximum age before the cache is considered stale.
+    ///   - forceRefresh: When `true`, always indicates a fetch is needed.
+    /// - Returns: A tuple of the (possibly restored) data and whether a fresh
+    ///   fetch is still needed.
+    public func restoreIfNeeded<T: Codable & Sendable>(
+        current: [T],
+        from fileName: String,
+        maxAge: TimeInterval,
+        forceRefresh: Bool
+    ) -> (restored: [T], needsFetch: Bool) {
+        guard let cached = loadCached([T].self, from: fileName, maxAge: maxAge) else {
+            return (current, true)
+        }
+        let restored = current.isEmpty ? cached.data : current
+        let needsFetch = forceRefresh || !cached.isFresh
+        return (restored, needsFetch)
+    }
+
     // MARK: - Delete
 
     public func delete(fileName: String) throws {

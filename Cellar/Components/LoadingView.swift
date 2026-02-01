@@ -5,13 +5,13 @@ struct LoadingView: View {
     var message: String = "Loading…"
 
     var body: some View {
-        ContentUnavailableView {
+        VStack(spacing: 8) {
             ProgressView()
                 .controlSize(.large)
-        } description: {
             Text(message)
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

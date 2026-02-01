@@ -36,12 +36,9 @@ struct DependencyGraphView: View {
         .searchable(text: $store.searchQuery, prompt: "Filter packages")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await store.loadGraph() }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                RefreshToolbarButton(isLoading: store.isLoading) {
+                    await store.loadGraph()
                 }
-                .disabled(store.isLoading)
             }
 
             ToolbarItem(placement: .automatic) {

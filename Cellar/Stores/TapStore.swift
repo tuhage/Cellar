@@ -27,6 +27,7 @@ final class TapStore {
 
     private let persistence = PersistenceService()
     private static let cacheMaxAge: TimeInterval = 300
+    private static let cacheFile = "cache-taps.json"
 
     // MARK: Computed
 
@@ -39,21 +40,17 @@ final class TapStore {
 
     /// Loads all Homebrew taps.
     func load(forceRefresh: Bool = false) async {
-        // Restore from disk if we have nothing to display yet.
-        if taps.isEmpty, let cached = persistence.loadCached([Tap].self, from: "cache-taps.json", maxAge: Self.cacheMaxAge) {
-            taps = cached.data
-            if cached.isFresh && !forceRefresh { return }
-        } else if !forceRefresh, !taps.isEmpty,
-                  let cached = persistence.loadCached([Tap].self, from: "cache-taps.json", maxAge: Self.cacheMaxAge),
-                  cached.isFresh {
-            return
-        }
+        let (restored, needsFetch) = persistence.restoreIfNeeded(
+            current: taps, from: Self.cacheFile,
+            maxAge: Self.cacheMaxAge, forceRefresh: forceRefresh
+        )
+        taps = restored
+        guard needsFetch else { return }
 
         isLoading = true
         errorMessage = nil
         do {
-            taps = try await Tap.all
-            persistence.saveToCache(taps, to: "cache-taps.json")
+            try await refreshTaps()
         } catch {
             if taps.isEmpty { errorMessage = error.localizedDescription }
         }
@@ -72,8 +69,7 @@ final class TapStore {
         errorMessage = nil
         do {
             try await tap.remove()
-            taps = try await Tap.all
-            persistence.saveToCache(taps, to: "cache-taps.json")
+            try await refreshTaps()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -83,5 +79,12 @@ final class TapStore {
     /// Dismisses the active action stream overlay.
     func dismissAction() {
         actionStream = nil
+    }
+
+    // MARK: Private
+
+    private func refreshTaps() async throws {
+        taps = try await Tap.all
+        persistence.saveToCache(taps, to: Self.cacheFile)
     }
 }

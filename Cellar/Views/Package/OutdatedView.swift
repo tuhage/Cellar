@@ -10,7 +10,7 @@ struct OutdatedView: View {
     var body: some View {
         Group {
             if store.isLoading && store.formulae.isEmpty && store.casks.isEmpty {
-                outdatedSkeleton
+                LoadingView(message: "Checking for Updates\u{2026}")
             } else if let errorMessage = store.errorMessage,
                       store.formulae.isEmpty && store.casks.isEmpty {
                 ErrorView(message: errorMessage) {
@@ -29,12 +29,9 @@ struct OutdatedView: View {
         .navigationTitle("Outdated")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await store.loadAll(forceRefresh: true) }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                RefreshToolbarButton(isLoading: store.isLoading) {
+                    await store.loadAll(forceRefresh: true)
                 }
-                .disabled(store.isLoading)
             }
 
             ToolbarItem(placement: .primaryAction) {
@@ -60,38 +57,6 @@ struct OutdatedView: View {
         } message: {
             let count = store.outdatedFormulae.count + store.outdatedCasks.count
             Text("Upgrade \(count) packages? This may take several minutes.")
-        }
-    }
-
-    // MARK: - Skeleton
-
-    private var outdatedSkeleton: some View {
-        SkeletonListView {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("package-name")
-                        .fontWeight(.medium)
-                    Text("A short package description here")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                HStack(spacing: 4) {
-                    Text("1.0.0")
-                        .font(.callout.monospaced())
-                        .foregroundStyle(.secondary)
-                    Image(systemName: "arrow.right")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                    Text("2.0.0")
-                        .font(.callout.monospaced())
-                        .foregroundStyle(.orange)
-                }
-            }
-            .padding(.vertical, 2)
         }
     }
 

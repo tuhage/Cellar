@@ -21,7 +21,7 @@ struct FormulaListView: View {
 
         Group {
             if store.isLoading && store.formulae.isEmpty {
-                formulaeSkeleton
+                LoadingView(message: "Loading Formulae\u{2026}")
             } else if let errorMessage = store.errorMessage, store.formulae.isEmpty {
                 ErrorView(message: errorMessage) {
                     Task { await store.loadFormulae() }
@@ -42,12 +42,9 @@ struct FormulaListView: View {
         .searchable(text: $store.searchQuery, prompt: "Search formulae")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await store.loadFormulae(forceRefresh: true) }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                RefreshToolbarButton(isLoading: store.isLoading) {
+                    await store.loadFormulae(forceRefresh: true)
                 }
-                .disabled(store.isLoading)
             }
         }
         .task {
@@ -223,24 +220,6 @@ struct FormulaListView: View {
         }
         .onChange(of: sortOrder) { _, newOrder in
             store.formulae.sort(using: newOrder)
-        }
-    }
-
-    // MARK: - Skeleton
-
-    private var formulaeSkeleton: some View {
-        SkeletonListView {
-            HStack {
-                Text("formula-name-here")
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                Text("1.0.0")
-                    .foregroundStyle(.secondary)
-                    .font(.body.monospaced())
-            }
-            .padding(.vertical, 2)
         }
     }
 

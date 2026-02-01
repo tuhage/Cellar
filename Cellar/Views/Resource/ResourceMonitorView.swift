@@ -23,12 +23,9 @@ struct ResourceMonitorView: View {
         .navigationTitle("Resources")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await refresh() }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                RefreshToolbarButton(isLoading: store.isLoading) {
+                    await self.refresh()
                 }
-                .disabled(store.isLoading)
             }
         }
         .task {

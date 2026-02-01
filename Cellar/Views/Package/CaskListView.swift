@@ -21,7 +21,7 @@ struct CaskListView: View {
 
         Group {
             if store.isLoading && store.casks.isEmpty {
-                casksSkeleton
+                LoadingView(message: "Loading Casks\u{2026}")
             } else if let errorMessage = store.errorMessage, store.casks.isEmpty {
                 ErrorView(message: errorMessage) {
                     Task { await store.loadCasks() }
@@ -42,12 +42,9 @@ struct CaskListView: View {
         .searchable(text: $store.searchQuery, prompt: "Search casks")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await store.loadCasks(forceRefresh: true) }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                RefreshToolbarButton(isLoading: store.isLoading) {
+                    await store.loadCasks(forceRefresh: true)
                 }
-                .disabled(store.isLoading)
             }
         }
         .task {
@@ -174,29 +171,6 @@ struct CaskListView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-        }
-    }
-
-    // MARK: - Skeleton
-
-    private var casksSkeleton: some View {
-        SkeletonListView {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Application Name")
-                        .fontWeight(.medium)
-                    Text("cask-token")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Text("1.0.0")
-                    .foregroundStyle(.secondary)
-                    .font(.body.monospaced())
-            }
-            .padding(.vertical, 2)
         }
     }
 

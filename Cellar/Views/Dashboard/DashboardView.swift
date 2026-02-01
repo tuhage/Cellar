@@ -23,88 +23,20 @@ struct DashboardView: View {
                     Task { await dashboardStore.load() }
                 }
             } else {
-                dashboardSkeleton
+                LoadingView(message: "Loading Dashboard\u{2026}")
             }
         }
         .navigationTitle("Dashboard")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await dashboardStore.load(forceRefresh: true) }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                RefreshToolbarButton(isLoading: dashboardStore.isLoading) {
+                    await dashboardStore.load(forceRefresh: true)
                 }
-                .disabled(dashboardStore.isLoading)
             }
         }
         .task {
             await dashboardStore.load()
         }
-    }
-
-    // MARK: - Skeleton
-
-    private var dashboardSkeleton: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeaderView(title: "Overview", systemImage: "chart.bar.fill", color: .secondary)
-
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
-                        spacing: 12
-                    ) {
-                        StatCardView(title: "Formulae", value: "--", systemImage: "terminal", color: .blue)
-                        StatCardView(title: "Casks", value: "--", systemImage: "macwindow", color: .purple)
-                        StatCardView(title: "Services", value: "--", systemImage: "gearshape.2", color: .green)
-                        StatCardView(title: "Updates", value: "--", systemImage: "arrow.triangle.2.circlepath", color: .green)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .secondary)
-
-                    HStack(spacing: 12) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(.quaternary)
-                                .frame(height: 50)
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeaderView(title: "Services", systemImage: "gearshape.2", color: .green)
-
-                    GroupBox {
-                        VStack(spacing: 0) {
-                            ForEach(0..<4, id: \.self) { index in
-                                HStack(spacing: 10) {
-                                    Circle()
-                                        .fill(.secondary)
-                                        .frame(width: 8, height: 8)
-                                    Text("service-name")
-                                        .fontWeight(.medium)
-                                    Spacer()
-                                    Text("Running")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 4)
-
-                                if index < 3 {
-                                    Divider()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(24)
-        }
-        .redacted(reason: .placeholder)
-        .disabled(true)
     }
 
     // MARK: - Content

@@ -17,7 +17,7 @@ struct TapListView: View {
 
         Group {
             if store.isLoading && store.taps.isEmpty {
-                tapsSkeleton
+                LoadingView(message: "Loading Taps\u{2026}")
             } else if let errorMessage = store.errorMessage, store.taps.isEmpty {
                 ErrorView(message: errorMessage) {
                     Task { await store.load() }
@@ -54,12 +54,9 @@ struct TapListView: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await store.load(forceRefresh: true) }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                RefreshToolbarButton(isLoading: store.isLoading) {
+                    await store.load(forceRefresh: true)
                 }
-                .disabled(store.isLoading)
             }
 
             ToolbarItem(placement: .status) {
@@ -86,33 +83,6 @@ struct TapListView: View {
             }
         } message: { tap in
             Text("Remove tap '\(tap.name)'? Packages from this tap may become unavailable.")
-        }
-    }
-
-    // MARK: - Skeleton
-
-    private var tapsSkeleton: some View {
-        SkeletonListView(rowCount: 6) {
-            HStack {
-                HStack(spacing: 6) {
-                    Text("homebrew/core")
-                        .fontWeight(.medium)
-                    Text("Official")
-                        .font(.caption2)
-                        .foregroundStyle(.blue)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(.blue.opacity(0.1), in: Capsule())
-                }
-
-                Spacer()
-
-                Text("123")
-                Text("45")
-                Text("Local")
-                    .font(.callout)
-            }
-            .padding(.vertical, 2)
         }
     }
 

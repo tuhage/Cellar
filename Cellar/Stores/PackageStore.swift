@@ -37,6 +37,8 @@ final class PackageStore {
 
     private let persistence = PersistenceService()
     private static let cacheMaxAge: TimeInterval = 300 // 5 minutes
+    private static let formulaeCacheFile = "cache-formulae.json"
+    private static let casksCacheFile = "cache-casks.json"
 
     // MARK: Computed
 
@@ -85,21 +87,18 @@ final class PackageStore {
     // MARK: Actions
 
     func loadFormulae(forceRefresh: Bool = false) async {
-        // Restore from disk if we have nothing to display yet.
-        if formulae.isEmpty, let cached = persistence.loadCached([Formula].self, from: "cache-formulae.json", maxAge: Self.cacheMaxAge) {
-            formulae = cached.data
-            if cached.isFresh && !forceRefresh { return }
-        } else if !forceRefresh, !formulae.isEmpty,
-                  let cached = persistence.loadCached([Formula].self, from: "cache-formulae.json", maxAge: Self.cacheMaxAge),
-                  cached.isFresh {
-            return
-        }
+        let (restored, needsFetch) = persistence.restoreIfNeeded(
+            current: formulae, from: Self.formulaeCacheFile,
+            maxAge: Self.cacheMaxAge, forceRefresh: forceRefresh
+        )
+        formulae = restored
+        guard needsFetch else { return }
 
         isLoading = true
         errorMessage = nil
         do {
             formulae = try await Formula.all
-            persistence.saveToCache(formulae, to: "cache-formulae.json")
+            persistence.saveToCache(formulae, to: Self.formulaeCacheFile)
         } catch {
             if formulae.isEmpty { errorMessage = error.localizedDescription }
         }
@@ -107,21 +106,18 @@ final class PackageStore {
     }
 
     func loadCasks(forceRefresh: Bool = false) async {
-        // Restore from disk if we have nothing to display yet.
-        if casks.isEmpty, let cached = persistence.loadCached([Cask].self, from: "cache-casks.json", maxAge: Self.cacheMaxAge) {
-            casks = cached.data
-            if cached.isFresh && !forceRefresh { return }
-        } else if !forceRefresh, !casks.isEmpty,
-                  let cached = persistence.loadCached([Cask].self, from: "cache-casks.json", maxAge: Self.cacheMaxAge),
-                  cached.isFresh {
-            return
-        }
+        let (restored, needsFetch) = persistence.restoreIfNeeded(
+            current: casks, from: Self.casksCacheFile,
+            maxAge: Self.cacheMaxAge, forceRefresh: forceRefresh
+        )
+        casks = restored
+        guard needsFetch else { return }
 
         isLoading = true
         errorMessage = nil
         do {
             casks = try await Cask.all
-            persistence.saveToCache(casks, to: "cache-casks.json")
+            persistence.saveToCache(casks, to: Self.casksCacheFile)
         } catch {
             if casks.isEmpty { errorMessage = error.localizedDescription }
         }
@@ -129,25 +125,17 @@ final class PackageStore {
     }
 
     func loadAll(forceRefresh: Bool = false) async {
-        // Restore from disk if we have nothing to display yet.
-        if formulae.isEmpty {
-            if let cached = persistence.loadCached([Formula].self, from: "cache-formulae.json", maxAge: Self.cacheMaxAge) {
-                formulae = cached.data
-            }
-        }
-        if casks.isEmpty {
-            if let cached = persistence.loadCached([Cask].self, from: "cache-casks.json", maxAge: Self.cacheMaxAge) {
-                casks = cached.data
-            }
-        }
-
-        // If both caches are fresh and not forcing, skip the brew calls.
-        if !forceRefresh,
-           let formulaeCache = persistence.loadCached([Formula].self, from: "cache-formulae.json", maxAge: Self.cacheMaxAge),
-           let casksCache = persistence.loadCached([Cask].self, from: "cache-casks.json", maxAge: Self.cacheMaxAge),
-           formulaeCache.isFresh, casksCache.isFresh {
-            return
-        }
+        let (restoredFormulae, formulaeNeedsFetch) = persistence.restoreIfNeeded(
+            current: formulae, from: Self.formulaeCacheFile,
+            maxAge: Self.cacheMaxAge, forceRefresh: forceRefresh
+        )
+        let (restoredCasks, casksNeedsFetch) = persistence.restoreIfNeeded(
+            current: casks, from: Self.casksCacheFile,
+            maxAge: Self.cacheMaxAge, forceRefresh: forceRefresh
+        )
+        formulae = restoredFormulae
+        casks = restoredCasks
+        guard formulaeNeedsFetch || casksNeedsFetch else { return }
 
         isLoading = true
         errorMessage = nil
@@ -157,10 +145,9 @@ final class PackageStore {
             formulae = try await loadedFormulae
             casks = try await loadedCasks
 
-            persistence.saveToCache(formulae, to: "cache-formulae.json")
-            persistence.saveToCache(casks, to: "cache-casks.json")
+            persistence.saveToCache(formulae, to: Self.formulaeCacheFile)
+            persistence.saveToCache(casks, to: Self.casksCacheFile)
 
-            // Re-index Spotlight
             await SpotlightService.shared.indexAll(formulae: formulae, casks: casks)
         } catch {
             if formulae.isEmpty && casks.isEmpty { errorMessage = error.localizedDescription }
@@ -173,8 +160,7 @@ final class PackageStore {
         errorMessage = nil
         do {
             try await formula.upgrade()
-            formulae = try await Formula.all
-            persistence.saveToCache(formulae, to: "cache-formulae.json")
+            try await refreshFormulae()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -186,8 +172,7 @@ final class PackageStore {
         errorMessage = nil
         do {
             try await cask.upgrade()
-            casks = try await Cask.all
-            persistence.saveToCache(casks, to: "cache-casks.json")
+            try await refreshCasks()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -222,8 +207,8 @@ final class PackageStore {
             async let loadedCasks = Cask.all
             formulae = try await loadedFormulae
             casks = try await loadedCasks
-            persistence.saveToCache(formulae, to: "cache-formulae.json")
-            persistence.saveToCache(casks, to: "cache-casks.json")
+            persistence.saveToCache(formulae, to: Self.formulaeCacheFile)
+            persistence.saveToCache(casks, to: Self.casksCacheFile)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -240,8 +225,7 @@ final class PackageStore {
         errorMessage = nil
         do {
             try await formula.uninstall()
-            formulae = try await Formula.all
-            persistence.saveToCache(formulae, to: "cache-formulae.json")
+            try await refreshFormulae()
             if selectedFormulaId == formula.id {
                 selectedFormulaId = nil
             }
@@ -256,8 +240,7 @@ final class PackageStore {
         errorMessage = nil
         do {
             try await cask.uninstall()
-            casks = try await Cask.all
-            persistence.saveToCache(casks, to: "cache-casks.json")
+            try await refreshCasks()
             if selectedCaskId == cask.id {
                 selectedCaskId = nil
             }
@@ -271,8 +254,7 @@ final class PackageStore {
         errorMessage = nil
         do {
             try await formula.pin()
-            formulae = try await Formula.all
-            persistence.saveToCache(formulae, to: "cache-formulae.json")
+            try await refreshFormulae()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -282,8 +264,7 @@ final class PackageStore {
         errorMessage = nil
         do {
             try await formula.unpin()
-            formulae = try await Formula.all
-            persistence.saveToCache(formulae, to: "cache-formulae.json")
+            try await refreshFormulae()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -328,8 +309,7 @@ final class PackageStore {
         do {
             let service = BrewService()
             for try await _ in service.install(name, isCask: false) {}
-            formulae = try await Formula.all
-            persistence.saveToCache(formulae, to: "cache-formulae.json")
+            try await refreshFormulae()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -340,11 +320,22 @@ final class PackageStore {
         installingPackages.insert(cask.token)
         do {
             try await cask.install()
-            casks = try await Cask.all
-            persistence.saveToCache(casks, to: "cache-casks.json")
+            try await refreshCasks()
         } catch {
             errorMessage = error.localizedDescription
         }
         installingPackages.remove(cask.token)
+    }
+
+    // MARK: Private
+
+    private func refreshFormulae() async throws {
+        formulae = try await Formula.all
+        persistence.saveToCache(formulae, to: Self.formulaeCacheFile)
+    }
+
+    private func refreshCasks() async throws {
+        casks = try await Cask.all
+        persistence.saveToCache(casks, to: Self.casksCacheFile)
     }
 }

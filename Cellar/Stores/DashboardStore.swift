@@ -30,19 +30,22 @@ final class DashboardStore {
     private let service = BrewService()
     private let persistence = PersistenceService()
     private static let cacheMaxAge: TimeInterval = 300
+    private static let cacheFile = "cache-dashboard.json"
 
     // MARK: Actions
 
     func load(forceRefresh: Bool = false) async {
         // Show cached data immediately if we have nothing to display yet.
-        if summary == nil, let cached = SystemSummary.loadFromCache() {
-            summary = cached
-        }
-
-        // If cache is fresh and not forcing, skip the brew calls.
-        if !forceRefresh, summary != nil,
-           let cached = persistence.loadCached(Date.self, from: "cache-dashboard-timestamp.json", maxAge: Self.cacheMaxAge),
-           cached.isFresh {
+        if summary == nil {
+            if let cached = persistence.loadCached(SystemSummary.self, from: Self.cacheFile, maxAge: Self.cacheMaxAge) {
+                summary = cached.data
+                if cached.isFresh && !forceRefresh { return }
+            } else if let cached = SystemSummary.loadFromCache() {
+                summary = cached
+            }
+        } else if !forceRefresh,
+                  let cached = persistence.loadCached(SystemSummary.self, from: Self.cacheFile, maxAge: Self.cacheMaxAge),
+                  cached.isFresh {
             return
         }
 
@@ -66,11 +69,10 @@ final class DashboardStore {
                 taps: taps
             )
             summary = loadedSummary
+            persistence.saveToCache(loadedSummary, to: Self.cacheFile)
             loadedSummary.saveToCache()
-            persistence.saveToCache(Date(), to: "cache-dashboard-timestamp.json")
             writeWidgetSnapshot(summary: loadedSummary, services: services)
         } catch {
-            // Only show error if we have no data at all (no cache either).
             if summary == nil {
                 errorMessage = error.localizedDescription
             }
