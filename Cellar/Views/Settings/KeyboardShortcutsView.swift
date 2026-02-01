@@ -104,7 +104,7 @@ private struct ShortcutRow: View {
                 .fontDesign(.monospaced)
                 .foregroundStyle(.secondary)
                 .badgeInset()
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.medium))
         }
         .padding(.horizontal, Spacing.sectionContent)
         .padding(.vertical, Spacing.item)

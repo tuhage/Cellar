@@ -109,15 +109,20 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Brew Path Resolution
+
+    private static let brewCandidatePaths = [
+        "/opt/homebrew/bin/brew",              // Apple Silicon
+        "/usr/local/bin/brew",                 // Intel
+        "/home/linuxbrew/.linuxbrew/bin/brew"  // Linux
+    ]
+
+    public static var isInstalled: Bool {
+        brewCandidatePaths.contains { FileManager.default.fileExists(atPath: $0) }
+    }
 
     public static func resolveBrewPath() -> String {
-        let candidates = [
-            "/opt/homebrew/bin/brew",      // Apple Silicon
-            "/usr/local/bin/brew",         // Intel
-            "/home/linuxbrew/.linuxbrew/bin/brew" // Linux
-        ]
-        return candidates.first { FileManager.default.fileExists(atPath: $0) }
+        brewCandidatePaths.first { FileManager.default.fileExists(atPath: $0) }
             ?? "/opt/homebrew/bin/brew"
     }
 

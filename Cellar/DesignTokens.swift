@@ -5,8 +5,10 @@ import SwiftUI
 nonisolated enum Spacing {
     /// 0 pt — Divider-separated stacked groups
     static let none: CGFloat = 0
-    /// 2 pt — Title + subtitle VStack pairs
+    /// 2 pt — Title/subtitle pairs, tight vertical gaps
     static let textPair: CGFloat = 2
+    /// 3 pt — Badge vertical padding
+    static let badgeVertical: CGFloat = 3
     /// 4 pt — Very close elements
     static let compact: CGFloat = 4
     /// 6 pt — Badge groups, flow layout, tag rows
@@ -68,31 +70,31 @@ nonisolated enum IconSize {
 // MARK: - View Modifiers
 
 extension View {
-    /// Padding for list rows: vertical 6 + horizontal 4
+    /// Padding for list rows: vertical 6, horizontal 4
     func listRowInset() -> some View {
         self
             .padding(.vertical, Spacing.related)
             .padding(.horizontal, Spacing.compact)
     }
 
-    /// Padding for status badges: horizontal 8 + vertical 3
+    /// Padding for status badges: horizontal 8, vertical 3
     func badgeInset() -> some View {
         self
             .padding(.horizontal, Spacing.item)
-            .padding(.vertical, 3)
+            .padding(.vertical, Spacing.badgeVertical)
     }
 
-    /// Padding for dependency/tag chips: horizontal 8 + vertical 4
+    /// Padding for dependency/tag chips: horizontal 8, vertical 4
     func chipInset() -> some View {
         self
             .padding(.horizontal, Spacing.item)
             .padding(.vertical, Spacing.compact)
     }
 
-    /// Padding for small badges: horizontal 6 + vertical 2
+    /// Padding for small badges: horizontal 6, vertical 2
     func smallBadgeInset() -> some View {
         self
             .padding(.horizontal, Spacing.related)
-            .padding(.vertical, 2)
+            .padding(.vertical, Spacing.textPair)
     }
 }

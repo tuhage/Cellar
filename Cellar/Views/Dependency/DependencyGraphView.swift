@@ -243,6 +243,7 @@ private struct DependencyDetailView: View {
             }
             .padding(Spacing.section)
         }
+        .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.background)
     }

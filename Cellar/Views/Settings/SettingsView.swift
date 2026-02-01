@@ -45,8 +45,10 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, Spacing.compact)
 
-                Link(destination: URL(string: "https://brew.sh")!) {
-                    Label("Homebrew Website", systemImage: "globe")
+                if let brewURL = URL(string: "https://brew.sh") {
+                    Link(destination: brewURL) {
+                        Label("Homebrew Website", systemImage: "globe")
+                    }
                 }
             }
 

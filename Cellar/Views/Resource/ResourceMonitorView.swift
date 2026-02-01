@@ -116,7 +116,7 @@ struct ResourceMonitorView: View {
 
         VStack(spacing: Spacing.item) {
             GeometryReader { geometry in
-                HStack(spacing: 2) {
+                HStack(spacing: Spacing.textPair) {
                     if cellarFraction > 0 {
                         RoundedRectangle(cornerRadius: CornerRadius.progressBar)
                             .fill(Color.purple)
@@ -150,7 +150,7 @@ struct ResourceMonitorView: View {
     }
 
     private func breakdownLegendItem(color: Color, label: String, value: String) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: Spacing.compact) {
             Circle()
                 .fill(color)
                 .frame(width: IconSize.statusDot, height: IconSize.statusDot)
