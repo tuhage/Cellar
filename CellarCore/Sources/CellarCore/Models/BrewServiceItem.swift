@@ -78,7 +78,17 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
             let service = BrewService()
             let data = try await service.listServicesData()
             if data.isEmpty { return [] }
-            return try JSONDecoder().decode([BrewServiceItem].self, from: data)
+            var items = try JSONDecoder().decode([BrewServiceItem].self, from: data)
+
+            // brew services list --json sometimes omits the pid field for running
+            // services. Fall back to launchctl to resolve it.
+            for index in items.indices where items[index].isRunning && items[index].pid == nil {
+                if let resolved = await resolvePIDViaLaunchctl(for: items[index].name) {
+                    items[index] = items[index].withPID(resolved)
+                }
+            }
+
+            return items
         }
     }
 
@@ -94,6 +104,78 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
             pid: 12345,
             registered: true
         )
+    }
+}
+
+// MARK: - PID Resolution
+
+extension BrewServiceItem {
+
+    /// Returns a copy with the given PID.
+    func withPID(_ pid: Int) -> BrewServiceItem {
+        BrewServiceItem(
+            name: name,
+            status: status,
+            user: user,
+            file: file,
+            exitCode: exitCode,
+            pid: pid,
+            registered: registered
+        )
+    }
+
+    /// Queries `launchctl list` for the service's PID using the
+    /// standard Homebrew label convention (`homebrew.mxcl.<name>`).
+    private static func resolvePIDViaLaunchctl(for serviceName: String) async -> Int? {
+        let label = "homebrew.mxcl.\(serviceName)"
+
+        return await withCheckedContinuation { continuation in
+            let process = Process()
+            let pipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            process.arguments = ["list", label]
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+
+            process.terminationHandler = { _ in
+                guard process.terminationStatus == 0 else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                guard let output = String(data: data, encoding: .utf8) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                // launchctl output contains a line like:  "PID" = 12345;
+                for line in output.components(separatedBy: "\n") {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed.hasPrefix("\"PID\"") {
+                        let parts = trimmed.components(separatedBy: "=")
+                        if parts.count >= 2 {
+                            let value = parts[1]
+                                .trimmingCharacters(in: .whitespaces)
+                                .replacingOccurrences(of: ";", with: "")
+                            if let pid = Int(value) {
+                                continuation.resume(returning: pid)
+                                return
+                            }
+                        }
+                    }
+                }
+
+                continuation.resume(returning: nil)
+            }
+
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(returning: nil)
+            }
+        }
     }
 }
 

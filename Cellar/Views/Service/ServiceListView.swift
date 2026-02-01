@@ -40,9 +40,10 @@ struct ServiceListView: View {
                     Text("\(store.runningCount) running")
                         .font(.callout)
                         .foregroundStyle(.green)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
                         .background(.green.opacity(0.1), in: Capsule())
+                        .padding(.horizontal, 8)
                 }
             }
         }
