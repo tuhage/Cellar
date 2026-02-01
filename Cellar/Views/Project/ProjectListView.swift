@@ -17,6 +17,8 @@ struct ProjectListView: View {
     @State private var newServiceName = ""
     @State private var newPackageName = ""
     @State private var missingPackages: [String] = []
+    @State private var isConfirmingDeleteProject = false
+    @State private var projectToDelete: ProjectEnvironment?
 
     var body: some View {
         mainContent
@@ -25,6 +27,17 @@ struct ProjectListView: View {
             .sheet(isPresented: $isAddingProject) { addProjectSheet }
             .sheet(isPresented: $isAddingService) { addServiceSheet }
             .sheet(isPresented: $isAddingPackage) { addPackageSheet }
+            .confirmationDialog(
+                "Delete Project?",
+                isPresented: $isConfirmingDeleteProject,
+                presenting: projectToDelete
+            ) { project in
+                Button("Delete", role: .destructive) {
+                    store.delete(project)
+                }
+            } message: { project in
+                Text("Delete project '\(project.name)'? Installed packages and services will not be removed.")
+            }
             .task { store.load() }
     }
 
@@ -54,7 +67,8 @@ struct ProjectListView: View {
                             .tag(project.id)
                             .contextMenu {
                                 Button(role: .destructive) {
-                                    store.delete(project)
+                                    projectToDelete = project
+                                    isConfirmingDeleteProject = true
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -80,7 +94,8 @@ struct ProjectListView: View {
 
                 if let project = store.selectedProject {
                     Button(role: .destructive) {
-                        store.delete(project)
+                        projectToDelete = project
+                        isConfirmingDeleteProject = true
                     } label: {
                         Label("Delete", systemImage: "minus")
                     }

@@ -5,11 +5,12 @@ struct OutdatedView: View {
     @Environment(PackageStore.self) private var store
 
     @State private var isUpgradingAll = false
+    @State private var isConfirmingUpgradeAll = false
 
     var body: some View {
         Group {
             if store.isLoading && store.formulae.isEmpty && store.casks.isEmpty {
-                LoadingView(message: "Checking for updates\u{2026}")
+                outdatedSkeleton
             } else if let errorMessage = store.errorMessage,
                       store.formulae.isEmpty && store.casks.isEmpty {
                 ErrorView(message: errorMessage) {
@@ -29,7 +30,7 @@ struct OutdatedView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await store.loadAll() }
+                    Task { await store.loadAll(forceRefresh: true) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -38,7 +39,7 @@ struct OutdatedView: View {
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    upgradeAll()
+                    isConfirmingUpgradeAll = true
                 } label: {
                     Label("Upgrade All", systemImage: "arrow.up.circle.fill")
                 }
@@ -46,9 +47,51 @@ struct OutdatedView: View {
             }
         }
         .task {
-            if store.formulae.isEmpty && store.casks.isEmpty {
-                await store.loadAll()
+            await store.loadAll()
+        }
+        .confirmationDialog(
+            "Upgrade All Packages?",
+            isPresented: $isConfirmingUpgradeAll,
+            titleVisibility: .visible
+        ) {
+            Button("Upgrade All", role: .destructive) {
+                upgradeAll()
             }
+        } message: {
+            let count = store.outdatedFormulae.count + store.outdatedCasks.count
+            Text("Upgrade \(count) packages? This may take several minutes.")
+        }
+    }
+
+    // MARK: - Skeleton
+
+    private var outdatedSkeleton: some View {
+        SkeletonListView {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("package-name")
+                        .fontWeight(.medium)
+                    Text("A short package description here")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Text("1.0.0")
+                        .font(.callout.monospaced())
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "arrow.right")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    Text("2.0.0")
+                        .font(.callout.monospaced())
+                        .foregroundStyle(.orange)
+                }
+            }
+            .padding(.vertical, 2)
         }
     }
 
@@ -59,36 +102,34 @@ struct OutdatedView: View {
             if !store.outdatedFormulae.isEmpty {
                 Section {
                     ForEach(store.outdatedFormulae) { formula in
-                        OutdatedFormulaRow(formula: formula) {
+                        OutdatedPackageRow(
+                            name: formula.name,
+                            description: formula.desc,
+                            currentVersion: formula.version,
+                            targetVersion: "latest"
+                        ) {
                             Task { await store.upgrade(formula) }
                         }
                     }
                 } header: {
-                    HStack {
-                        Label("Formulae", systemImage: "terminal")
-                        Spacer()
-                        Text("\(store.outdatedFormulae.count)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
+                    CountedSectionHeader(title: "Formulae", systemImage: "terminal", count: store.outdatedFormulae.count)
                 }
             }
 
             if !store.outdatedCasks.isEmpty {
                 Section {
                     ForEach(store.outdatedCasks) { cask in
-                        OutdatedCaskRow(cask: cask) {
+                        OutdatedPackageRow(
+                            name: cask.displayName,
+                            description: cask.desc,
+                            currentVersion: cask.installed ?? cask.version,
+                            targetVersion: cask.version
+                        ) {
                             Task { await store.upgrade(cask) }
                         }
                     }
                 } header: {
-                    HStack {
-                        Label("Casks", systemImage: "macwindow")
-                        Spacer()
-                        Text("\(store.outdatedCasks.count)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
+                    CountedSectionHeader(title: "Casks", systemImage: "macwindow", count: store.outdatedCasks.count)
                 }
             }
         }
@@ -132,10 +173,13 @@ struct OutdatedView: View {
     }
 }
 
-// MARK: - Formula Row
+// MARK: - Outdated Package Row
 
-private struct OutdatedFormulaRow: View {
-    let formula: Formula
+private struct OutdatedPackageRow: View {
+    let name: String
+    let description: String?
+    let currentVersion: String
+    let targetVersion: String
     let upgradeAction: () -> Void
 
     @State private var isUpgrading = false
@@ -143,11 +187,11 @@ private struct OutdatedFormulaRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(formula.name)
+                Text(name)
                     .fontWeight(.medium)
 
-                if let desc = formula.desc {
-                    Text(desc)
+                if let description {
+                    Text(description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -157,7 +201,7 @@ private struct OutdatedFormulaRow: View {
             Spacer()
 
             HStack(spacing: 4) {
-                Text(formula.version)
+                Text(currentVersion)
                     .font(.callout.monospaced())
                     .foregroundStyle(.secondary)
 
@@ -165,66 +209,7 @@ private struct OutdatedFormulaRow: View {
                     .font(.caption2)
                     .foregroundStyle(.orange)
 
-                Text("latest")
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.orange)
-            }
-
-            Button {
-                isUpgrading = true
-                upgradeAction()
-            } label: {
-                if isUpgrading {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Label("Upgrade", systemImage: "arrow.up.circle")
-                        .labelStyle(.iconOnly)
-                }
-            }
-            .buttonStyle(.bordered)
-            .tint(.orange)
-            .controlSize(.small)
-            .disabled(isUpgrading)
-        }
-        .padding(.vertical, 2)
-    }
-}
-
-// MARK: - Cask Row
-
-private struct OutdatedCaskRow: View {
-    let cask: Cask
-    let upgradeAction: () -> Void
-
-    @State private var isUpgrading = false
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(cask.displayName)
-                    .fontWeight(.medium)
-
-                if let desc = cask.desc {
-                    Text(desc)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer()
-
-            HStack(spacing: 4) {
-                Text(cask.installed ?? cask.version)
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.secondary)
-
-                Image(systemName: "arrow.right")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-
-                Text(cask.version)
+                Text(targetVersion)
                     .font(.callout.monospaced())
                     .foregroundStyle(.orange)
             }

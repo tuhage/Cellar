@@ -8,6 +8,9 @@ struct CaskListView: View {
     @State private var sortOrder: [KeyPathComparator<Cask>] = [
         KeyPathComparator(\.token)
     ]
+    @State private var caskToUninstall: Cask?
+    @State private var installStream: AsyncThrowingStream<String, Error>?
+    @State private var installTitle: String?
 
     private var isSearching: Bool {
         !store.searchQuery.isEmpty
@@ -18,7 +21,7 @@ struct CaskListView: View {
 
         Group {
             if store.isLoading && store.casks.isEmpty {
-                LoadingView(message: "Loading casks\u{2026}")
+                casksSkeleton
             } else if let errorMessage = store.errorMessage, store.casks.isEmpty {
                 ErrorView(message: errorMessage) {
                     Task { await store.loadCasks() }
@@ -40,7 +43,7 @@ struct CaskListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await store.loadCasks() }
+                    Task { await store.loadCasks(forceRefresh: true) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -48,9 +51,7 @@ struct CaskListView: View {
             }
         }
         .task {
-            if store.casks.isEmpty {
-                await store.loadCasks()
-            }
+            await store.loadCasks()
         }
         .task(id: store.searchQuery) {
             guard !store.searchQuery.isEmpty else {
@@ -60,6 +61,23 @@ struct CaskListView: View {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             await store.searchRemoteCasks()
+        }
+        .confirmationDialog(
+            "Uninstall \(caskToUninstall?.displayName ?? "")?",
+            isPresented: Binding(
+                get: { caskToUninstall != nil },
+                set: { if !$0 { caskToUninstall = nil } }
+            ),
+            presenting: caskToUninstall
+        ) { cask in
+            Button("Uninstall", role: .destructive) {
+                Task { await store.uninstall(cask) }
+            }
+        } message: { cask in
+            Text("This will remove \(cask.displayName) and its associated files.")
+        }
+        .installProgressSheet(stream: $installStream, title: $installTitle) {
+            Task { await store.loadCasks(forceRefresh: true) }
         }
     }
 
@@ -74,13 +92,7 @@ struct CaskListView: View {
                             .contextMenu { caskContextMenu(for: cask) }
                     }
                 } header: {
-                    HStack {
-                        Label("Installed", systemImage: "checkmark.circle.fill")
-                        Spacer()
-                        Text("\(store.filteredCasks.count)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
+                    CountedSectionHeader(title: "Installed", systemImage: "checkmark.circle.fill", count: store.filteredCasks.count)
                 }
             }
 
@@ -99,13 +111,7 @@ struct CaskListView: View {
                         availableCaskRow(cask)
                     }
                 } header: {
-                    HStack {
-                        Label("Available", systemImage: "arrow.down.circle")
-                        Spacer()
-                        Text("\(store.availableCasks.count)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
+                    CountedSectionHeader(title: "Available", systemImage: "arrow.down.circle", count: store.availableCasks.count)
                 }
             }
 
@@ -160,18 +166,37 @@ struct CaskListView: View {
             Spacer()
 
             Button {
-                Task { await store.installCask(cask) }
+                let service = BrewService()
+                installTitle = "Installing \(cask.displayName)"
+                installStream = service.install(cask.token, isCask: true)
             } label: {
-                if store.installingPackages.contains(cask.token) {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Label("Install", systemImage: "arrow.down.circle")
-                }
+                Label("Install", systemImage: "arrow.down.circle")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .disabled(store.installingPackages.contains(cask.token))
+        }
+    }
+
+    // MARK: - Skeleton
+
+    private var casksSkeleton: some View {
+        SkeletonListView {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Application Name")
+                        .fontWeight(.medium)
+                    Text("cask-token")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text("1.0.0")
+                    .foregroundStyle(.secondary)
+                    .font(.body.monospaced())
+            }
+            .padding(.vertical, 2)
         }
     }
 
@@ -250,7 +275,7 @@ struct CaskListView: View {
         Divider()
 
         Button(role: .destructive) {
-            Task { await store.uninstall(cask) }
+            caskToUninstall = cask
         } label: {
             Label("Uninstall", systemImage: "trash")
         }

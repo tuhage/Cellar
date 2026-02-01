@@ -10,22 +10,42 @@ struct SearchView: View {
     @State private var errorMessage: String?
     @State private var installingPackages: Set<String> = []
 
+    private var installedFormulae: [Formula] {
+        formulaResults.filter(\.isInstalled)
+    }
+
+    private var availableFormulae: [Formula] {
+        formulaResults.filter { !$0.isInstalled }
+    }
+
+    private var installedCasks: [Cask] {
+        caskResults.filter(\.isInstalled)
+    }
+
+    private var availableCasks: [Cask] {
+        caskResults.filter { !$0.isInstalled }
+    }
+
     var body: some View {
         Group {
             if let errorMessage {
                 ErrorView(message: errorMessage) {
-                    search()
+                    Task { await search() }
                 }
             } else if isSearching {
                 LoadingView(message: "Searching\u{2026}")
             } else if !hasSearched {
                 promptView
             } else if formulaResults.isEmpty && caskResults.isEmpty {
-                EmptyStateView(
-                    title: "No Results",
-                    systemImage: "magnifyingglass",
-                    description: "No packages found for \"\(query)\"."
-                )
+                ContentUnavailableView {
+                    Label("No Results", systemImage: "magnifyingglass")
+                } description: {
+                    Text("No packages found for \"\(query)\".")
+                } actions: {
+                    Text("Check the spelling or try a different search term.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 resultsList
             }
@@ -33,14 +53,14 @@ struct SearchView: View {
         .navigationTitle("Search")
         .searchable(text: $query, prompt: "Search Homebrew packages")
         .onSubmit(of: .search) {
-            search()
+            Task { await search() }
         }
         .task(id: query) {
             let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }
-            try? await Task.sleep(for: .milliseconds(500))
+            try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            search()
+            await search()
         }
     }
 
@@ -59,9 +79,9 @@ struct SearchView: View {
 
     private var resultsList: some View {
         List {
-            if !formulaResults.isEmpty {
+            if !installedFormulae.isEmpty {
                 Section {
-                    ForEach(formulaResults) { formula in
+                    ForEach(installedFormulae) { formula in
                         SearchFormulaRow(
                             formula: formula,
                             isInstalling: installingPackages.contains(formula.name)
@@ -70,19 +90,13 @@ struct SearchView: View {
                         }
                     }
                 } header: {
-                    HStack {
-                        Label("Formulae", systemImage: "terminal")
-                        Spacer()
-                        Text("\(formulaResults.count)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
+                    CountedSectionHeader(title: "Installed Formulae", systemImage: "checkmark.circle.fill", count: installedFormulae.count)
                 }
             }
 
-            if !caskResults.isEmpty {
+            if !installedCasks.isEmpty {
                 Section {
-                    ForEach(caskResults) { cask in
+                    ForEach(installedCasks) { cask in
                         SearchCaskRow(
                             cask: cask,
                             isInstalling: installingPackages.contains(cask.token)
@@ -91,13 +105,37 @@ struct SearchView: View {
                         }
                     }
                 } header: {
-                    HStack {
-                        Label("Casks", systemImage: "macwindow")
-                        Spacer()
-                        Text("\(caskResults.count)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
+                    CountedSectionHeader(title: "Installed Casks", systemImage: "checkmark.circle.fill", count: installedCasks.count)
+                }
+            }
+
+            if !availableFormulae.isEmpty {
+                Section {
+                    ForEach(availableFormulae) { formula in
+                        SearchFormulaRow(
+                            formula: formula,
+                            isInstalling: installingPackages.contains(formula.name)
+                        ) {
+                            installFormula(formula)
+                        }
                     }
+                } header: {
+                    CountedSectionHeader(title: "Available Formulae", systemImage: "arrow.down.circle", count: availableFormulae.count)
+                }
+            }
+
+            if !availableCasks.isEmpty {
+                Section {
+                    ForEach(availableCasks) { cask in
+                        SearchCaskRow(
+                            cask: cask,
+                            isInstalling: installingPackages.contains(cask.token)
+                        ) {
+                            installCask(cask)
+                        }
+                    }
+                } header: {
+                    CountedSectionHeader(title: "Available Casks", systemImage: "arrow.down.circle", count: availableCasks.count)
                 }
             }
         }
@@ -105,7 +143,7 @@ struct SearchView: View {
 
     // MARK: - Actions
 
-    private func search() {
+    private func search() async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -115,18 +153,16 @@ struct SearchView: View {
         formulaResults = []
         caskResults = []
 
-        Task {
-            do {
-                async let formulae = Formula.search(for: trimmed)
-                async let casks = Cask.search(for: trimmed)
+        do {
+            async let formulae = Formula.search(for: trimmed)
+            async let casks = Cask.search(for: trimmed)
 
-                formulaResults = try await formulae
-                caskResults = try await casks
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            isSearching = false
+            formulaResults = try await formulae
+            caskResults = try await casks
+        } catch {
+            errorMessage = error.localizedDescription
         }
+        isSearching = false
     }
 
     private func installFormula(_ formula: Formula) {
@@ -179,13 +215,7 @@ private struct SearchFormulaRow: View {
             Spacer()
 
             if formula.isInstalled {
-                Text("Installed")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.green.opacity(0.12), in: Capsule())
-                    .foregroundStyle(.green)
+                StatusBadge(text: "Installed", color: .green)
             } else {
                 Button {
                     installAction()
@@ -237,13 +267,7 @@ private struct SearchCaskRow: View {
             Spacer()
 
             if cask.isInstalled {
-                Text("Installed")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.green.opacity(0.12), in: Capsule())
-                    .foregroundStyle(.green)
+                StatusBadge(text: "Installed", color: .green)
             } else {
                 Button {
                     installAction()

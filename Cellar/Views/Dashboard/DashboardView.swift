@@ -11,9 +11,10 @@ struct DashboardView: View {
     var body: some View {
         Group {
             if let stream = dashboardStore.actionStream {
-                actionOutputView(
+                ActionOutputView(
                     title: dashboardStore.actionTitle ?? "Running",
-                    stream: stream
+                    stream: stream,
+                    onDismiss: { dashboardStore.dismissAction() }
                 )
             } else if let summary = dashboardStore.summary {
                 dashboardContent(summary)
@@ -22,14 +23,14 @@ struct DashboardView: View {
                     Task { await dashboardStore.load() }
                 }
             } else {
-                LoadingView(message: "Loading dashboard\u{2026}")
+                dashboardSkeleton
             }
         }
         .navigationTitle("Dashboard")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await dashboardStore.load() }
+                    Task { await dashboardStore.load(forceRefresh: true) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -39,6 +40,71 @@ struct DashboardView: View {
         .task {
             await dashboardStore.load()
         }
+    }
+
+    // MARK: - Skeleton
+
+    private var dashboardSkeleton: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionHeaderView(title: "Overview", systemImage: "chart.bar.fill", color: .secondary)
+
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
+                        spacing: 12
+                    ) {
+                        StatCardView(title: "Formulae", value: "--", systemImage: "terminal", color: .blue)
+                        StatCardView(title: "Casks", value: "--", systemImage: "macwindow", color: .purple)
+                        StatCardView(title: "Services", value: "--", systemImage: "gearshape.2", color: .green)
+                        StatCardView(title: "Updates", value: "--", systemImage: "arrow.triangle.2.circlepath", color: .green)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .secondary)
+
+                    HStack(spacing: 12) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(.quaternary)
+                                .frame(height: 50)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionHeaderView(title: "Services", systemImage: "gearshape.2", color: .green)
+
+                    GroupBox {
+                        VStack(spacing: 0) {
+                            ForEach(0..<4, id: \.self) { index in
+                                HStack(spacing: 10) {
+                                    Circle()
+                                        .fill(.secondary)
+                                        .frame(width: 8, height: 8)
+                                    Text("service-name")
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    Text("Running")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 4)
+
+                                if index < 3 {
+                                    Divider()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(24)
+        }
+        .redacted(reason: .placeholder)
+        .disabled(true)
     }
 
     // MARK: - Content
@@ -118,9 +184,7 @@ struct DashboardView: View {
     // MARK: - Services Section
 
     private func servicesSection(_ summary: SystemSummary) -> some View {
-        let items = Array(summary.services.prefix(5))
-
-        return VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             SectionHeaderView(
                 title: "Services at a Glance",
                 systemImage: "gearshape.2",
@@ -131,17 +195,13 @@ struct DashboardView: View {
 
             GroupBox {
                 VStack(spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, service in
+                    DividedForEach(data: Array(summary.services.prefix(5))) { service in
                         Button {
                             selection = .services
                         } label: {
                             serviceRow(service)
                         }
                         .buttonStyle(.plain)
-
-                        if index < items.count - 1 {
-                            Divider()
-                        }
                     }
                 }
             }
@@ -151,7 +211,7 @@ struct DashboardView: View {
     private func serviceRow(_ service: BrewServiceItem) -> some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(serviceStatusColor(service.status))
+                .fill(service.status.color)
                 .frame(width: 8, height: 8)
 
             Text(service.name)
@@ -159,7 +219,7 @@ struct DashboardView: View {
 
             Spacer()
 
-            Text(service.status.rawValue.capitalized)
+            Text(service.status.label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -172,14 +232,6 @@ struct DashboardView: View {
         .contentShape(Rectangle())
     }
 
-    private func serviceStatusColor(_ status: ServiceStatus) -> Color {
-        switch status {
-        case .started: .green
-        case .error: .red
-        case .stopped, .none, .unknown: .secondary
-        }
-    }
-
     // MARK: - Quick Actions Section
 
     private func quickActionsSection(_ summary: SystemSummary) -> some View {
@@ -187,74 +239,39 @@ struct DashboardView: View {
             SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .secondary)
 
             HStack(spacing: 12) {
-                quickActionButton(
+                QuickActionButton(
                     title: "Upgrade All",
                     subtitle: summary.updatesAvailable > 0
                         ? "\(summary.updatesAvailable) available"
                         : "All up to date",
                     systemImage: "arrow.up.circle.fill",
                     color: .orange,
-                    disabled: summary.updatesAvailable == 0
+                    isDisabled: summary.updatesAvailable == 0 || dashboardStore.isPerformingAction
                 ) {
                     dashboardStore.upgradeAll()
                 }
 
-                quickActionButton(
+                QuickActionButton(
                     title: "Cleanup",
                     subtitle: "Free disk space",
                     systemImage: "trash.circle.fill",
-                    color: .red
+                    color: .red,
+                    isDisabled: dashboardStore.isPerformingAction
                 ) {
                     dashboardStore.cleanup()
                 }
 
-                quickActionButton(
+                QuickActionButton(
                     title: "Health Check",
                     subtitle: "Run brew doctor",
                     systemImage: "heart.circle.fill",
-                    color: .pink
+                    color: .pink,
+                    isDisabled: dashboardStore.isPerformingAction
                 ) {
                     dashboardStore.healthCheck()
                 }
             }
         }
-    }
-
-    private func quickActionButton(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        color: Color,
-        disabled: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        let isDisabled = disabled || dashboardStore.isPerformingAction
-
-        return Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(color.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.subheadline.weight(.medium))
-
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(QuickActionStyle())
-        .disabled(isDisabled)
-        .opacity(isDisabled ? 0.5 : 1)
     }
 
     // MARK: - Recently Installed Section
@@ -271,7 +288,7 @@ struct DashboardView: View {
 
             GroupBox {
                 VStack(spacing: 0) {
-                    ForEach(Array(summary.recentlyInstalled.enumerated()), id: \.element.id) { index, formula in
+                    DividedForEach(data: summary.recentlyInstalled) { formula in
                         Button {
                             packageStore.selectedFormulaId = formula.id
                             selection = .formulae
@@ -279,10 +296,6 @@ struct DashboardView: View {
                             recentlyInstalledRow(formula)
                         }
                         .buttonStyle(.plain)
-
-                        if index < summary.recentlyInstalled.count - 1 {
-                            Divider()
-                        }
                     }
                 }
             }
@@ -329,17 +342,13 @@ struct DashboardView: View {
 
             GroupBox {
                 VStack(spacing: 0) {
-                    ForEach(Array(summary.taps.enumerated()), id: \.element.id) { index, tap in
+                    DividedForEach(data: summary.taps) { tap in
                         Button {
                             selection = .taps
                         } label: {
                             tapRow(tap)
                         }
                         .buttonStyle(.plain)
-
-                        if index < summary.taps.count - 1 {
-                            Divider()
-                        }
                     }
                 }
             }
@@ -514,30 +523,6 @@ struct DashboardView: View {
         .contentShape(Rectangle())
     }
 
-    // MARK: - Action Output
-
-    private func actionOutputView(
-        title: String,
-        stream: AsyncThrowingStream<String, Error>
-    ) -> some View {
-        VStack(spacing: 0) {
-            ProcessOutputView(title: title, stream: stream)
-
-            Divider()
-
-            HStack {
-                Spacer()
-                Button("Done") {
-                    dashboardStore.dismissAction()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .keyboardShortcut(.defaultAction)
-            }
-            .padding()
-        }
-    }
-
     // MARK: - Helpers
 
     private func navigableCard<Content: View>(
@@ -589,19 +574,6 @@ private struct NavigableCardStyle: ButtonStyle {
             .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
             .animation(.easeInOut(duration: 0.15), value: isHovered)
             .onHover { isHovered = $0 }
-    }
-}
-
-// MARK: - Quick Action Button Style
-
-private struct QuickActionStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(configuration.isPressed ? .tertiary : .quaternary)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

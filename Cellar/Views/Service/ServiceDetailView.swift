@@ -7,6 +7,8 @@ struct ServiceDetailView: View {
     @Environment(ServiceStore.self) private var store
     @State private var isPerformingAction = false
     @State private var actionError: String?
+    @State private var isConfirmingStop = false
+    @State private var isConfirmingRestart = false
 
     var body: some View {
         ScrollView {
@@ -30,6 +32,32 @@ struct ServiceDetailView: View {
             Button("OK") { actionError = nil }
         } message: {
             Text(actionError ?? "")
+        }
+        .confirmationDialog(
+            "Stop \(service.name)?",
+            isPresented: $isConfirmingStop,
+            titleVisibility: .visible
+        ) {
+            Button("Stop", role: .destructive) {
+                performAction {
+                    await store.stop(service)
+                }
+            }
+        } message: {
+            Text("Stop \(service.name)? Running applications that depend on it may be affected.")
+        }
+        .confirmationDialog(
+            "Restart \(service.name)?",
+            isPresented: $isConfirmingRestart,
+            titleVisibility: .visible
+        ) {
+            Button("Restart", role: .destructive) {
+                performAction {
+                    await store.restart(service)
+                }
+            }
+        } message: {
+            Text("Restart \(service.name)? The service will be briefly unavailable.")
         }
     }
 
@@ -69,7 +97,7 @@ struct ServiceDetailView: View {
             GridRow {
                 Text("Status")
                     .foregroundStyle(.secondary)
-                Text(statusDescription)
+                Text(service.status.label)
             }
 
             GridRow {
@@ -134,9 +162,7 @@ struct ServiceDetailView: View {
             HStack(spacing: 12) {
                 if service.isRunning {
                     Button {
-                        performAction {
-                            await store.stop(service)
-                        }
+                        isConfirmingStop = true
                     } label: {
                         Label("Stop", systemImage: "stop.circle")
                     }
@@ -144,9 +170,7 @@ struct ServiceDetailView: View {
                     .tint(.red)
 
                     Button {
-                        performAction {
-                            await store.restart(service)
-                        }
+                        isConfirmingRestart = true
                     } label: {
                         Label("Restart", systemImage: "arrow.clockwise.circle")
                     }
@@ -199,16 +223,6 @@ struct ServiceDetailView: View {
 
     // MARK: - Helpers
 
-    private var statusDescription: String {
-        switch service.status {
-        case .started: "Running"
-        case .stopped: "Stopped"
-        case .error: "Error"
-        case .none: "None"
-        case .unknown: "Unknown"
-        }
-    }
-
     private func performAction(_ action: @escaping () async -> Void) {
         isPerformingAction = true
         Task {
@@ -229,37 +243,17 @@ private struct ServiceDetailStatusBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(statusColor)
+                .fill(status.color)
                 .frame(width: 10, height: 10)
 
-            Text(statusLabel)
+            Text(status.label)
                 .font(.title3)
                 .fontWeight(.medium)
-                .foregroundStyle(statusColor)
+                .foregroundStyle(status.color)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
-        .background(statusColor.opacity(0.1), in: Capsule())
-    }
-
-    private var statusColor: Color {
-        switch status {
-        case .started: .green
-        case .stopped: .secondary
-        case .error: .red
-        case .none: .secondary
-        case .unknown: .orange
-        }
-    }
-
-    private var statusLabel: String {
-        switch status {
-        case .started: "Running"
-        case .stopped: "Stopped"
-        case .error: "Error"
-        case .none: "None"
-        case .unknown: "Unknown"
-        }
+        .background(status.color.opacity(0.1), in: Capsule())
     }
 }
 

@@ -22,6 +22,11 @@ final class ServiceStore {
     var errorMessage: String?
     var selectedServiceId: String?
 
+    // MARK: Cache
+
+    private let persistence = PersistenceService()
+    private static let cacheMaxAge: TimeInterval = 300
+
     // MARK: Computed
 
     var runningServices: [BrewServiceItem] {
@@ -39,13 +44,24 @@ final class ServiceStore {
     // MARK: Actions
 
     /// Loads all Homebrew services.
-    func load() async {
+    func load(forceRefresh: Bool = false) async {
+        // Restore from disk if we have nothing to display yet.
+        if services.isEmpty, let cached = persistence.loadCached([BrewServiceItem].self, from: "cache-services.json", maxAge: Self.cacheMaxAge) {
+            services = cached.data
+            if cached.isFresh && !forceRefresh { return }
+        } else if !forceRefresh, !services.isEmpty,
+                  let cached = persistence.loadCached([BrewServiceItem].self, from: "cache-services.json", maxAge: Self.cacheMaxAge),
+                  cached.isFresh {
+            return
+        }
+
         isLoading = true
         errorMessage = nil
         do {
             services = try await BrewServiceItem.all
+            persistence.saveToCache(services, to: "cache-services.json")
         } catch {
-            errorMessage = error.localizedDescription
+            if services.isEmpty { errorMessage = error.localizedDescription }
         }
         isLoading = false
     }
@@ -57,6 +73,7 @@ final class ServiceStore {
         do {
             try await service.start()
             services = try await BrewServiceItem.all
+            persistence.saveToCache(services, to: "cache-services.json")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -70,6 +87,7 @@ final class ServiceStore {
         do {
             try await service.stop()
             services = try await BrewServiceItem.all
+            persistence.saveToCache(services, to: "cache-services.json")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -83,6 +101,7 @@ final class ServiceStore {
         do {
             try await service.restart()
             services = try await BrewServiceItem.all
+            persistence.saveToCache(services, to: "cache-services.json")
         } catch {
             errorMessage = error.localizedDescription
         }

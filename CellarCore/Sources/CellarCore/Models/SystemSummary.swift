@@ -4,9 +4,10 @@ import Foundation
 
 /// Aggregates system-wide Homebrew statistics at a point in time.
 ///
-/// Not `Codable` — this is computed at runtime from live brew data,
-/// never persisted. Used by `DashboardStore` to power the dashboard view.
-public struct SystemSummary: Sendable {
+/// `Codable` so the last-known summary can be cached to disk and shown
+/// instantly on next launch (stale-while-revalidate). The live data
+/// replaces the cached version once brew commands complete.
+public struct SystemSummary: Codable, Sendable {
 
     // MARK: Data
 
@@ -65,9 +66,10 @@ public struct SystemSummary: Sendable {
         let outdatedCasks = casks.filter(\.outdated)
 
         let recentlyInstalled = formulae
-            .filter { $0.installTime != nil }
-            .sorted { $0.installTime! > $1.installTime! }
+            .compactMap { formula in formula.installTime.map { (formula, $0) } }
+            .sorted { $0.1 > $1.1 }
             .prefix(5)
+            .map(\.0)
 
         return SystemSummary(
             totalFormulae: formulae.count,
@@ -81,6 +83,20 @@ public struct SystemSummary: Sendable {
             recentlyInstalled: Array(recentlyInstalled),
             taps: taps
         )
+    }
+
+    // MARK: Cache
+
+    private static let cacheFileName = "dashboard-cache.json"
+
+    /// Writes this summary to the shared App Group container.
+    public func saveToCache() {
+        AppGroupStorage.save(self, to: Self.cacheFileName)
+    }
+
+    /// Reads the most recent cached summary from the shared App Group container.
+    public static func loadFromCache() -> SystemSummary? {
+        AppGroupStorage.load(SystemSummary.self, from: cacheFileName)
     }
 
     // MARK: Preview

@@ -5,7 +5,9 @@ struct TapListView: View {
     @Environment(TapStore.self) private var store
 
     @State private var selectedTapID: Tap.ID?
-    @State private var showingAddSheet = false
+    @State private var isAddingTap = false
+    @State private var isConfirmingUntap = false
+    @State private var tapToRemove: Tap?
     @State private var sortOrder: [KeyPathComparator<Tap>] = [
         KeyPathComparator(\.name)
     ]
@@ -15,7 +17,7 @@ struct TapListView: View {
 
         Group {
             if store.isLoading && store.taps.isEmpty {
-                LoadingView(message: "Loading taps\u{2026}")
+                tapsSkeleton
             } else if let errorMessage = store.errorMessage, store.taps.isEmpty {
                 ErrorView(message: errorMessage) {
                     Task { await store.load() }
@@ -36,7 +38,7 @@ struct TapListView: View {
                     .background(.background)
                     .onDisappear {
                         store.dismissAction()
-                        Task { await store.load() }
+                        Task { await store.load(forceRefresh: true) }
                     }
             }
         }
@@ -45,7 +47,7 @@ struct TapListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showingAddSheet = true
+                    isAddingTap = true
                 } label: {
                     Label("Add Tap", systemImage: "plus")
                 }
@@ -53,7 +55,7 @@ struct TapListView: View {
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await store.load() }
+                    Task { await store.load(forceRefresh: true) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -69,12 +71,48 @@ struct TapListView: View {
             }
         }
         .task {
-            if store.taps.isEmpty {
-                await store.load()
-            }
+            await store.load()
         }
-        .sheet(isPresented: $showingAddSheet) {
+        .sheet(isPresented: $isAddingTap) {
             AddTapSheet(store: store)
+        }
+        .confirmationDialog(
+            "Remove Tap?",
+            isPresented: $isConfirmingUntap,
+            presenting: tapToRemove
+        ) { tap in
+            Button("Untap", role: .destructive) {
+                Task { await store.removeTap(tap) }
+            }
+        } message: { tap in
+            Text("Remove tap '\(tap.name)'? Packages from this tap may become unavailable.")
+        }
+    }
+
+    // MARK: - Skeleton
+
+    private var tapsSkeleton: some View {
+        SkeletonListView(rowCount: 6) {
+            HStack {
+                HStack(spacing: 6) {
+                    Text("homebrew/core")
+                        .fontWeight(.medium)
+                    Text("Official")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.blue.opacity(0.1), in: Capsule())
+                }
+
+                Spacer()
+
+                Text("123")
+                Text("45")
+                Text("Local")
+                    .font(.callout)
+            }
+            .padding(.vertical, 2)
         }
     }
 
@@ -153,7 +191,8 @@ struct TapListView: View {
         Divider()
 
         Button(role: .destructive) {
-            Task { await store.removeTap(tap) }
+            tapToRemove = tap
+            isConfirmingUntap = true
         } label: {
             Label("Untap", systemImage: "trash")
         }

@@ -8,6 +8,9 @@ struct FormulaListView: View {
     @State private var sortOrder: [KeyPathComparator<Formula>] = [
         KeyPathComparator(\.name)
     ]
+    @State private var formulaToUninstall: Formula?
+    @State private var installStream: AsyncThrowingStream<String, Error>?
+    @State private var installTitle: String?
 
     private var isSearching: Bool {
         !store.searchQuery.isEmpty
@@ -18,7 +21,7 @@ struct FormulaListView: View {
 
         Group {
             if store.isLoading && store.formulae.isEmpty {
-                LoadingView(message: "Loading formulae\u{2026}")
+                formulaeSkeleton
             } else if let errorMessage = store.errorMessage, store.formulae.isEmpty {
                 ErrorView(message: errorMessage) {
                     Task { await store.loadFormulae() }
@@ -40,7 +43,7 @@ struct FormulaListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await store.loadFormulae() }
+                    Task { await store.loadFormulae(forceRefresh: true) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -48,9 +51,7 @@ struct FormulaListView: View {
             }
         }
         .task {
-            if store.formulae.isEmpty {
-                await store.loadFormulae()
-            }
+            await store.loadFormulae()
         }
         .task(id: store.searchQuery) {
             guard !store.searchQuery.isEmpty else {
@@ -60,6 +61,23 @@ struct FormulaListView: View {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             await store.searchRemoteFormulae()
+        }
+        .confirmationDialog(
+            "Uninstall \(formulaToUninstall?.name ?? "")?",
+            isPresented: Binding(
+                get: { formulaToUninstall != nil },
+                set: { if !$0 { formulaToUninstall = nil } }
+            ),
+            presenting: formulaToUninstall
+        ) { formula in
+            Button("Uninstall", role: .destructive) {
+                Task { await store.uninstall(formula) }
+            }
+        } message: { formula in
+            Text("This will remove \(formula.name) and its associated files.")
+        }
+        .installProgressSheet(stream: $installStream, title: $installTitle) {
+            Task { await store.loadFormulae(forceRefresh: true) }
         }
     }
 
@@ -74,13 +92,7 @@ struct FormulaListView: View {
                             .contextMenu { formulaContextMenu(for: formula) }
                     }
                 } header: {
-                    HStack {
-                        Label("Installed", systemImage: "checkmark.circle.fill")
-                        Spacer()
-                        Text("\(store.filteredFormulae.count)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
+                    CountedSectionHeader(title: "Installed", systemImage: "checkmark.circle.fill", count: store.filteredFormulae.count)
                 }
             }
 
@@ -99,13 +111,7 @@ struct FormulaListView: View {
                         availableFormulaRow(formula)
                     }
                 } header: {
-                    HStack {
-                        Label("Available", systemImage: "arrow.down.circle")
-                        Spacer()
-                        Text("\(store.availableFormulae.count)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
+                    CountedSectionHeader(title: "Available", systemImage: "arrow.down.circle", count: store.availableFormulae.count)
                 }
             }
 
@@ -161,18 +167,14 @@ struct FormulaListView: View {
             Spacer()
 
             Button {
-                Task { await store.installFormula(name: formula.name) }
+                let service = BrewService()
+                installTitle = "Installing \(formula.name)"
+                installStream = service.install(formula.name, isCask: false)
             } label: {
-                if store.installingPackages.contains(formula.name) {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Label("Install", systemImage: "arrow.down.circle")
-                }
+                Label("Install", systemImage: "arrow.down.circle")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .disabled(store.installingPackages.contains(formula.name))
         }
     }
 
@@ -224,6 +226,24 @@ struct FormulaListView: View {
         }
     }
 
+    // MARK: - Skeleton
+
+    private var formulaeSkeleton: some View {
+        SkeletonListView {
+            HStack {
+                Text("formula-name-here")
+                    .fontWeight(.medium)
+
+                Spacer()
+
+                Text("1.0.0")
+                    .foregroundStyle(.secondary)
+                    .font(.body.monospaced())
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
     // MARK: - Context Menu
 
     @ViewBuilder
@@ -253,7 +273,7 @@ struct FormulaListView: View {
         Divider()
 
         Button(role: .destructive) {
-            Task { await store.uninstall(formula) }
+            formulaToUninstall = formula
         } label: {
             Label("Uninstall", systemImage: "trash")
         }

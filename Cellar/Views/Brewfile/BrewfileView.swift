@@ -14,13 +14,20 @@ struct BrewfileView: View {
     @State private var newProfileName = ""
     @State private var newProfilePath = ""
     @State private var newProfileMode: BrewfileCreationMode = .empty
+    @State private var isConfirmingCleanup = false
 
     var body: some View {
         Group {
             if let stream = store.actionStream {
-                actionOutputView(
+                ActionOutputView(
                     title: store.actionTitle ?? "Running",
-                    stream: stream
+                    stream: stream,
+                    onDismiss: {
+                        store.dismissAction()
+                        if let profile = store.selectedProfile {
+                            store.loadBrewfileContent(for: profile)
+                        }
+                    }
                 )
             } else if let profile = store.selectedProfile {
                 if store.brewfileExistsOnDisk {
@@ -46,6 +53,18 @@ struct BrewfileView: View {
             if let profile = store.selectedProfile {
                 Text("The profile \"\(profile.name)\" will be removed. You can also delete the Brewfile at \(profile.path).")
             }
+        }
+        .confirmationDialog(
+            "Cleanup Packages?",
+            isPresented: $isConfirmingCleanup,
+            titleVisibility: .visible
+        ) {
+            Button("Cleanup", role: .destructive) {
+                guard let profile = store.selectedProfile else { return }
+                store.cleanupBrewfile(for: profile)
+            }
+        } message: {
+            Text("Remove all packages not listed in the current Brewfile? This cannot be undone.")
         }
         .task {
             store.loadProfiles()
@@ -222,90 +241,59 @@ struct BrewfileView: View {
     // MARK: - Quick Actions Section
 
     private var quickActionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let isDisabled = store.isLoading || store.isPerformingAction || store.isChecking
+
+        return VStack(alignment: .leading, spacing: 12) {
             SectionHeaderView(title: "Actions", systemImage: "bolt.fill", color: .secondary)
 
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
                 spacing: 12
             ) {
-                quickActionButton(
+                QuickActionButton(
                     title: "Sync",
                     subtitle: "Export current packages to Brewfile",
                     systemImage: "arrow.triangle.2.circlepath",
-                    color: .blue
+                    color: .blue,
+                    isDisabled: isDisabled
                 ) {
                     guard let profile = store.selectedProfile else { return }
                     Task { await store.exportBrewfile(to: profile) }
                 }
 
-                quickActionButton(
+                QuickActionButton(
                     title: "Install",
                     subtitle: "Install all packages from Brewfile",
                     systemImage: "square.and.arrow.down.fill",
-                    color: .green
+                    color: .green,
+                    isDisabled: isDisabled
                 ) {
                     guard let profile = store.selectedProfile else { return }
                     store.beginInstall(from: profile)
                 }
 
-                quickActionButton(
+                QuickActionButton(
                     title: "Check",
                     subtitle: "Verify all packages are installed",
                     systemImage: "checkmark.shield.fill",
-                    color: .orange
+                    color: .orange,
+                    isDisabled: isDisabled
                 ) {
                     guard let profile = store.selectedProfile else { return }
                     Task { await store.checkBrewfile(for: profile) }
                 }
 
-                quickActionButton(
+                QuickActionButton(
                     title: "Cleanup",
                     subtitle: "Remove packages not in Brewfile",
                     systemImage: "trash.circle.fill",
-                    color: .red
+                    color: .red,
+                    isDisabled: isDisabled
                 ) {
-                    guard let profile = store.selectedProfile else { return }
-                    store.cleanupBrewfile(for: profile)
+                    isConfirmingCleanup = true
                 }
             }
         }
-    }
-
-    private func quickActionButton(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        color: Color,
-        action: @escaping () -> Void
-    ) -> some View {
-        let isDisabled = store.isLoading || store.isPerformingAction || store.isChecking
-
-        return Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(color.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.subheadline.weight(.medium))
-
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(BrewfileQuickActionStyle())
-        .disabled(isDisabled)
-        .opacity(isDisabled ? 0.5 : 1)
     }
 
     // MARK: - Check Result Banner
@@ -392,7 +380,7 @@ struct BrewfileView: View {
 
             GroupBox {
                 VStack(spacing: 0) {
-                    ForEach(entries) { entry in
+                    DividedForEach(data: entries) { entry in
                         HStack(spacing: 8) {
                             Image(systemName: systemImage)
                                 .foregroundStyle(color)
@@ -405,10 +393,6 @@ struct BrewfileView: View {
                         }
                         .padding(.vertical, 6)
                         .padding(.horizontal, 4)
-
-                        if entry.id != entries.last?.id {
-                            Divider()
-                        }
                     }
                 }
             }
@@ -454,33 +438,6 @@ struct BrewfileView: View {
             systemImage: "doc.text",
             description: Text("Create a Brewfile profile to get started.")
         )
-    }
-
-    // MARK: - Action Output
-
-    private func actionOutputView(
-        title: String,
-        stream: AsyncThrowingStream<String, Error>
-    ) -> some View {
-        VStack(spacing: 0) {
-            ProcessOutputView(title: title, stream: stream)
-
-            Divider()
-
-            HStack {
-                Spacer()
-                Button("Done") {
-                    store.dismissAction()
-                    if let profile = store.selectedProfile {
-                        store.loadBrewfileContent(for: profile)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .keyboardShortcut(.defaultAction)
-            }
-            .padding()
-        }
     }
 
     // MARK: - Toolbar
@@ -651,19 +608,6 @@ struct BrewfileView: View {
                 newProfilePath = url.path
             }
         }
-    }
-}
-
-// MARK: - Quick Action Button Style
-
-private struct BrewfileQuickActionStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(configuration.isPressed ? .tertiary : .quaternary)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

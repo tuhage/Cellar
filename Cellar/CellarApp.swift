@@ -33,6 +33,12 @@ struct CellarApp: App {
         }
         .commands { AppCommands() }
 
+        Window("Keyboard Shortcuts", id: "keyboard-shortcuts") {
+            KeyboardShortcutsView()
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         Settings {
             SettingsView()
         }

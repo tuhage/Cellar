@@ -28,10 +28,24 @@ final class DashboardStore {
     // MARK: Dependencies
 
     private let service = BrewService()
+    private let persistence = PersistenceService()
+    private static let cacheMaxAge: TimeInterval = 300
 
     // MARK: Actions
 
-    func load() async {
+    func load(forceRefresh: Bool = false) async {
+        // Show cached data immediately if we have nothing to display yet.
+        if summary == nil, let cached = SystemSummary.loadFromCache() {
+            summary = cached
+        }
+
+        // If cache is fresh and not forcing, skip the brew calls.
+        if !forceRefresh, summary != nil,
+           let cached = persistence.loadCached(Date.self, from: "cache-dashboard-timestamp.json", maxAge: Self.cacheMaxAge),
+           cached.isFresh {
+            return
+        }
+
         isLoading = true
         errorMessage = nil
         do {
@@ -52,9 +66,14 @@ final class DashboardStore {
                 taps: taps
             )
             summary = loadedSummary
+            loadedSummary.saveToCache()
+            persistence.saveToCache(Date(), to: "cache-dashboard-timestamp.json")
             writeWidgetSnapshot(summary: loadedSummary, services: services)
         } catch {
-            errorMessage = error.localizedDescription
+            // Only show error if we have no data at all (no cache either).
+            if summary == nil {
+                errorMessage = error.localizedDescription
+            }
         }
         isLoading = false
     }
@@ -80,6 +99,7 @@ final class DashboardStore {
                     let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
                     continuation.yield(message.isEmpty ? "Your system is ready to brew." : message)
                     continuation.finish()
+                    await self.load()
                 } catch {
                     continuation.finish(throwing: error)
                 }

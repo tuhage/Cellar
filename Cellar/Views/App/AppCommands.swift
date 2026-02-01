@@ -8,9 +8,16 @@ import CellarCore
 /// Uses `NotificationCenter` to communicate actions to views, since
 /// `Commands` structs cannot directly access `@Environment` stores.
 struct AppCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) { }
+
+        CommandGroup(replacing: .help) {
+            Button("Keyboard Shortcuts") {
+                openWindow(id: "keyboard-shortcuts")
+            }
+        }
 
         CommandMenu("Packages") {
             Button("Refresh All") {

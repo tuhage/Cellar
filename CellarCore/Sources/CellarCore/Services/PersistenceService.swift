@@ -1,5 +1,23 @@
 import Foundation
 
+// MARK: - CacheEntry
+
+public struct CacheEntry<T: Codable>: Codable, Sendable where T: Sendable {
+    public let data: T
+    public let timestamp: Date
+
+    public init(data: T, timestamp: Date = .now) {
+        self.data = data
+        self.timestamp = timestamp
+    }
+
+    public func isValid(maxAge: TimeInterval) -> Bool {
+        Date().timeIntervalSince(timestamp) < maxAge
+    }
+}
+
+// MARK: - PersistenceService
+
 public nonisolated final class PersistenceService: Sendable {
     private let baseURL: URL
 
@@ -29,6 +47,21 @@ public nonisolated final class PersistenceService: Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(value)
         try data.write(to: url, options: .atomic)
+    }
+
+    // MARK: - Cache
+
+    /// Loads cached data and returns it along with freshness status.
+    /// Returns `nil` if no cache exists or if decoding fails.
+    public func loadCached<T: Codable & Sendable>(_ type: T.Type, from fileName: String, maxAge: TimeInterval) -> (data: T, isFresh: Bool)? {
+        guard let entry = try? load(CacheEntry<T>.self, from: fileName) else { return nil }
+        return (data: entry.data, isFresh: entry.isValid(maxAge: maxAge))
+    }
+
+    /// Wraps data in a `CacheEntry` with the current timestamp and saves it.
+    public func saveToCache<T: Codable & Sendable>(_ data: T, to fileName: String) {
+        let entry = CacheEntry(data: data)
+        try? save(entry, to: fileName)
     }
 
     // MARK: - Delete

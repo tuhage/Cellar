@@ -12,7 +12,7 @@ struct ServiceListView: View {
     var body: some View {
         Group {
             if store.isLoading && store.services.isEmpty {
-                LoadingView(message: "Loading services\u{2026}")
+                servicesSkeleton
             } else if let errorMessage = store.errorMessage, store.services.isEmpty {
                 ErrorView(message: errorMessage) {
                     Task { await store.load() }
@@ -31,7 +31,7 @@ struct ServiceListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await store.load() }
+                    Task { await store.load(forceRefresh: true) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -50,9 +50,35 @@ struct ServiceListView: View {
             }
         }
         .task {
-            if store.services.isEmpty {
-                await store.load()
+            await store.load()
+        }
+    }
+
+    // MARK: - Skeleton
+
+    private var servicesSkeleton: some View {
+        SkeletonListView(rowCount: 6) {
+            HStack(spacing: 12) {
+                Text("service-name")
+                    .fontWeight(.medium)
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(.secondary)
+                        .frame(width: 8, height: 8)
+                    Text("Running")
+                        .font(.callout)
+                }
+
+                Text("12345")
+                    .font(.body.monospaced())
+                    .foregroundStyle(.secondary)
+
+                Text("username")
             }
+            .padding(.vertical, 2)
         }
     }
 
@@ -134,38 +160,18 @@ private struct ServiceStatusBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(statusColor)
+                .fill(status.color)
                 .frame(width: 8, height: 8)
                 .overlay {
                     if status == .started {
                         Circle()
-                            .fill(statusColor.opacity(0.4))
+                            .fill(status.color.opacity(0.4))
                             .frame(width: 14, height: 14)
                     }
                 }
 
-            Text(statusLabel)
+            Text(status.label)
                 .font(.callout)
-        }
-    }
-
-    private var statusColor: Color {
-        switch status {
-        case .started: .green
-        case .stopped: .secondary
-        case .error: .red
-        case .none: .secondary
-        case .unknown: .orange
-        }
-    }
-
-    private var statusLabel: String {
-        switch status {
-        case .started: "Running"
-        case .stopped: "Stopped"
-        case .error: "Error"
-        case .none: "None"
-        case .unknown: "Unknown"
         }
     }
 }

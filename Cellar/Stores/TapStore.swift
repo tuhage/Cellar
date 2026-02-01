@@ -23,6 +23,11 @@ final class TapStore {
     var searchQuery = ""
     var actionStream: AsyncThrowingStream<String, Error>?
 
+    // MARK: Cache
+
+    private let persistence = PersistenceService()
+    private static let cacheMaxAge: TimeInterval = 300
+
     // MARK: Computed
 
     var filteredTaps: [Tap] {
@@ -33,13 +38,24 @@ final class TapStore {
     // MARK: Actions
 
     /// Loads all Homebrew taps.
-    func load() async {
+    func load(forceRefresh: Bool = false) async {
+        // Restore from disk if we have nothing to display yet.
+        if taps.isEmpty, let cached = persistence.loadCached([Tap].self, from: "cache-taps.json", maxAge: Self.cacheMaxAge) {
+            taps = cached.data
+            if cached.isFresh && !forceRefresh { return }
+        } else if !forceRefresh, !taps.isEmpty,
+                  let cached = persistence.loadCached([Tap].self, from: "cache-taps.json", maxAge: Self.cacheMaxAge),
+                  cached.isFresh {
+            return
+        }
+
         isLoading = true
         errorMessage = nil
         do {
             taps = try await Tap.all
+            persistence.saveToCache(taps, to: "cache-taps.json")
         } catch {
-            errorMessage = error.localizedDescription
+            if taps.isEmpty { errorMessage = error.localizedDescription }
         }
         isLoading = false
     }
@@ -57,6 +73,7 @@ final class TapStore {
         do {
             try await tap.remove()
             taps = try await Tap.all
+            persistence.saveToCache(taps, to: "cache-taps.json")
         } catch {
             errorMessage = error.localizedDescription
         }
