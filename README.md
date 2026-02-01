@@ -33,7 +33,24 @@
 
 ## Screenshots
 
-> Coming soon
+<p align="center">
+  <img src=".github/assets/dashboard.png" width="720" alt="Dashboard" />
+</p>
+<p align="center">
+  <img src=".github/assets/formulae.png" width="720" alt="Formulae" />
+</p>
+<p align="center">
+  <img src=".github/assets/services.png" width="720" alt="Services" />
+</p>
+<p align="center">
+  <img src=".github/assets/taps.png" width="720" alt="Taps" />
+</p>
+<p align="center">
+  <img src=".github/assets/dependencies.png" width="720" alt="Dependencies" />
+</p>
+<p align="center">
+  <img src=".github/assets/resources.png" width="720" alt="Resources" />
+</p>
 
 ## Installation
 
