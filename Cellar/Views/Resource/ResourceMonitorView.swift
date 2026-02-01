@@ -24,7 +24,7 @@ struct ResourceMonitorView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
-                    await self.refresh()
+                    await refresh()
                 }
             }
         }
@@ -258,29 +258,23 @@ struct ResourceMonitorView: View {
 
     private var resourceSummary: some View {
         HStack(spacing: Spacing.sectionContent) {
-            HStack(spacing: Spacing.related) {
-                Image(systemName: "cpu")
-                    .foregroundStyle(.blue)
-                Text("CPU: \(formatPercent(store.totalCPU))")
-                    .font(.callout.monospaced())
-            }
-            .padding(.horizontal, Spacing.row)
-            .padding(.vertical, Spacing.related)
-            .background(.blue.opacity(0.08), in: Capsule())
-
-            HStack(spacing: Spacing.related) {
-                Image(systemName: "memorychip")
-                    .foregroundStyle(.purple)
-                Text("Memory: \(formatMemory(store.totalMemoryMB))")
-                    .font(.callout.monospaced())
-            }
-            .padding(.horizontal, Spacing.row)
-            .padding(.vertical, Spacing.related)
-            .background(.purple.opacity(0.08), in: Capsule())
-
+            summaryPill(icon: "cpu", label: "CPU", value: formatPercent(store.totalCPU), color: .blue)
+            summaryPill(icon: "memorychip", label: "Memory", value: formatMemory(store.totalMemoryMB), color: .purple)
             Spacer()
         }
         .foregroundStyle(.secondary)
+    }
+
+    private func summaryPill(icon: String, label: String, value: String, color: Color) -> some View {
+        HStack(spacing: Spacing.related) {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+            Text("\(label): \(value)")
+                .font(.callout.monospaced())
+        }
+        .padding(.horizontal, Spacing.row)
+        .padding(.vertical, Spacing.related)
+        .background(color.opacity(0.08), in: Capsule())
     }
 
     // MARK: - Helpers

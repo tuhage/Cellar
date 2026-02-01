@@ -28,8 +28,8 @@ struct DependencyGraphView: View {
                     systemImage: "point.3.connected.trianglepath.dotted",
                     description: "Could not load dependency information."
                 )
-            } else {
-                graphContent
+            } else if let graph = store.graph {
+                graphContent(graph: graph)
             }
         }
         .navigationTitle("Dependencies")
@@ -56,16 +56,13 @@ struct DependencyGraphView: View {
 
     // MARK: - Content
 
-    @ViewBuilder
-    private var graphContent: some View {
-        if let graph = store.graph {
-            HSplitView {
-                nodeList(graph: graph)
-                    .frame(minWidth: 280, idealWidth: 350)
+    private func graphContent(graph: DependencyGraph) -> some View {
+        HSplitView {
+            nodeList(graph: graph)
+                .frame(minWidth: 280, idealWidth: 350)
 
-                detailPanel
-                    .frame(minWidth: 250, idealWidth: 320, maxWidth: 400)
-            }
+            detailPanel
+                .frame(minWidth: 250, idealWidth: 320, maxWidth: 400)
         }
     }
 
@@ -145,6 +142,22 @@ struct DependencyGraphView: View {
     }
 }
 
+// MARK: - DependencyNode Appearance
+
+private extension DependencyNode {
+    var color: Color {
+        if isOrphan { return .orange }
+        if isLeaf { return .green }
+        return .blue
+    }
+
+    var icon: String {
+        if isOrphan { return "exclamationmark.triangle" }
+        if isLeaf { return "leaf" }
+        return "shippingbox"
+    }
+}
+
 // MARK: - DependencyNodeRow
 
 /// A single row in the dependency list showing a package name, dependency count,
@@ -152,25 +165,13 @@ struct DependencyGraphView: View {
 private struct DependencyNodeRow: View {
     let node: DependencyNode
 
-    private var nodeColor: Color {
-        if node.isOrphan { return .orange }
-        if node.isLeaf { return .green }
-        return .blue
-    }
-
-    private var nodeIcon: String {
-        if node.isOrphan { return "exclamationmark.triangle" }
-        if node.isLeaf { return "leaf" }
-        return "shippingbox"
-    }
-
     var body: some View {
         HStack(spacing: Spacing.row) {
-            Image(systemName: nodeIcon)
+            Image(systemName: node.icon)
                 .font(.caption)
-                .foregroundStyle(nodeColor)
+                .foregroundStyle(node.color)
                 .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
-                .background(nodeColor.opacity(0.1), in: RoundedRectangle(cornerRadius: CornerRadius.small))
+                .background(node.color.opacity(0.1), in: RoundedRectangle(cornerRadius: CornerRadius.small))
 
             VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(node.name)
@@ -218,18 +219,6 @@ private struct DependencyDetailView: View {
     let node: DependencyNode
     let onNavigate: (String) -> Void
 
-    private var nodeColor: Color {
-        if node.isOrphan { return .orange }
-        if node.isLeaf { return .green }
-        return .blue
-    }
-
-    private var nodeIcon: String {
-        if node.isOrphan { return "exclamationmark.triangle" }
-        if node.isLeaf { return "leaf" }
-        return "shippingbox"
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
@@ -252,11 +241,11 @@ private struct DependencyDetailView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: Spacing.detailElement) {
-            Image(systemName: nodeIcon)
+            Image(systemName: node.icon)
                 .font(.title2)
-                .foregroundStyle(nodeColor)
+                .foregroundStyle(node.color)
                 .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
-                .background(nodeColor.opacity(0.1), in: Circle())
+                .background(node.color.opacity(0.1), in: Circle())
 
             VStack(alignment: .leading, spacing: Spacing.related) {
                 Text(node.name)
@@ -281,7 +270,7 @@ private struct DependencyDetailView: View {
     // MARK: Info Section
 
     private var infoSection: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 10) {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Spacing.cardPadding, verticalSpacing: Spacing.row) {
             GridRow {
                 Text("Connections")
                     .foregroundStyle(.secondary)
@@ -305,63 +294,51 @@ private struct DependencyDetailView: View {
     // MARK: Dependencies Section
 
     private var dependenciesSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.item) {
-            SectionHeaderView(
-                title: "Dependencies",
-                systemImage: "arrow.down.circle",
-                color: .blue
-            ) {
-                Text("\(node.dependencies.count)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            if node.dependencies.isEmpty {
-                Text("No dependencies \u{2014} this is a leaf package.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 4)
-            } else {
-                FlowLayout(spacing: Spacing.related) {
-                    ForEach(node.dependencies, id: \.self) { dep in
-                        Button { onNavigate(dep) } label: {
-                            Text(dep)
-                                .font(.callout)
-                                .fontDesign(.monospaced)
-                                .chipInset()
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
+        packageListSection(
+            title: "Dependencies",
+            systemImage: "arrow.down.circle",
+            color: .blue,
+            packages: node.dependencies,
+            emptyText: "No dependencies \u{2014} this is a leaf package."
+        )
     }
 
     // MARK: Dependents Section
 
     private var dependentsSection: some View {
+        packageListSection(
+            title: "Used By",
+            systemImage: "arrow.up.circle",
+            color: .purple,
+            packages: node.dependents,
+            emptyText: "Nothing depends on this package."
+        )
+    }
+
+    private func packageListSection(
+        title: String,
+        systemImage: String,
+        color: Color,
+        packages: [String],
+        emptyText: String
+    ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.item) {
-            SectionHeaderView(
-                title: "Used By",
-                systemImage: "arrow.up.circle",
-                color: .purple
-            ) {
-                Text("\(node.dependents.count)")
+            SectionHeaderView(title: title, systemImage: systemImage, color: color) {
+                Text("\(packages.count)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
-            if node.dependents.isEmpty {
-                Text("Nothing depends on this package.")
+            if packages.isEmpty {
+                Text(emptyText)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
             } else {
                 FlowLayout(spacing: Spacing.related) {
-                    ForEach(node.dependents, id: \.self) { dep in
-                        Button { onNavigate(dep) } label: {
-                            Text(dep)
+                    ForEach(packages, id: \.self) { name in
+                        Button { onNavigate(name) } label: {
+                            Text(name)
                                 .font(.callout)
                                 .fontDesign(.monospaced)
                                 .chipInset()

@@ -7,6 +7,9 @@ struct SettingsView: View {
     @AppStorage("confirmBeforeUninstall") private var confirmBeforeUninstall = true
     @AppStorage("showNotifications") private var showNotifications = true
 
+    private static let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    private static let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+
     var body: some View {
         Form {
             Section("General") {
@@ -38,7 +41,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: Spacing.textPair) {
                         Text("Cellar")
                             .font(.headline)
-                        Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
+                        Text("Version \(Self.appVersion) (\(Self.buildNumber))")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -79,25 +82,18 @@ private struct BrewInfoRow: View {
 
     private func loadBrewInfo() async {
         let process = BrewProcess()
-        do {
-            let versionOutput = try await process.run(["--version"])
-            let version = versionOutput.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !version.isEmpty {
-                brewVersion = version.components(separatedBy: "\n").first ?? version
-            } else {
-                brewVersion = "Unknown"
-            }
-        } catch {
+
+        if let output = try? await process.run(["--version"]) {
+            let firstLine = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: "\n").first ?? ""
+            brewVersion = firstLine.isEmpty ? "Unknown" : firstLine
+        } else {
             brewVersion = "Not found"
         }
-        do {
-            let prefixOutput = try await process.run(["--prefix"])
-            let prefix = prefixOutput.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !prefix.isEmpty {
-                brewPrefix = prefix
-            }
-        } catch {
-            // Prefix is optional
+
+        if let output = try? await process.run(["--prefix"]) {
+            let prefix = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !prefix.isEmpty { brewPrefix = prefix }
         }
     }
 }
