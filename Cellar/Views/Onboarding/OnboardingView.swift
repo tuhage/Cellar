@@ -2,9 +2,9 @@ import SwiftUI
 import CellarCore
 
 struct OnboardingView: View {
-    var onBrewDetected: () -> Void
+    let onBrewDetected: () -> Void
 
-    @State private var copied = false
+    @State private var isCopied = false
     @State private var showNotFoundError = false
 
     private static let installCommand =
@@ -54,16 +54,8 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(Self.installCommand, forType: .string)
-                    copied = true
-                    Task {
-                        try? await Task.sleep(for: .seconds(2))
-                        copied = false
-                    }
-                } label: {
-                    Label(copied ? "Copied!" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                Button(action: copyInstallCommand) {
+                    Label(isCopied ? "Copied!" : "Copy", systemImage: isCopied ? "checkmark" : "doc.on.doc")
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.bordered)
@@ -76,22 +68,14 @@ struct OnboardingView: View {
 
     private var actions: some View {
         VStack(spacing: Spacing.sectionContent) {
-            Button {
-                openTerminalWithInstallCommand()
-            } label: {
+            Button(action: openTerminalWithInstallCommand) {
                 Label("Install in Terminal", systemImage: "terminal")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
 
-            Button {
-                if BrewProcess.isInstalled {
-                    onBrewDetected()
-                } else {
-                    showNotFoundError = true
-                }
-            } label: {
+            Button(action: recheckBrew) {
                 Label("Check Again", systemImage: "arrow.clockwise")
             }
             .controlSize(.large)
@@ -111,6 +95,24 @@ struct OnboardingView: View {
 
     // MARK: - Private
 
+    private func copyInstallCommand() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Self.installCommand, forType: .string)
+        isCopied = true
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            isCopied = false
+        }
+    }
+
+    private func recheckBrew() {
+        if BrewProcess.isInstalled {
+            onBrewDetected()
+        } else {
+            showNotFoundError = true
+        }
+    }
+
     private func openTerminalWithInstallCommand() {
         let script = """
         tell application "Terminal"
@@ -118,10 +120,9 @@ struct OnboardingView: View {
             do script "\(Self.installCommand)"
         end tell
         """
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
-        }
+        guard let appleScript = NSAppleScript(source: script) else { return }
+        var error: NSDictionary?
+        appleScript.executeAndReturnError(&error)
     }
 }
 

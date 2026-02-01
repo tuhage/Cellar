@@ -3,7 +3,7 @@ import CellarCore
 
 struct ContentView: View {
     @State private var selection: SidebarItem? = .dashboard
-    @State private var brewStatus: BrewStatus = .checking
+    @State private var isBrewInstalled = BrewProcess.isInstalled
 
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
@@ -12,22 +12,17 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            switch brewStatus {
-            case .checking:
-                LoadingView(message: "Checking Homebrew installation\u{2026}")
-            case .notInstalled:
-                OnboardingView {
-                    withAnimation { brewStatus = .installed }
-                }
-            case .installed:
+            if isBrewInstalled {
                 mainContent
+            } else {
+                OnboardingView {
+                    withAnimation { isBrewInstalled = true }
+                }
             }
         }
-        .task { checkBrew() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            if brewStatus == .notInstalled {
-                checkBrew()
-            }
+            guard !isBrewInstalled else { return }
+            isBrewInstalled = BrewProcess.isInstalled
         }
     }
 
@@ -49,10 +44,6 @@ struct ContentView: View {
         .task { await prefetchStores() }
     }
 
-    private func checkBrew() {
-        brewStatus = BrewProcess.isInstalled ? .installed : .notInstalled
-    }
-
     /// Eagerly loads all brew-dependent stores on launch so every
     /// section has fresh data when the user navigates to it.
     private func prefetchStores() async {
@@ -63,10 +54,6 @@ struct ContentView: View {
 
         await resourceStore.loadAll(services: serviceStore.services)
     }
-}
-
-private enum BrewStatus {
-    case checking, notInstalled, installed
 }
 
 private struct DetailView: View {
