@@ -40,8 +40,10 @@ struct ServiceListView: View {
                     Text("\(store.runningCount) running")
                         .font(.callout)
                         .foregroundStyle(.green)
+                        .contentTransition(.numericText())
                         .badgeInset()
-                        .background(.green.opacity(0.1), in: Capsule())
+                        .background(.green.opacity(Opacity.badgeBackground), in: Capsule())
+                        .transition(.scale.combined(with: .opacity))
                         .padding(.horizontal, Spacing.item)
                 }
             }
@@ -126,6 +128,8 @@ struct ServiceListView: View {
 private struct ServiceStatusBadge: View {
     let status: ServiceStatus
 
+    @State private var isPulsing = false
+
     var body: some View {
         HStack(spacing: Spacing.related) {
             Circle()
@@ -136,11 +140,17 @@ private struct ServiceStatusBadge: View {
                         Circle()
                             .fill(status.color.opacity(0.4))
                             .frame(width: IconSize.dotGlow, height: IconSize.dotGlow)
+                            .scaleEffect(isPulsing ? 1.3 : 1.0)
+                            .opacity(isPulsing ? 0.0 : 0.4)
+                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: isPulsing)
                     }
                 }
 
             Text(status.label)
                 .font(.callout)
+        }
+        .onAppear {
+            if status == .started { isPulsing = true }
         }
     }
 }

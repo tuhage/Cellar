@@ -5,11 +5,26 @@ import Foundation
 public enum AppGroupStorage {
     public static let groupIdentifier = "group.com.tuhage.Cellar"
 
-    /// Returns the shared App Group container URL, falling back to temp directory.
+    /// Returns the shared App Group container URL.
+    ///
+    /// `containerURL(forSecurityApplicationGroupIdentifier:)` returns `nil`
+    /// for non-sandboxed apps, so we fall back to the well-known path that
+    /// macOS uses for group containers.
     public static var containerURL: URL {
-        FileManager.default.containerURL(
+        if let url = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: groupIdentifier
-        ) ?? FileManager.default.temporaryDirectory
+        ) {
+            return url
+        }
+
+        // Non-sandboxed fallback — same path macOS uses for group containers.
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let url = home
+            .appendingPathComponent("Library/Group Containers")
+            .appendingPathComponent(groupIdentifier)
+
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 
     /// Reads a `Decodable` value from the shared container.

@@ -97,4 +97,96 @@ extension View {
             .padding(.horizontal, Spacing.related)
             .padding(.vertical, Spacing.textPair)
     }
+
+    /// Card background with subtle shadow and thin border
+    func cardStyle(cornerRadius: CGFloat = CornerRadius.large) -> some View {
+        self
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
+            )
+            .shadow(color: Shadow.cardColor, radius: Shadow.cardBlur, y: Shadow.cardY)
+    }
+
+    /// Elevated card background with stronger shadow — used for hover states
+    func elevatedCardStyle(cornerRadius: CGFloat = CornerRadius.large) -> some View {
+        self
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
+            )
+            .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
+    }
+}
+
+// MARK: - Shadow
+
+nonisolated enum Shadow {
+    /// Card shadow: blur 8, y 2, 6% opacity
+    static let cardBlur: CGFloat = 8
+    static let cardY: CGFloat = 2
+    static let cardColor: Color = .black.opacity(0.06)
+
+    /// Elevated shadow: blur 16, y 4, 10% opacity
+    static let elevatedBlur: CGFloat = 16
+    static let elevatedY: CGFloat = 4
+    static let elevatedColor: Color = .black.opacity(0.10)
+
+    /// Subtle shadow: blur 4, y 1, 4% opacity
+    static let subtleBlur: CGFloat = 4
+    static let subtleY: CGFloat = 1
+    static let subtleColor: Color = .black.opacity(0.04)
+}
+
+// MARK: - AnimationToken
+
+nonisolated enum AnimationToken {
+    /// Interactive spring: 0.3s, bounce 0.15 — buttons, hovers
+    static let interactive: Animation = .spring(duration: 0.3, bounce: 0.15)
+    /// Smooth spring: 0.4s — layout transitions
+    static let smooth: Animation = .spring(duration: 0.4)
+    /// Snap spring: 0.2s, bounce 0.2 — quick pops, numeric transitions
+    static let snap: Animation = .spring(duration: 0.2, bounce: 0.2)
+    /// Gentle ease: 0.3s — fades, opacity changes
+    static let gentle: Animation = .easeInOut(duration: 0.3)
+    /// Stagger delay between items
+    static let staggerDelay: Double = 0.05
+}
+
+// MARK: - Opacity
+
+nonisolated enum Opacity {
+    /// Background tint for icon containers
+    static let iconBackground: Double = 0.12
+    /// Background tint for badge capsules
+    static let badgeBackground: Double = 0.12
+    /// Hover overlay tint
+    static let hoverOverlay: Double = 0.04
+    /// Pressed overlay tint
+    static let pressedOverlay: Double = 0.08
+    /// Thin border stroke
+    static let subtleBorder: Double = 0.08
+}
+
+// MARK: - HoverableCardButtonStyle
+
+/// A button style that elevates shadow on hover and scales down on press.
+struct HoverableCardButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : isHovered ? 1.01 : 1.0)
+            .shadow(
+                color: isHovered ? Shadow.elevatedColor : Shadow.cardColor,
+                radius: isHovered ? Shadow.elevatedBlur : Shadow.cardBlur,
+                y: isHovered ? Shadow.elevatedY : Shadow.cardY
+            )
+            .brightness(isHovered ? 0.02 : 0)
+            .animation(AnimationToken.interactive, value: configuration.isPressed)
+            .animation(AnimationToken.interactive, value: isHovered)
+            .onHover { isHovered = $0 }
+    }
 }

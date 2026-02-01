@@ -44,13 +44,22 @@ struct QuickActionButton: View {
 // MARK: - Button Style
 
 private struct QuickActionButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
-                    .fill(configuration.isPressed ? .tertiary : .quaternary)
+            .cardStyle(cornerRadius: CornerRadius.card)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .brightness(configuration.isPressed ? -0.02 : isHovered ? 0.02 : 0)
+            .shadow(
+                color: isHovered ? Shadow.elevatedColor : .clear,
+                radius: isHovered ? Shadow.elevatedBlur : 0,
+                y: isHovered ? Shadow.elevatedY : 0
             )
             .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+            .animation(AnimationToken.interactive, value: configuration.isPressed)
+            .animation(AnimationToken.interactive, value: isHovered)
+            .onHover { isHovered = $0 }
     }
 }
 

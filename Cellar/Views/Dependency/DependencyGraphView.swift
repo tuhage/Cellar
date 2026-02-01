@@ -171,7 +171,7 @@ private struct DependencyNodeRow: View {
                 .font(.caption)
                 .foregroundStyle(node.color)
                 .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
-                .background(node.color.opacity(0.1), in: RoundedRectangle(cornerRadius: CornerRadius.small))
+                .background(node.color.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.small))
 
             VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(node.name)
@@ -245,7 +245,8 @@ private struct DependencyDetailView: View {
                 .font(.title2)
                 .foregroundStyle(node.color)
                 .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
-                .background(node.color.opacity(0.1), in: Circle())
+                .background(node.color.opacity(Opacity.iconBackground), in: Circle())
+                .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
 
             VStack(alignment: .leading, spacing: Spacing.related) {
                 Text(node.name)
@@ -343,6 +344,11 @@ private struct DependencyDetailView: View {
                                 .fontDesign(.monospaced)
                                 .chipInset()
                                 .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: CornerRadius.small)
+                                        .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
+                                )
+                                .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
                         }
                         .buttonStyle(.plain)
                     }

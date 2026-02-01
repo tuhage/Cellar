@@ -14,8 +14,12 @@ struct CountedSectionHeader: View {
             Label(title, systemImage: systemImage)
             Spacer()
             Text("\(count)")
-                .foregroundStyle(.secondary)
                 .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+                .badgeInset()
+                .background(.quaternary, in: Capsule())
+                .contentTransition(.numericText())
         }
     }
 }

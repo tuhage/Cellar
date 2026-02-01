@@ -7,11 +7,15 @@ struct EmptyStateView: View {
     var description: String?
 
     var body: some View {
-        if let description {
-            ContentUnavailableView(title, systemImage: systemImage, description: Text(description))
-        } else {
-            ContentUnavailableView(title, systemImage: systemImage)
+        Group {
+            if let description {
+                ContentUnavailableView(title, systemImage: systemImage, description: Text(description))
+            } else {
+                ContentUnavailableView(title, systemImage: systemImage)
+            }
         }
+        .symbolEffect(.pulse)
+        .transition(.opacity)
     }
 }
 

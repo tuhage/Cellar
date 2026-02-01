@@ -125,42 +125,43 @@ struct DashboardView: View {
                 seeAllButton(to: .services)
             }
 
-            GroupBox {
-                VStack(spacing: 0) {
-                    DividedForEach(data: Array(summary.services.prefix(5))) { service in
-                        Button {
-                            selection = .services
-                        } label: {
-                            serviceRow(service)
-                        }
-                        .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                DividedForEach(data: Array(summary.services.prefix(5))) { service in
+                    Button {
+                        selection = .services
+                    } label: {
+                        serviceRow(service)
                     }
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(.vertical, Spacing.compact)
+            .cardStyle()
         }
     }
 
     private func serviceRow(_ service: BrewServiceItem) -> some View {
-        HStack(spacing: Spacing.row) {
-            Circle()
-                .fill(service.status.color)
-                .frame(width: IconSize.statusDot, height: IconSize.statusDot)
+        DashboardHoverRow {
+            HStack(spacing: Spacing.row) {
+                Circle()
+                    .fill(service.status.color)
+                    .frame(width: IconSize.statusDot, height: IconSize.statusDot)
 
-            Text(service.name)
-                .fontWeight(.medium)
+                Text(service.name)
+                    .fontWeight(.medium)
 
-            Spacer()
+                Spacer()
 
-            Text(service.status.label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(service.status.label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .listRowInset()
         }
-        .listRowInset()
-        .contentShape(Rectangle())
     }
 
     // MARK: - Quick Actions Section
@@ -217,45 +218,46 @@ struct DashboardView: View {
                 seeAllButton(to: .formulae)
             }
 
-            GroupBox {
-                VStack(spacing: 0) {
-                    DividedForEach(data: summary.recentlyInstalled) { formula in
-                        Button {
-                            packageStore.selectedFormulaId = formula.id
-                            selection = .formulae
-                        } label: {
-                            recentlyInstalledRow(formula)
-                        }
-                        .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                DividedForEach(data: summary.recentlyInstalled) { formula in
+                    Button {
+                        packageStore.selectedFormulaId = formula.id
+                        selection = .formulae
+                    } label: {
+                        recentlyInstalledRow(formula)
                     }
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(.vertical, Spacing.compact)
+            .cardStyle()
         }
     }
 
     private func recentlyInstalledRow(_ formula: Formula) -> some View {
-        HStack(spacing: Spacing.row) {
-            Image(systemName: "terminal")
-                .foregroundStyle(.blue)
-                .frame(width: IconSize.iconColumn)
+        DashboardHoverRow {
+            HStack(spacing: Spacing.row) {
+                Image(systemName: "terminal")
+                    .foregroundStyle(.blue)
+                    .frame(width: IconSize.iconColumn)
 
-            Text(formula.name)
-                .fontWeight(.medium)
+                Text(formula.name)
+                    .fontWeight(.medium)
 
-            Spacer()
+                Spacer()
 
-            if let installTime = formula.installTime {
-                Text(Self.relativeDateFormatter.localizedString(for: installTime, relativeTo: .now))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let installTime = formula.installTime {
+                    Text(Self.relativeDateFormatter.localizedString(for: installTime, relativeTo: .now))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
-
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            .listRowInset()
         }
-        .listRowInset()
-        .contentShape(Rectangle())
     }
 
     // MARK: - Taps Section
@@ -270,51 +272,52 @@ struct DashboardView: View {
                 seeAllButton(to: .taps)
             }
 
-            GroupBox {
-                VStack(spacing: 0) {
-                    DividedForEach(data: summary.taps) { tap in
-                        Button {
-                            selection = .taps
-                        } label: {
-                            tapRow(tap)
-                        }
-                        .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                DividedForEach(data: summary.taps) { tap in
+                    Button {
+                        selection = .taps
+                    } label: {
+                        tapRow(tap)
                     }
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(.vertical, Spacing.compact)
+            .cardStyle()
         }
     }
 
     private func tapRow(_ tap: Tap) -> some View {
-        HStack(spacing: Spacing.row) {
-            Image(systemName: "spigot")
-                .foregroundStyle(.teal)
-                .frame(width: IconSize.iconColumn)
+        DashboardHoverRow {
+            HStack(spacing: Spacing.row) {
+                Image(systemName: "spigot")
+                    .foregroundStyle(.teal)
+                    .frame(width: IconSize.iconColumn)
 
-            Text(tap.name)
-                .fontWeight(.medium)
-
-            if tap.official {
-                Text("Official")
-                    .font(.caption2)
+                Text(tap.name)
                     .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .smallBadgeInset()
-                    .background(.blue.gradient, in: Capsule())
+
+                if tap.official {
+                    Text("Official")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .smallBadgeInset()
+                        .background(.blue.gradient, in: Capsule())
+                }
+
+                Spacer()
+
+                Text("\(tap.totalPackages) packages")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
-
-            Spacer()
-
-            Text("\(tap.totalPackages) packages")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            .listRowInset()
         }
-        .listRowInset()
-        .contentShape(Rectangle())
     }
 
     // MARK: - Outdated Section
@@ -336,13 +339,13 @@ struct DashboardView: View {
                     .foregroundStyle(.secondary)
             }
 
-            GroupBox {
-                VStack(spacing: 0) {
-                    ForEach(Array(formulae.enumerated()), id: \.element.id) { index, formula in
-                        Button {
-                            packageStore.selectedFormulaId = formula.id
-                            selection = .formulae
-                        } label: {
+            VStack(spacing: 0) {
+                ForEach(Array(formulae.enumerated()), id: \.element.id) { index, formula in
+                    Button {
+                        packageStore.selectedFormulaId = formula.id
+                        selection = .formulae
+                    } label: {
+                        DashboardHoverRow {
                             outdatedRow(
                                 name: formula.name,
                                 description: formula.desc,
@@ -352,18 +355,20 @@ struct DashboardView: View {
                                 targetVersion: "latest"
                             )
                         }
-                        .buttonStyle(.plain)
-
-                        if index < formulae.count - 1 || !casks.isEmpty || remaining > 0 {
-                            Divider()
-                        }
                     }
+                    .buttonStyle(.plain)
 
-                    ForEach(Array(casks.enumerated()), id: \.element.id) { index, cask in
-                        Button {
-                            packageStore.selectedCaskId = cask.id
-                            selection = .casks
-                        } label: {
+                    if index < formulae.count - 1 || !casks.isEmpty || remaining > 0 {
+                        Divider()
+                    }
+                }
+
+                ForEach(Array(casks.enumerated()), id: \.element.id) { index, cask in
+                    Button {
+                        packageStore.selectedCaskId = cask.id
+                        selection = .casks
+                    } label: {
+                        DashboardHoverRow {
                             outdatedRow(
                                 name: cask.displayName,
                                 description: cask.desc,
@@ -373,31 +378,33 @@ struct DashboardView: View {
                                 targetVersion: cask.version
                             )
                         }
-                        .buttonStyle(.plain)
-
-                        if index < casks.count - 1 || remaining > 0 {
-                            Divider()
-                        }
                     }
+                    .buttonStyle(.plain)
 
-                    if remaining > 0 {
-                        Button {
-                            selection = .outdated
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text("and \(remaining) more\u{2026}")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                            }
-                            .padding(.vertical, Spacing.item)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                    if index < casks.count - 1 || remaining > 0 {
+                        Divider()
                     }
                 }
+
+                if remaining > 0 {
+                    Button {
+                        selection = .outdated
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("and \(remaining) more\u{2026}")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .padding(.vertical, Spacing.item)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
+            .padding(.vertical, Spacing.compact)
+            .cardStyle()
         }
     }
 
@@ -468,7 +475,7 @@ struct DashboardView: View {
                 }
                 .contentShape(RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
         }
-        .buttonStyle(NavigableCardStyle())
+        .buttonStyle(HoverableCardButtonStyle())
     }
 
     private func seeAllButton(to destination: SidebarItem) -> some View {
@@ -478,8 +485,7 @@ struct DashboardView: View {
             Text("See All")
                 .font(.subheadline)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.blue)
+        .buttonStyle(SeeAllButtonStyle())
     }
 
     private static let relativeDateFormatter: RelativeDateTimeFormatter = {
@@ -489,17 +495,39 @@ struct DashboardView: View {
     }()
 }
 
-// MARK: - Navigable Card Style
 
-private struct NavigableCardStyle: ButtonStyle {
+// MARK: - Dashboard Hover Row
+
+/// A row wrapper that highlights on hover for dashboard list sections.
+private struct DashboardHoverRow<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    @State private var isHovered = false
+
+    var body: some View {
+        content()
+            .padding(.horizontal, Spacing.item)
+            .background(
+                RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(Opacity.hoverOverlay) : .clear)
+            )
+            .contentShape(Rectangle())
+            .onHover { isHovered = $0 }
+            .animation(AnimationToken.interactive, value: isHovered)
+    }
+}
+
+// MARK: - See All Button Style
+
+private struct SeeAllButtonStyle: ButtonStyle {
     @State private var isHovered = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .brightness(isHovered ? 0.03 : 0)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-            .animation(.easeInOut(duration: 0.15), value: isHovered)
+            .foregroundStyle(.blue)
+            .opacity(configuration.isPressed ? 0.6 : isHovered ? 0.8 : 1.0)
+            .animation(AnimationToken.interactive, value: isHovered)
+            .animation(AnimationToken.interactive, value: configuration.isPressed)
             .onHover { isHovered = $0 }
     }
 }

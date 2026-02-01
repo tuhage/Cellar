@@ -101,8 +101,10 @@ struct OutdatedView: View {
         .overlay(alignment: .top) {
             if isUpgradingAll {
                 upgradeAllBanner
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(AnimationToken.smooth, value: isUpgradingAll)
     }
 
     // MARK: - Upgrade All Banner

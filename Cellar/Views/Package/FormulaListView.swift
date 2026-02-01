@@ -123,6 +123,7 @@ struct FormulaListView: View {
                 .listRowSeparator(.hidden)
             }
         }
+        .listRowSeparatorTint(.primary.opacity(0.05))
     }
 
     private func installedFormulaRow(_ formula: Formula) -> some View {

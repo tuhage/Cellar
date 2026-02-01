@@ -36,6 +36,7 @@ struct InstallProgressSheet: ViewModifier {
                     .padding()
                 }
                 .frame(minWidth: 500, minHeight: 350)
+                .presentationBackground(.ultraThinMaterial)
             }
         }
     }

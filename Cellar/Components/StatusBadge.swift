@@ -20,8 +20,11 @@ struct StatusBadge: View {
         .font(.caption)
         .fontWeight(.medium)
         .badgeInset()
-        .background(color.opacity(0.12), in: Capsule())
+        .background(color.opacity(Opacity.badgeBackground), in: Capsule())
+        .overlay(Capsule().strokeBorder(color.opacity(0.2), lineWidth: 0.5))
         .foregroundStyle(color)
+        .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
+        .transition(.scale.combined(with: .opacity))
     }
 }
 

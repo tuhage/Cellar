@@ -13,6 +13,7 @@ struct ErrorView: View {
     var body: some View {
         ContentUnavailableView {
             Label("Something Went Wrong", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.red.opacity(0.8))
         } description: {
             VStack(spacing: 8) {
                 Text(message)
@@ -26,8 +27,11 @@ struct ErrorView: View {
             if let retryAction {
                 Button("Retry", action: retryAction)
                     .buttonStyle(.borderedProminent)
+                    .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
             }
         }
+        .transition(.opacity)
+        .animation(AnimationToken.smooth, value: message)
     }
 
     // MARK: - Suggestion Detection

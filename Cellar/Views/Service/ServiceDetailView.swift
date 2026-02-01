@@ -14,11 +14,13 @@ struct ServiceDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 headerSection
-                Divider()
+                Divider().opacity(0.5)
                 infoSection
-                Divider()
+                    .padding(Spacing.cardPadding)
+                    .cardStyle()
+                Divider().opacity(0.5)
                 actionsSection
-                Divider()
+                Divider().opacity(0.5)
                 logsPlaceholderSection
             }
             .padding(Spacing.section)
@@ -69,7 +71,8 @@ struct ServiceDetailView: View {
                 .font(.title2)
                 .foregroundStyle(.green)
                 .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
-                .background(.green.opacity(0.1), in: Circle())
+                .background(.green.opacity(Opacity.iconBackground), in: Circle())
+                .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
 
             VStack(alignment: .leading, spacing: Spacing.related) {
                 Text(service.name)
@@ -84,7 +87,7 @@ struct ServiceDetailView: View {
     // MARK: - Info
 
     private var infoSection: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 10) {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Spacing.cardPadding, verticalSpacing: Spacing.row) {
             GridRow {
                 Text("Name")
                     .foregroundStyle(.secondary)
@@ -217,7 +220,12 @@ struct ServiceDetailView: View {
                     .foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, minHeight: 150)
-            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: CornerRadius.card))
+            .cardStyle(cornerRadius: CornerRadius.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+                    .foregroundStyle(.tertiary)
+            )
         }
     }
 
@@ -253,7 +261,8 @@ private struct ServiceDetailStatusBadge: View {
         }
         .padding(.horizontal, Spacing.sectionContent)
         .padding(.vertical, Spacing.compact)
-        .background(status.color.opacity(0.1), in: Capsule())
+        .background(status.color.opacity(Opacity.badgeBackground), in: Capsule())
+        .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
     }
 }
 

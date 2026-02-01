@@ -12,7 +12,7 @@ struct ProcessOutputView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
+            Divider().opacity(0.5)
             outputArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -32,12 +32,15 @@ struct ProcessOutputView: View {
             } else if error != nil {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.red)
+                    .transition(.scale.combined(with: .opacity))
             } else {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding()
+        .animation(AnimationToken.snap, value: isRunning)
+        .padding(Spacing.cardPadding)
     }
 
     private var outputArea: some View {
@@ -61,6 +64,7 @@ struct ProcessOutputView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
             }
+            .background(.primary.opacity(0.02))
             .background(.background.secondary)
             .onChange(of: lines.count) {
                 withAnimation {

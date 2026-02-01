@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		CC100001WIDGET0000000001 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC100002WIDGET0000000002 /* CellarCore */; };
 		CC200001CLI000000000001 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC200002CLI000000000002 /* CellarCore */; };
+		CC300002EMBEDWIDGET00001 /* CellarWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CC500002WIDGETAPPEX0001 /* CellarWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CC300003EMBEDFS000000001 /* CellarFinderSync.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CCF00004FSPRODUCT0000001 /* CellarFinderSync.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CCC10001CLICOPYFILE00001 /* cellar in Copy CLI Tool */ = {isa = PBXBuildFile; fileRef = CC600001CLIPRODUCT00001 /* cellar */; };
 		CCF00001FSBUILDFILE00001 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CCF00002FSPKGDEP00000001 /* CellarCore */; };
 		E59E70032F2D213A00937D73 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC000002CELLARCORE000002 /* CellarCore */; };
 /* End PBXBuildFile section */
@@ -20,6 +23,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = CC500001WIDGETTARGET0001;
 			remoteInfo = CellarWidget;
+		};
+		CCC10002CLIPROXY00000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E59E6E2B2F2CDDDC00937D73 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CCC00001CLITARGET000001;
+			remoteInfo = CellarCLI;
 		};
 		CCF00003FSPROXY000000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -37,8 +47,21 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				CC300002EMBEDWIDGET00001 /* CellarWidget.appex in Embed Foundation Extensions */,
+				CC300003EMBEDFS000000001 /* CellarFinderSync.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CCC10003CLICOPY000000001 /* Copy CLI Tool */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 7;
+			files = (
+				CCC10001CLICOPYFILE00001 /* cellar in Copy CLI Tool */,
+			);
+			name = "Copy CLI Tool";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -210,12 +233,14 @@
 				E59E6E302F2CDDDC00937D73 /* Frameworks */,
 				E59E6E312F2CDDDC00937D73 /* Resources */,
 				CC300001EMBEDEXT0000001 /* Embed Foundation Extensions */,
+				CCC10003CLICOPY000000001 /* Copy CLI Tool */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				CC400002WIDGETDEP000001 /* PBXTargetDependency */,
 				CCF00009FSDEP0000000001 /* PBXTargetDependency */,
+				CCC10004CLIDEP0000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				E59E6E352F2CDDDC00937D73 /* Cellar */,
@@ -338,6 +363,11 @@
 			target = CC500001WIDGETTARGET0001 /* CellarWidget */;
 			targetProxy = CC400001WIDGETPROXY00001 /* PBXContainerItemProxy */;
 		};
+		CCC10004CLIDEP0000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CCC00001CLITARGET000001 /* CellarCLI */;
+			targetProxy = CCC10002CLIPROXY00000001 /* PBXContainerItemProxy */;
+		};
 		CCF00009FSDEP0000000001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = CCF00010FSTARGET00000001 /* CellarFinderSync */;
@@ -355,6 +385,7 @@
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CellarWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CellarWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -380,6 +411,7 @@
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CellarWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CellarWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -149,7 +149,8 @@ struct MaintenanceView: View {
 
     private var runningOverlay: some View {
         ZStack {
-            Color.black.opacity(0.3)
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
 
             VStack(spacing: Spacing.cardPadding) {
@@ -165,8 +166,9 @@ struct MaintenanceView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            .padding(32)
+            .padding(Spacing.section)
             .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: CornerRadius.extraLarge))
+            .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
         }
     }
 }
@@ -216,7 +218,7 @@ private struct MaintenanceReportRow: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 guard report.details != nil else { return }
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(AnimationToken.snap) {
                     isExpanded.toggle()
                 }
             }
@@ -227,7 +229,7 @@ private struct MaintenanceReportRow: View {
                     .foregroundStyle(.secondary)
                     .padding(Spacing.item)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
+                    .cardStyle(cornerRadius: CornerRadius.small)
                     .padding(.leading, 38)
                     .textSelection(.enabled)
             }

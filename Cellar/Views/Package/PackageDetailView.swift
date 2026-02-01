@@ -84,21 +84,26 @@ struct PackageDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 headerSection
-                Divider()
+                Divider().opacity(0.5)
                 infoSection
+                    .padding(Spacing.cardPadding)
+                    .cardStyle()
                 if !badges.isEmpty {
-                    Divider()
+                    Divider().opacity(0.5)
                     badgeSection
+                        .transition(.opacity)
                 }
                 if case .formula(let formula) = package, !formula.dependencies.isEmpty {
-                    Divider()
+                    Divider().opacity(0.5)
                     dependenciesSection(formula.dependencies)
+                        .transition(.opacity)
                 }
                 if case .formula(let formula) = package, !formula.runtimeDependencies.isEmpty {
-                    Divider()
+                    Divider().opacity(0.5)
                     runtimeDependenciesSection(formula.runtimeDependencies)
+                        .transition(.opacity)
                 }
-                Divider()
+                Divider().opacity(0.5)
                 actionsSection
             }
             .padding(Spacing.section)
@@ -123,7 +128,8 @@ struct PackageDetailView: View {
                 .font(.title2)
                 .foregroundStyle(packageColor)
                 .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
-                .background(packageColor.opacity(0.1), in: Circle())
+                .background(packageColor.opacity(Opacity.iconBackground), in: Circle())
+                .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
 
             VStack(alignment: .leading, spacing: Spacing.related) {
                 HStack(alignment: .firstTextBaseline) {
@@ -149,7 +155,7 @@ struct PackageDetailView: View {
     // MARK: - Info
 
     private var infoSection: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 10) {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Spacing.cardPadding, verticalSpacing: Spacing.row) {
             GridRow {
                 Text("Identifier")
                     .foregroundStyle(.secondary)
@@ -261,6 +267,11 @@ struct PackageDetailView: View {
                         .fontDesign(.monospaced)
                         .chipInset()
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: CornerRadius.small)
+                                .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
+                        )
+                        .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
                 }
             }
         }
@@ -283,6 +294,11 @@ struct PackageDetailView: View {
                     .fontDesign(.monospaced)
                     .chipInset()
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: CornerRadius.small)
+                            .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
+                    )
+                    .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
                 }
             }
         }

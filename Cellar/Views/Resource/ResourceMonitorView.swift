@@ -101,7 +101,7 @@ struct ResourceMonitorView: View {
             }
         }
         .padding(Spacing.cardPadding)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
+        .cardStyle()
     }
 
     @ViewBuilder
@@ -204,13 +204,13 @@ struct ResourceMonitorView: View {
             Spacer()
         }
         .padding(Spacing.cardPadding)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
+        .cardStyle()
     }
 
     // MARK: - Resource Table
 
     private var resourceTable: some View {
-        GroupBox {
+        VStack(spacing: 0) {
             Table(store.sortedUsages) {
                 TableColumn("Service") { usage in
                     HStack(spacing: Spacing.item) {
@@ -252,6 +252,7 @@ struct ResourceMonitorView: View {
             .tableStyle(.inset(alternatesRowBackgrounds: true))
             .frame(minHeight: CGFloat(store.sortedUsages.count) * 32 + 32)
         }
+        .cardStyle()
     }
 
     // MARK: - Resource Summary
@@ -275,6 +276,8 @@ struct ResourceMonitorView: View {
         .padding(.horizontal, Spacing.row)
         .padding(.vertical, Spacing.related)
         .background(color.opacity(0.08), in: Capsule())
+        .overlay(Capsule().strokeBorder(color.opacity(0.15), lineWidth: 0.5))
+        .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
     }
 
     // MARK: - Helpers
@@ -341,6 +344,7 @@ struct ResourceMonitorView: View {
                 RoundedRectangle(cornerRadius: CornerRadius.minimal)
                     .fill(cpuColor(for: percent))
                     .frame(width: geometry.size.width * min(percent / 100.0, 1.0))
+                    .animation(AnimationToken.smooth, value: percent)
             }
         }
         .frame(width: 60, height: IconSize.statusDot)

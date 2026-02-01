@@ -28,6 +28,7 @@ struct OnboardingView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 96, height: 96)
+                .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
 
             VStack(spacing: Spacing.item) {
                 Text("Welcome to Cellar")
@@ -45,23 +46,23 @@ struct OnboardingView: View {
     // MARK: - Command Box
 
     private var commandBox: some View {
-        GroupBox {
-            HStack {
-                Text(Self.installCommand)
-                    .font(.system(.callout, design: .monospaced))
-                    .textSelection(.enabled)
-                    .lineLimit(2)
+        HStack {
+            Text(Self.installCommand)
+                .font(.system(.callout, design: .monospaced))
+                .textSelection(.enabled)
+                .lineLimit(2)
 
-                Spacer()
+            Spacer()
 
-                Button(action: copyInstallCommand) {
-                    Label(isCopied ? "Copied!" : "Copy", systemImage: isCopied ? "checkmark" : "doc.on.doc")
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(.bordered)
+            Button(action: copyInstallCommand) {
+                Label(isCopied ? "Copied!" : "Copy", systemImage: isCopied ? "checkmark" : "doc.on.doc")
+                    .contentTransition(.symbolEffect(.replace))
             }
-            .padding(Spacing.compact)
+            .buttonStyle(.bordered)
         }
+        .padding(Spacing.sectionContent)
+        .background(.primary.opacity(0.03))
+        .cardStyle(cornerRadius: CornerRadius.card)
     }
 
     // MARK: - Actions
@@ -74,6 +75,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .shadow(color: Shadow.cardColor, radius: Shadow.cardBlur, y: Shadow.cardY)
 
             Button(action: recheckBrew) {
                 Label("Check Again", systemImage: "arrow.clockwise")
@@ -84,6 +86,8 @@ struct OnboardingView: View {
                 Label("Homebrew was not found. Please install it and try again.", systemImage: "xmark.circle.fill")
                     .foregroundStyle(.red)
                     .font(.callout)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .animation(AnimationToken.snap, value: showNotFoundError)
             }
 
             Link(destination: URL(string: "https://brew.sh")!) {

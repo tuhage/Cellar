@@ -5,17 +5,13 @@ struct RefreshToolbarButton: View {
     var action: () async -> Void
 
     var body: some View {
-        if isLoading {
-            ProgressView()
-                .controlSize(.small)
-                .padding(.horizontal, 8)
-        } else {
-            Button {
-                Task { await action() }
-            } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
+        Button {
+            Task { await action() }
+        } label: {
+            Label("Refresh", systemImage: isLoading ? "progress.indicator" : "arrow.clockwise")
+                .contentTransition(.symbolEffect(.replace))
         }
+        .disabled(isLoading)
     }
 }
 

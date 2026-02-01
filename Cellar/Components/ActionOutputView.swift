@@ -23,6 +23,11 @@ struct ActionOutputView: View {
                     .keyboardShortcut(.defaultAction)
             }
             .padding()
+            .background {
+                Rectangle()
+                    .fill(.background)
+                    .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: -Shadow.subtleY)
+            }
         }
     }
 }
