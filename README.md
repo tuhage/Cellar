@@ -19,30 +19,32 @@
 ## Features
 
 - **Dashboard** — Overview of installed packages, services, and system health at a glance
-- **Package Management** — Browse, install, upgrade, and uninstall Homebrew formulae and casks
+- **Package Management** — Browse, install, upgrade, and uninstall formulae and casks
 - **Services** — Start, stop, and monitor Homebrew services with real-time status
 - **Dependency Graph** — Visualize package dependencies interactively
 - **Resource Monitor** — Track Homebrew disk usage and system resources
 - **Maintenance** — Run cleanup, doctor checks, and manage taps
 - **Brewfile Support** — View and manage Brewfiles from your projects
-- **Search** — Find new packages with integrated Homebrew search
-- **Widget** — WidgetKit extension with small, medium, and large sizes
-- **CLI Tool** — `cellar` command-line tool for quick operations
-- **Finder Sync** — Badges directories containing Brewfiles, right-click service controls
+- **Search** — Find new packages with integrated search
+- **Widget** — Desktop widget with small, medium, and large sizes
+- **CLI Tool** — `cellar` command-line tool for quick terminal operations
+- **Finder Integration** — Badges directories containing Brewfiles, right-click service controls
 - **Spotlight** — All installed packages indexed for system-wide search
-- **Keyboard Shortcuts** — Configurable shortcuts for common actions
 
 ## Screenshots
 
 > Coming soon
 
-## Requirements
+## Installation
+
+### Download
+
+Download the latest `.dmg` from the [Releases](https://github.com/tuhage/Cellar/releases) page. Open the `.dmg` and drag **Cellar** to your **Applications** folder.
+
+### Requirements
 
 - macOS 15 or later
 - [Homebrew](https://brew.sh) installed
-- Xcode 16+ (to build from source)
-
-## Installation
 
 ### Build from Source
 
@@ -52,57 +54,29 @@ cd Cellar
 xcodebuild -project Cellar.xcodeproj -scheme Cellar -configuration Release build -allowProvisioningUpdates
 ```
 
-The built app will be in `DerivedData/Build/Products/Release/Cellar.app`.
+## CLI Tool
 
-## Architecture
-
-Cellar follows the **Model-View (MV)** pattern — no ViewModels. Views bind directly to Models and Stores.
-
-All shared code lives in the **CellarCore** local Swift package, which every target imports.
-
-| Target | Product | Description |
-|--------|---------|-------------|
-| Cellar | Cellar.app | Main macOS app |
-| CellarWidget | CellarWidget.appex | WidgetKit extension |
-| CellarCLI | cellar | Command-line tool |
-| CellarFinderSync | CellarFinderSync.appex | Finder Sync extension |
-| CellarCore | CellarCore.framework | Shared models and services |
-
-All data is derived from the `brew` CLI at runtime — there is no local database. No third-party dependencies are used.
-
-## CLI Usage
-
-The `cellar` command-line tool provides quick access to common operations:
+Cellar includes a command-line tool for quick terminal access:
 
 ```bash
-cellar status              # Show summary of installed packages and services
-cellar start <service>     # Start a Homebrew service
-cellar stop <service>      # Stop a Homebrew service
-cellar health              # Run brew doctor and show results
-cellar cleanup             # Clean up old downloads and cache files
-cellar version             # Show version
-cellar help                # Show help message
+cellar status              # Package and service summary
+cellar start <service>     # Start a service
+cellar stop <service>      # Stop a service
+cellar health              # Run brew doctor
+cellar cleanup             # Clean up old downloads and cache
 ```
-
-## Widget
-
-The Cellar widget reads a snapshot from the shared App Group container and displays Homebrew status on your desktop:
-
-- **Small** — Service count
-- **Medium** — Services and outdated packages
-- **Large** — Full summary
 
 ## URL Scheme
 
-Cellar supports deep linking via the `cellar://` URL scheme:
+Open specific sections directly via `cellar://` links:
 
 ```
-cellar://formula/<name>    # Navigate to a formula
-cellar://cask/<token>      # Navigate to a cask
-cellar://dashboard         # Open dashboard
-cellar://services          # Open services
+cellar://formula/<name>
+cellar://cask/<token>
+cellar://dashboard
+cellar://services
 ```
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.
