@@ -200,7 +200,7 @@ private struct SearchFormulaRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(formula.name)
                     .fontWeight(.medium)
 
@@ -233,7 +233,7 @@ private struct SearchFormulaRow: View {
                 .disabled(isInstalling)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Spacing.textPair)
     }
 }
 
@@ -246,7 +246,7 @@ private struct SearchCaskRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(cask.displayName)
                     .fontWeight(.medium)
 
@@ -285,7 +285,7 @@ private struct SearchCaskRow: View {
                 .disabled(isInstalling)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Spacing.textPair)
     }
 }
 

@@ -14,12 +14,12 @@ struct QuickActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.row) {
                 Image(systemName: systemImage)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(color.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
+                    .background(color.gradient, in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
@@ -32,7 +32,7 @@ struct QuickActionButton: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(10)
+            .padding(Spacing.row)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(QuickActionButtonStyle())
@@ -47,17 +47,17 @@ private struct QuickActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
                     .fill(configuration.isPressed ? .tertiary : .quaternary)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    HStack(spacing: 12) {
+    HStack(spacing: Spacing.sectionContent) {
         QuickActionButton(
             title: "Upgrade All",
             subtitle: "3 available",

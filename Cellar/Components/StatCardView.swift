@@ -8,14 +8,14 @@ struct StatCardView: View {
     var color: Color = .accentColor
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Spacing.detailElement) {
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(color.gradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .frame(width: IconSize.mediumIcon, height: IconSize.mediumIcon)
+                .background(color.gradient, in: RoundedRectangle(cornerRadius: CornerRadius.medium, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(value)
                     .font(.system(.title2, design: .rounded, weight: .bold))
                     .contentTransition(.numericText())
@@ -27,13 +27,13 @@ struct StatCardView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(14)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(Spacing.detailElement)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
     }
 }
 
 #Preview {
-    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.sectionContent) {
         StatCardView(title: "Formulae", value: "142", systemImage: "terminal", color: .blue)
         StatCardView(title: "Casks", value: "38", systemImage: "macwindow", color: .purple)
         StatCardView(title: "Services", value: "4/7", systemImage: "gearshape.2", color: .green)

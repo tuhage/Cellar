@@ -108,17 +108,17 @@ struct OutdatedView: View {
     // MARK: - Upgrade All Banner
 
     private var upgradeAllBanner: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.item) {
             ProgressView()
                 .controlSize(.small)
             Text("Upgrading all packages\u{2026}")
                 .font(.callout)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, Spacing.cardPadding)
+        .padding(.vertical, Spacing.row)
+        .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: CornerRadius.card))
         .shadow(radius: 4, y: 2)
-        .padding(.top, 8)
+        .padding(.top, Spacing.item)
     }
 
     // MARK: - Actions
@@ -151,7 +151,7 @@ private struct OutdatedPackageRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(name)
                     .fontWeight(.medium)
 
@@ -165,7 +165,7 @@ private struct OutdatedPackageRow: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.compact) {
                 Text(currentVersion)
                     .font(.callout.monospaced())
                     .foregroundStyle(.secondary)
@@ -196,7 +196,7 @@ private struct OutdatedPackageRow: View {
             .controlSize(.small)
             .disabled(isUpgrading)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Spacing.textPair)
     }
 }
 

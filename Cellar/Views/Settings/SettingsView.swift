@@ -29,13 +29,13 @@ struct SettingsView: View {
             }
 
             Section("About") {
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.sectionContent) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable()
                         .frame(width: 48, height: 48)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card))
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Spacing.textPair) {
                         Text("Cellar")
                             .font(.headline)
                         Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
@@ -43,7 +43,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, Spacing.compact)
 
                 Link(destination: URL(string: "https://brew.sh")!) {
                     Label("Homebrew Website", systemImage: "globe")

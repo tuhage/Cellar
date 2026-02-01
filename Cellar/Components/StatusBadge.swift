@@ -19,15 +19,14 @@ struct StatusBadge: View {
         }
         .font(.caption)
         .fontWeight(.medium)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .badgeInset()
         .background(color.opacity(0.12), in: Capsule())
         .foregroundStyle(color)
     }
 }
 
 #Preview {
-    HStack(spacing: 8) {
+    HStack(spacing: Spacing.item) {
         StatusBadge(text: "Outdated", color: .orange)
         StatusBadge(text: "Pinned", color: .blue, icon: "pin.fill")
         StatusBadge(text: "Deprecated", color: .red, icon: "exclamationmark.triangle")

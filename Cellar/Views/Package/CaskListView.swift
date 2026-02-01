@@ -127,7 +127,7 @@ struct CaskListView: View {
 
     private func installedCaskRow(_ cask: Cask) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(cask.displayName)
                     .fontWeight(.medium)
 
@@ -144,7 +144,7 @@ struct CaskListView: View {
                 .foregroundStyle(.secondary)
                 .font(.body.monospaced())
 
-            HStack(spacing: 6) {
+            HStack(spacing: Spacing.related) {
                 if cask.outdated {
                     StatusBadge(text: "Outdated", color: .orange)
                 }
@@ -179,7 +179,7 @@ struct CaskListView: View {
     private var caskTable: some View {
         Table(store.filteredCasks, selection: $selectedCaskID, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.token) { cask in
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.textPair) {
                     Text(cask.displayName)
                         .fontWeight(.medium)
                     if cask.displayName != cask.token {
@@ -212,7 +212,7 @@ struct CaskListView: View {
             .width(min: 60, ideal: 100)
 
             TableColumn("Status") { cask in
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.related) {
                     if cask.outdated {
                         StatusBadge(text: "Outdated", color: .orange)
                     }

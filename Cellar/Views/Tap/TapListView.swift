@@ -64,6 +64,7 @@ struct TapListView: View {
                     Text("\(store.taps.count) taps")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, Spacing.item)
                 }
             }
         }
@@ -91,7 +92,7 @@ struct TapListView: View {
     private var tapTable: some View {
         Table(store.filteredTaps, selection: $selectedTapID, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.name) { tap in
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.related) {
                     Text(tap.name)
                         .fontWeight(.medium)
                     if tap.official {
@@ -119,7 +120,7 @@ struct TapListView: View {
             .width(min: 60, ideal: 80)
 
             TableColumn("Source") { tap in
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.related) {
                     Image(systemName: tap.installed ? "externaldrive" : "cloud")
                         .foregroundStyle(.secondary)
                         .font(.callout)
@@ -178,7 +179,7 @@ private struct AddTapSheet: View {
     @State private var tapName = ""
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.cardPadding) {
             Text("Add Tap")
                 .font(.headline)
 

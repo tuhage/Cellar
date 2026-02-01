@@ -109,12 +109,12 @@ struct MaintenanceView: View {
     private var reportsSection: some View {
         Section {
             if store.reports.isEmpty {
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.sectionContent) {
                     Image(systemName: "doc.text")
                         .font(.title3)
                         .foregroundStyle(.tertiary)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Spacing.textPair) {
                         Text("No Reports Yet")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -125,7 +125,7 @@ struct MaintenanceView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 8)
+                .padding(.vertical, Spacing.item)
             } else {
                 ForEach(store.reports) { report in
                     MaintenanceReportRow(report: report)
@@ -152,7 +152,7 @@ struct MaintenanceView: View {
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
 
-            VStack(spacing: 16) {
+            VStack(spacing: Spacing.cardPadding) {
                 ProgressView()
                     .controlSize(.large)
 
@@ -166,7 +166,7 @@ struct MaintenanceView: View {
                     .foregroundStyle(.secondary)
             }
             .padding(32)
-            .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: CornerRadius.extraLarge))
         }
     }
 }
@@ -179,14 +179,14 @@ private struct MaintenanceReportRow: View {
     @State private var isExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.item) {
+            HStack(alignment: .top, spacing: Spacing.row) {
                 let iconColor: Color = report.type == .cleanup ? .orange : .green
                 Image(systemName: report.type.icon)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(iconColor.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
+                    .background(iconColor.gradient, in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .firstTextBaseline) {
@@ -225,14 +225,14 @@ private struct MaintenanceReportRow: View {
                 Text(details)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
-                    .padding(8)
+                    .padding(Spacing.item)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
                     .padding(.leading, 38)
                     .textSelection(.enabled)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.compact)
     }
 }
 

@@ -102,12 +102,12 @@ struct ProjectListView: View {
                     .buttonStyle(.borderless)
                 }
             }
-            .padding(8)
+            .padding(Spacing.item)
         }
     }
 
     private var emptyProjectList: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.item) {
             Spacer()
             Image(systemName: "folder.badge.gearshape")
                 .font(.system(size: 28))
@@ -124,23 +124,23 @@ struct ProjectListView: View {
     }
 
     private func projectRow(_ project: ProjectEnvironment) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.row) {
             Circle()
                 .fill(store.activeProjectId == project.id ? .green : .clear)
-                .frame(width: 8, height: 8)
+                .frame(width: IconSize.statusDot, height: IconSize.statusDot)
                 .overlay {
                     if store.activeProjectId == project.id {
                         Circle()
                             .fill(.green.opacity(0.4))
-                            .frame(width: 14, height: 14)
+                            .frame(width: IconSize.dotGlow, height: IconSize.dotGlow)
                     }
                 }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(project.name)
                     .fontWeight(.medium)
 
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.related) {
                     if !project.services.isEmpty {
                         Label("\(project.services.count)", systemImage: "gearshape.2")
                     }
@@ -174,12 +174,12 @@ struct ProjectListView: View {
     // MARK: - Onboarding
 
     private var onboardingView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: Spacing.section) {
             Image(systemName: "hammer.circle")
                 .font(.system(size: 48))
                 .foregroundStyle(.tint)
 
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.item) {
                 Text("Project Environments")
                     .font(.title2)
                     .fontWeight(.bold)
@@ -191,7 +191,7 @@ struct ProjectListView: View {
                     .frame(maxWidth: 420)
             }
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Spacing.sectionContent) {
                 featureRow(
                     icon: "gearshape.2",
                     color: .blue,
@@ -227,13 +227,13 @@ struct ProjectListView: View {
     }
 
     private func featureRow(icon: String, color: Color, title: String, description: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.sectionContent) {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundStyle(color)
-                .frame(width: 28, alignment: .center)
+                .frame(width: IconSize.smallIcon, alignment: .center)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(title)
                     .fontWeight(.medium)
                 Text(description)
@@ -254,14 +254,14 @@ struct ProjectListView: View {
     }
 
     private func projectDetailHeader(_ project: ProjectEnvironment) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.sectionContent) {
             Image(systemName: "hammer")
                 .font(.title2)
                 .foregroundStyle(.tint)
-                .frame(width: 44, height: 44)
+                .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
                 .background(Color.accentColor.opacity(0.1), in: Circle())
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(project.name)
                     .font(.headline)
                 Text(project.path)
@@ -320,7 +320,7 @@ struct ProjectListView: View {
             if !missingPackages.isEmpty {
                 Section {
                     ForEach(missingPackages, id: \.self) { name in
-                        HStack(spacing: 8) {
+                        HStack(spacing: Spacing.item) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
                                 .font(.caption)
@@ -329,12 +329,11 @@ struct ProjectListView: View {
                         }
                     }
                 } header: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: Spacing.related) {
                         Label("Missing Packages", systemImage: "exclamationmark.triangle.fill")
                         Text("\(missingPackages.count)")
                             .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .smallBadgeInset()
                             .background(.orange.opacity(0.15), in: Capsule())
                     }
                     .foregroundStyle(.orange)
@@ -344,7 +343,7 @@ struct ProjectListView: View {
             // Services section
             Section {
                 if project.services.isEmpty {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.item) {
                         Image(systemName: "info.circle")
                             .foregroundStyle(.secondary)
                         Text("Add brew services this project needs (e.g. postgresql@16, redis).")
@@ -378,7 +377,7 @@ struct ProjectListView: View {
             // Packages section
             Section {
                 if project.packages.isEmpty {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.item) {
                         Image(systemName: "info.circle")
                             .foregroundStyle(.secondary)
                         Text("Add formulae this project depends on (e.g. node, python@3.12).")
@@ -482,7 +481,7 @@ struct ProjectListView: View {
     // MARK: - Add Project Sheet
 
     private var addProjectSheet: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.cardPadding) {
             Text("New Project")
                 .font(.headline)
 
@@ -526,7 +525,7 @@ struct ProjectListView: View {
     // MARK: - Add Service Sheet
 
     private var addServiceSheet: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.cardPadding) {
             Text("Add Service")
                 .font(.headline)
 
@@ -566,7 +565,7 @@ struct ProjectListView: View {
     // MARK: - Add Package Sheet
 
     private var addPackageSheet: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.cardPadding) {
             Text("Add Package")
                 .font(.headline)
 

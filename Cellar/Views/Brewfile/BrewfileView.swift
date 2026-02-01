@@ -99,7 +99,7 @@ struct BrewfileView: View {
 
     private var brewfileContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.section) {
                 profileHeader
                 statsSection
                 quickActionsSection
@@ -108,24 +108,24 @@ struct BrewfileView: View {
                 }
                 packageListSections
             }
-            .padding(24)
+            .padding(Spacing.section)
         }
     }
 
     // MARK: - Profile Header
 
     private var profileHeader: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.sectionContent) {
             Image(systemName: "doc.text.fill")
                 .font(.largeTitle)
                 .foregroundStyle(.blue)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.compact) {
                 if let profile = store.selectedProfile {
                     Text(profile.name)
                         .font(.headline)
 
-                    HStack(spacing: 6) {
+                    HStack(spacing: Spacing.related) {
                         Text(profile.path)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -153,8 +153,8 @@ struct BrewfileView: View {
 
             profileMenu
         }
-        .padding(12)
-        .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(Spacing.sectionContent)
+        .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: CornerRadius.card))
     }
 
     // MARK: - Profile Menu
@@ -202,7 +202,7 @@ struct BrewfileView: View {
     // MARK: - Stats Section
 
     private var statsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: "Contents", systemImage: "tray.full.fill", color: .secondary) {
                 StatusBadge(
                     text: "\(store.parsedContent.totalItems) items",
@@ -211,8 +211,8 @@ struct BrewfileView: View {
             }
 
             LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
-                spacing: 12
+                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.sectionContent), count: 3),
+                spacing: Spacing.sectionContent
             ) {
                 StatCardView(
                     title: "Taps",
@@ -243,12 +243,12 @@ struct BrewfileView: View {
     private var quickActionsSection: some View {
         let isDisabled = store.isLoading || store.isPerformingAction || store.isChecking
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: "Actions", systemImage: "bolt.fill", color: .secondary)
 
             LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
-                spacing: 12
+                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.sectionContent), count: 2),
+                spacing: Spacing.sectionContent
             ) {
                 QuickActionButton(
                     title: "Sync",
@@ -303,12 +303,12 @@ struct BrewfileView: View {
             || result.localizedCaseInsensitiveContains("dependencies are satisfied")
         let bannerColor: Color = isSuccess ? .green : .orange
 
-        return HStack(spacing: 12) {
+        return HStack(spacing: Spacing.sectionContent) {
             Image(systemName: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                 .font(.title2)
                 .foregroundStyle(bannerColor)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(isSuccess ? "All Satisfied" : "Issues Found")
                     .font(.headline)
 
@@ -327,8 +327,8 @@ struct BrewfileView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(12)
-        .background(bannerColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(Spacing.sectionContent)
+        .background(bannerColor.opacity(0.08), in: RoundedRectangle(cornerRadius: CornerRadius.card))
     }
 
     // MARK: - Package List Sections
@@ -373,7 +373,7 @@ struct BrewfileView: View {
         color: Color,
         entries: [BrewfileContent.Entry]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: title, systemImage: systemImage, color: color) {
                 StatusBadge(text: "\(entries.count)", color: color)
             }
@@ -381,18 +381,17 @@ struct BrewfileView: View {
             GroupBox {
                 VStack(spacing: 0) {
                     DividedForEach(data: entries) { entry in
-                        HStack(spacing: 8) {
+                        HStack(spacing: Spacing.item) {
                             Image(systemName: systemImage)
                                 .foregroundStyle(color)
-                                .frame(width: 20)
+                                .frame(width: IconSize.iconColumn)
 
                             Text(entry.name)
                                 .fontWeight(.medium)
 
                             Spacer()
                         }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 4)
+                        .listRowInset()
                     }
                 }
             }
@@ -400,7 +399,7 @@ struct BrewfileView: View {
     }
 
     private var emptyPackagesView: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: "Packages", systemImage: "shippingbox", color: .secondary)
 
             ContentUnavailableView(
@@ -472,7 +471,7 @@ struct BrewfileView: View {
                 TextEditor(text: $store.brewfileContent)
                     .font(.system(.body, design: .monospaced))
                     .scrollContentBackground(.hidden)
-                    .padding(8)
+                    .padding(Spacing.item)
 
                 Divider()
 
@@ -481,12 +480,11 @@ struct BrewfileView: View {
                     Text("\(lineCount) lines")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .badgeInset()
                         .background(.fill.tertiary, in: Capsule())
                     Spacer()
                 }
-                .padding(8)
+                .padding(Spacing.item)
             }
             .navigationTitle("Edit Brewfile")
             .toolbar {
@@ -518,7 +516,7 @@ struct BrewfileView: View {
         let trimmedPath = newProfilePath.trimmingCharacters(in: .whitespaces)
         let isFormValid = !trimmedName.isEmpty && !trimmedPath.isEmpty
 
-        return VStack(spacing: 16) {
+        return VStack(spacing: Spacing.cardPadding) {
             Text("New Profile")
                 .font(.headline)
 
@@ -532,7 +530,7 @@ struct BrewfileView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Spacing.item) {
                     Text("Contents")
                         .font(.subheadline.weight(.medium))
 

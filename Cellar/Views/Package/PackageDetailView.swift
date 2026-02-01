@@ -82,7 +82,7 @@ struct PackageDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.section) {
                 headerSection
                 Divider()
                 infoSection
@@ -101,7 +101,7 @@ struct PackageDetailView: View {
                 Divider()
                 actionsSection
             }
-            .padding(24)
+            .padding(Spacing.section)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(package.name)
@@ -118,14 +118,14 @@ struct PackageDetailView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: Spacing.detailElement) {
             Image(systemName: packageIcon)
                 .font(.title2)
                 .foregroundStyle(packageColor)
-                .frame(width: 44, height: 44)
+                .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
                 .background(packageColor.opacity(0.1), in: Circle())
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.related) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(package.name)
                         .font(.largeTitle)
@@ -235,11 +235,11 @@ struct PackageDetailView: View {
     }
 
     private var badgeSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.item) {
             Text("Status")
                 .font(.headline)
 
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.item) {
                 ForEach(badges, id: \.text) { badge in
                     StatusBadge(text: badge.text, color: badge.color, icon: badge.icon)
                 }
@@ -250,31 +250,30 @@ struct PackageDetailView: View {
     // MARK: - Dependencies
 
     private func dependenciesSection(_ dependencies: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.item) {
             Text("Dependencies")
                 .font(.headline)
 
-            FlowLayout(spacing: 6) {
+            FlowLayout(spacing: Spacing.related) {
                 ForEach(dependencies, id: \.self) { dep in
                     Text(dep)
                         .font(.callout)
                         .fontDesign(.monospaced)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                        .chipInset()
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
                 }
             }
         }
     }
 
     private func runtimeDependenciesSection(_ dependencies: [RuntimeDependency]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.item) {
             Text("Runtime Dependencies")
                 .font(.headline)
 
-            FlowLayout(spacing: 6) {
+            FlowLayout(spacing: Spacing.related) {
                 ForEach(dependencies, id: \.fullName) { dep in
-                    HStack(spacing: 4) {
+                    HStack(spacing: Spacing.compact) {
                         Text(dep.fullName)
                             .fontWeight(.medium)
                         Text(dep.version)
@@ -282,9 +281,8 @@ struct PackageDetailView: View {
                     }
                     .font(.callout)
                     .fontDesign(.monospaced)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    .chipInset()
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
                 }
             }
         }
@@ -293,11 +291,11 @@ struct PackageDetailView: View {
     // MARK: - Actions
 
     private var actionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             Text("Actions")
                 .font(.headline)
 
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.sectionContent) {
                 if package.isOutdated {
                     Button {
                         performAction {

@@ -127,7 +127,7 @@ struct FormulaListView: View {
 
     private func installedFormulaRow(_ formula: Formula) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(formula.name)
                     .fontWeight(.medium)
 
@@ -145,7 +145,7 @@ struct FormulaListView: View {
                 .foregroundStyle(.secondary)
                 .font(.body.monospaced())
 
-            HStack(spacing: 6) {
+            HStack(spacing: Spacing.related) {
                 if formula.outdated {
                     StatusBadge(text: "Outdated", color: .orange)
                 }
@@ -193,7 +193,7 @@ struct FormulaListView: View {
             .width(min: 80, ideal: 120)
 
             TableColumn("Status") { formula in
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.related) {
                     if formula.outdated {
                         StatusBadge(text: "Outdated", color: .orange)
                     }

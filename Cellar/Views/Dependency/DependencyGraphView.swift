@@ -98,7 +98,7 @@ struct DependencyGraphView: View {
     // MARK: - Stats Row
 
     private func statsRow(graph: DependencyGraph) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.sectionContent) {
             StatCardView(
                 title: "Packages",
                 value: "\(graph.totalPackages)",
@@ -165,18 +165,18 @@ private struct DependencyNodeRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.row) {
             Image(systemName: nodeIcon)
                 .font(.caption)
                 .foregroundStyle(nodeColor)
-                .frame(width: 28, height: 28)
-                .background(nodeColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
+                .background(nodeColor.opacity(0.1), in: RoundedRectangle(cornerRadius: CornerRadius.small))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(node.name)
                     .fontWeight(.medium)
 
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.sectionContent) {
                     if !node.dependencies.isEmpty {
                         Label(
                             "\(node.dependencies.count) deps",
@@ -203,7 +203,7 @@ private struct DependencyNodeRow: View {
                 StatusBadge(text: "Leaf", color: .green)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.compact)
     }
 }
 
@@ -232,7 +232,7 @@ private struct DependencyDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.section) {
                 header
                 Divider()
                 infoSection
@@ -241,7 +241,7 @@ private struct DependencyDetailView: View {
                 Divider()
                 dependentsSection
             }
-            .padding(24)
+            .padding(Spacing.section)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.background)
@@ -250,19 +250,19 @@ private struct DependencyDetailView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: Spacing.detailElement) {
             Image(systemName: nodeIcon)
                 .font(.title2)
                 .foregroundStyle(nodeColor)
-                .frame(width: 44, height: 44)
+                .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
                 .background(nodeColor.opacity(0.1), in: Circle())
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.related) {
                 Text(node.name)
                     .font(.largeTitle)
                     .fontWeight(.bold)
 
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.item) {
                     if node.isOrphan {
                         StatusBadge(text: "Orphan", color: .orange)
                     }
@@ -304,7 +304,7 @@ private struct DependencyDetailView: View {
     // MARK: Dependencies Section
 
     private var dependenciesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.item) {
             SectionHeaderView(
                 title: "Dependencies",
                 systemImage: "arrow.down.circle",
@@ -321,15 +321,14 @@ private struct DependencyDetailView: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
             } else {
-                FlowLayout(spacing: 6) {
+                FlowLayout(spacing: Spacing.related) {
                     ForEach(node.dependencies, id: \.self) { dep in
                         Button { onNavigate(dep) } label: {
                             Text(dep)
                                 .font(.callout)
                                 .fontDesign(.monospaced)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                                .chipInset()
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
                         }
                         .buttonStyle(.plain)
                     }
@@ -341,7 +340,7 @@ private struct DependencyDetailView: View {
     // MARK: Dependents Section
 
     private var dependentsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.item) {
             SectionHeaderView(
                 title: "Used By",
                 systemImage: "arrow.up.circle",
@@ -358,15 +357,14 @@ private struct DependencyDetailView: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 4)
             } else {
-                FlowLayout(spacing: 6) {
+                FlowLayout(spacing: Spacing.related) {
                     ForEach(node.dependents, id: \.self) { dep in
                         Button { onNavigate(dep) } label: {
                             Text(dep)
                                 .font(.callout)
                                 .fontDesign(.monospaced)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                                .chipInset()
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
                         }
                         .buttonStyle(.plain)
                     }

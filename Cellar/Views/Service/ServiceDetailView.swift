@@ -12,7 +12,7 @@ struct ServiceDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.section) {
                 headerSection
                 Divider()
                 infoSection
@@ -21,7 +21,7 @@ struct ServiceDetailView: View {
                 Divider()
                 logsPlaceholderSection
             }
-            .padding(24)
+            .padding(Spacing.section)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(service.name)
@@ -64,14 +64,14 @@ struct ServiceDetailView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: Spacing.detailElement) {
             Image(systemName: "gearshape.2")
                 .font(.title2)
                 .foregroundStyle(.green)
-                .frame(width: 44, height: 44)
+                .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
                 .background(.green.opacity(0.1), in: Circle())
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.related) {
                 Text(service.name)
                     .font(.largeTitle)
                     .fontWeight(.bold)
@@ -155,11 +155,11 @@ struct ServiceDetailView: View {
     // MARK: - Actions
 
     private var actionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             Text("Actions")
                 .font(.headline)
 
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.sectionContent) {
                 if service.isRunning {
                     Button {
                         isConfirmingStop = true
@@ -199,11 +199,11 @@ struct ServiceDetailView: View {
     // MARK: - Logs Placeholder
 
     private var logsPlaceholderSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             Text("Logs")
                 .font(.headline)
 
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.sectionContent) {
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.largeTitle)
                     .foregroundStyle(.tertiary)
@@ -217,7 +217,7 @@ struct ServiceDetailView: View {
                     .foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, minHeight: 150)
-            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
+            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: CornerRadius.card))
         }
     }
 
@@ -241,18 +241,18 @@ private struct ServiceDetailStatusBadge: View {
     let status: ServiceStatus
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Spacing.related) {
             Circle()
                 .fill(status.color)
-                .frame(width: 10, height: 10)
+                .frame(width: IconSize.indicator, height: IconSize.indicator)
 
             Text(status.label)
                 .font(.title3)
                 .fontWeight(.medium)
                 .foregroundStyle(status.color)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Spacing.sectionContent)
+        .padding(.vertical, Spacing.compact)
         .background(status.color.opacity(0.1), in: Capsule())
     }
 }

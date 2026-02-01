@@ -40,10 +40,9 @@ struct ServiceListView: View {
                     Text("\(store.runningCount) running")
                         .font(.callout)
                         .foregroundStyle(.green)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .badgeInset()
                         .background(.green.opacity(0.1), in: Capsule())
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, Spacing.item)
                 }
             }
         }
@@ -128,15 +127,15 @@ private struct ServiceStatusBadge: View {
     let status: ServiceStatus
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Spacing.related) {
             Circle()
                 .fill(status.color)
-                .frame(width: 8, height: 8)
+                .frame(width: IconSize.statusDot, height: IconSize.statusDot)
                 .overlay {
                     if status == .started {
                         Circle()
                             .fill(status.color.opacity(0.4))
-                            .frame(width: 14, height: 14)
+                            .frame(width: IconSize.dotGlow, height: IconSize.dotGlow)
                     }
                 }
 

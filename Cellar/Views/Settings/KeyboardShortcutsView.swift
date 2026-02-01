@@ -7,7 +7,7 @@ import SwiftUI
 struct KeyboardShortcutsView: View {
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.section) {
                 header
 
                 ShortcutSection(title: "General", systemImage: "command", shortcuts: [
@@ -31,7 +31,7 @@ struct KeyboardShortcutsView: View {
                     Shortcut(keys: "\u{2318}F", description: "Search (when available)"),
                 ])
             }
-            .padding(24)
+            .padding(Spacing.section)
         }
         .frame(width: 420, height: 460)
         .background(.background)
@@ -40,7 +40,7 @@ struct KeyboardShortcutsView: View {
     // MARK: - Subviews
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.compact) {
             Text("Keyboard Shortcuts")
                 .font(.title2)
                 .fontWeight(.semibold)
@@ -68,7 +68,7 @@ private struct ShortcutSection: View {
     let shortcuts: [Shortcut]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.item) {
             Label(title, systemImage: systemImage)
                 .font(.headline)
                 .foregroundStyle(.secondary)
@@ -82,7 +82,7 @@ private struct ShortcutSection: View {
                     }
                 }
             }
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: CornerRadius.medium))
         }
     }
 }
@@ -103,12 +103,11 @@ private struct ShortcutRow: View {
                 .font(.body)
                 .fontDesign(.monospaced)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
+                .badgeInset()
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Spacing.sectionContent)
+        .padding(.vertical, Spacing.item)
     }
 }
 

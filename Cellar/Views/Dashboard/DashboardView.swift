@@ -44,7 +44,7 @@ struct DashboardView: View {
     @ViewBuilder
     private func dashboardContent(_ summary: SystemSummary) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.section) {
                 statsSection(summary)
                 if !summary.services.isEmpty {
                     servicesSection(summary)
@@ -60,19 +60,19 @@ struct DashboardView: View {
                     outdatedSection(summary)
                 }
             }
-            .padding(24)
+            .padding(Spacing.section)
         }
     }
 
     // MARK: - Stats Section
 
     private func statsSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: "Overview", systemImage: "chart.bar.fill", color: .secondary)
 
             LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
-                spacing: 12
+                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.sectionContent), count: 2),
+                spacing: Spacing.sectionContent
             ) {
                 navigableCard(to: .formulae) {
                     StatCardView(
@@ -116,7 +116,7 @@ struct DashboardView: View {
     // MARK: - Services Section
 
     private func servicesSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(
                 title: "Services at a Glance",
                 systemImage: "gearshape.2",
@@ -141,10 +141,10 @@ struct DashboardView: View {
     }
 
     private func serviceRow(_ service: BrewServiceItem) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.row) {
             Circle()
                 .fill(service.status.color)
-                .frame(width: 8, height: 8)
+                .frame(width: IconSize.statusDot, height: IconSize.statusDot)
 
             Text(service.name)
                 .fontWeight(.medium)
@@ -159,18 +159,17 @@ struct DashboardView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
+        .listRowInset()
         .contentShape(Rectangle())
     }
 
     // MARK: - Quick Actions Section
 
     private func quickActionsSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .secondary)
 
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.sectionContent) {
                 QuickActionButton(
                     title: "Upgrade All",
                     subtitle: summary.updatesAvailable > 0
@@ -209,7 +208,7 @@ struct DashboardView: View {
     // MARK: - Recently Installed Section
 
     private func recentlyInstalledSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(
                 title: "Recently Installed",
                 systemImage: "clock.arrow.circlepath",
@@ -235,10 +234,10 @@ struct DashboardView: View {
     }
 
     private func recentlyInstalledRow(_ formula: Formula) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.row) {
             Image(systemName: "terminal")
                 .foregroundStyle(.blue)
-                .frame(width: 20)
+                .frame(width: IconSize.iconColumn)
 
             Text(formula.name)
                 .fontWeight(.medium)
@@ -255,15 +254,14 @@ struct DashboardView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
+        .listRowInset()
         .contentShape(Rectangle())
     }
 
     // MARK: - Taps Section
 
     private func tapsSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(
                 title: "Taps",
                 systemImage: "spigot",
@@ -288,10 +286,10 @@ struct DashboardView: View {
     }
 
     private func tapRow(_ tap: Tap) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.row) {
             Image(systemName: "spigot")
                 .foregroundStyle(.teal)
-                .frame(width: 20)
+                .frame(width: IconSize.iconColumn)
 
             Text(tap.name)
                 .fontWeight(.medium)
@@ -301,8 +299,7 @@ struct DashboardView: View {
                     .font(.caption2)
                     .fontWeight(.medium)
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .smallBadgeInset()
                     .background(.blue.gradient, in: Capsule())
             }
 
@@ -316,8 +313,7 @@ struct DashboardView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
+        .listRowInset()
         .contentShape(Rectangle())
     }
 
@@ -329,7 +325,7 @@ struct DashboardView: View {
         let totalShown = formulae.count + casks.count
         let remaining = summary.updatesAvailable - totalShown
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(
                 title: "Outdated Packages",
                 systemImage: "arrow.triangle.2.circlepath",
@@ -395,7 +391,7 @@ struct DashboardView: View {
                                     .foregroundStyle(.secondary)
                                 Spacer()
                             }
-                            .padding(.vertical, 8)
+                            .padding(.vertical, Spacing.item)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -416,7 +412,7 @@ struct DashboardView: View {
         HStack {
             Image(systemName: systemImage)
                 .foregroundStyle(iconColor)
-                .frame(width: 20)
+                .frame(width: IconSize.iconColumn)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
@@ -432,7 +428,7 @@ struct DashboardView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.compact) {
                 Text(currentVersion)
                     .font(.callout.monospaced())
                     .foregroundStyle(.secondary)
@@ -450,8 +446,7 @@ struct DashboardView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
+        .listRowInset()
         .contentShape(Rectangle())
     }
 
@@ -469,9 +464,9 @@ struct DashboardView: View {
                     Image(systemName: "chevron.right")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                        .padding(8)
+                        .padding(Spacing.item)
                 }
-                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
         }
         .buttonStyle(NavigableCardStyle())
     }

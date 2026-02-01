@@ -38,25 +38,25 @@ struct ResourceMonitorView: View {
 
     private var resourceContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.section) {
                 diskUsageSection
                 serviceResourceSection
             }
-            .padding(24)
+            .padding(Spacing.section)
         }
     }
 
     // MARK: - Disk Usage Section
 
     private var diskUsageSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: "Disk Usage", systemImage: "internaldrive", color: .blue)
 
             diskOverviewCard
 
             LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
-                spacing: 12
+                columns: [GridItem(.flexible(), spacing: Spacing.sectionContent), GridItem(.flexible(), spacing: Spacing.sectionContent)],
+                spacing: Spacing.sectionContent
             ) {
                 StatCardView(
                     title: "Cellar",
@@ -76,15 +76,15 @@ struct ResourceMonitorView: View {
     }
 
     private var diskOverviewCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.detailElement) {
+            HStack(spacing: Spacing.detailElement) {
                 Image(systemName: "internaldrive.fill")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(.blue.gradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(width: IconSize.largeIcon, height: IconSize.largeIcon)
+                    .background(.blue.gradient, in: RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.textPair) {
                     Text("Homebrew Total")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -100,8 +100,8 @@ struct ResourceMonitorView: View {
                 storageBreakdownBar(diskUsage: diskUsage)
             }
         }
-        .padding(16)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(Spacing.cardPadding)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
     }
 
     @ViewBuilder
@@ -114,27 +114,27 @@ struct ResourceMonitorView: View {
         let cellarFraction = total > 0 ? cellar / total : 0
         let cacheFraction = total > 0 ? cache / total : 0
 
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.item) {
             GeometryReader { geometry in
                 HStack(spacing: 2) {
                     if cellarFraction > 0 {
-                        RoundedRectangle(cornerRadius: 3)
+                        RoundedRectangle(cornerRadius: CornerRadius.progressBar)
                             .fill(Color.purple)
                             .frame(width: max(geometry.size.width * cellarFraction, 4))
                     }
                     if cacheFraction > 0 {
-                        RoundedRectangle(cornerRadius: 3)
+                        RoundedRectangle(cornerRadius: CornerRadius.progressBar)
                             .fill(Color.orange)
                             .frame(width: max(geometry.size.width * cacheFraction, 4))
                     }
-                    RoundedRectangle(cornerRadius: 3)
+                    RoundedRectangle(cornerRadius: CornerRadius.progressBar)
                         .fill(Color.primary.opacity(0.08))
                 }
             }
             .frame(height: 8)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.minimal))
 
-            HStack(spacing: 16) {
+            HStack(spacing: Spacing.cardPadding) {
                 breakdownLegendItem(color: .purple, label: "Cellar", value: diskUsage.cellarSize)
                 breakdownLegendItem(color: .orange, label: "Cache", value: diskUsage.cacheSize)
                 if other > 0.5 {
@@ -153,7 +153,7 @@ struct ResourceMonitorView: View {
         HStack(spacing: 5) {
             Circle()
                 .fill(color)
-                .frame(width: 8, height: 8)
+                .frame(width: IconSize.statusDot, height: IconSize.statusDot)
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -165,7 +165,7 @@ struct ResourceMonitorView: View {
     // MARK: - Service Resource Section
 
     private var serviceResourceSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(
                 title: "Service Resources",
                 systemImage: "gauge.with.dots.needle.33percent",
@@ -188,12 +188,12 @@ struct ResourceMonitorView: View {
     }
 
     private var serviceEmptyState: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Spacing.detailElement) {
             Image(systemName: "gauge.with.dots.needle.0percent")
                 .font(.system(size: 24))
                 .foregroundStyle(.tertiary)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text("No Running Services")
                     .font(.subheadline.weight(.medium))
                 Text("Start a Homebrew service to see its resource usage.")
@@ -203,8 +203,8 @@ struct ResourceMonitorView: View {
 
             Spacer()
         }
-        .padding(16)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(Spacing.cardPadding)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
     }
 
     // MARK: - Resource Table
@@ -213,10 +213,10 @@ struct ResourceMonitorView: View {
         GroupBox {
             Table(store.sortedUsages) {
                 TableColumn("Service") { usage in
-                    HStack(spacing: 8) {
+                    HStack(spacing: Spacing.item) {
                         Circle()
                             .fill(.green)
-                            .frame(width: 8, height: 8)
+                            .frame(width: IconSize.statusDot, height: IconSize.statusDot)
 
                         Text(usage.serviceName)
                             .fontWeight(.medium)
@@ -232,7 +232,7 @@ struct ResourceMonitorView: View {
                 .width(min: 60, ideal: 80)
 
                 TableColumn("CPU %") { usage in
-                    HStack(spacing: 6) {
+                    HStack(spacing: Spacing.related) {
                         cpuBar(percent: usage.cpuPercent)
 
                         Text(formatPercent(usage.cpuPercent))
@@ -257,25 +257,25 @@ struct ResourceMonitorView: View {
     // MARK: - Resource Summary
 
     private var resourceSummary: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 6) {
+        HStack(spacing: Spacing.sectionContent) {
+            HStack(spacing: Spacing.related) {
                 Image(systemName: "cpu")
                     .foregroundStyle(.blue)
                 Text("CPU: \(formatPercent(store.totalCPU))")
                     .font(.callout.monospaced())
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Spacing.row)
+            .padding(.vertical, Spacing.related)
             .background(.blue.opacity(0.08), in: Capsule())
 
-            HStack(spacing: 6) {
+            HStack(spacing: Spacing.related) {
                 Image(systemName: "memorychip")
                     .foregroundStyle(.purple)
                 Text("Memory: \(formatMemory(store.totalMemoryMB))")
                     .font(.callout.monospaced())
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Spacing.row)
+            .padding(.vertical, Spacing.related)
             .background(.purple.opacity(0.08), in: Capsule())
 
             Spacer()
@@ -341,15 +341,15 @@ struct ResourceMonitorView: View {
     private func cpuBar(percent: Double) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: CornerRadius.minimal)
                     .fill(.quaternary)
 
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: CornerRadius.minimal)
                     .fill(cpuColor(for: percent))
                     .frame(width: geometry.size.width * min(percent / 100.0, 1.0))
             }
         }
-        .frame(width: 60, height: 8)
+        .frame(width: 60, height: IconSize.statusDot)
     }
 }
 

@@ -11,7 +11,7 @@ struct SectionHeaderView<Trailing: View>: View {
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.item) {
             Image(systemName: systemImage)
                 .foregroundStyle(color)
                 .font(.body)

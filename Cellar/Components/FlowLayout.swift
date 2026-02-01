@@ -6,7 +6,7 @@ import SwiftUI
 /// exceed the available width. Used for dependency lists, filter
 /// chips, and badge collections.
 struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
+    var spacing: CGFloat = Spacing.item
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let result = arrange(proposal: proposal, subviews: subviews)
@@ -59,14 +59,13 @@ struct FlowLayout: Layout {
 }
 
 #Preview {
-    FlowLayout(spacing: 6) {
+    FlowLayout(spacing: Spacing.related) {
         ForEach(["openssl@3", "readline", "sqlite3", "xz", "zlib", "libyaml", "gmp"], id: \.self) { dep in
             Text(dep)
                 .font(.callout)
                 .fontDesign(.monospaced)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                .chipInset()
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
         }
     }
     .padding()
