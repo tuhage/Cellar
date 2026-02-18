@@ -154,25 +154,31 @@ final class ResourceStore {
 /// The `ResourceStore` calls it from async methods that can hop off
 /// the main actor for the duration of the process.
 private nonisolated func runCommand(_ executablePath: String, _ arguments: [String]) async throws -> String {
-    try await withCheckedThrowingContinuation { continuation in
-        let process = Process()
-        let pipe = Pipe()
+    let process = Process()
+    let pipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = arguments
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+    process.executableURL = URL(fileURLWithPath: executablePath)
+    process.arguments = arguments
+    process.standardOutput = pipe
+    process.standardError = FileHandle.nullDevice
 
-        process.terminationHandler = { _ in
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            continuation.resume(returning: output)
+    return try await withTaskCancellationHandler {
+        try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { _ in
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                continuation.resume(returning: output)
+            }
+
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(throwing: error)
+            }
         }
-
-        do {
-            try process.run()
-        } catch {
-            continuation.resume(throwing: error)
+    } onCancel: {
+        if process.isRunning {
+            process.terminate()
         }
     }
 }

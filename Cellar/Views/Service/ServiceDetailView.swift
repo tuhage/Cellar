@@ -259,6 +259,8 @@ private struct ServiceDetailStatusBadge: View {
                 .fontWeight(.medium)
                 .foregroundStyle(status.color)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Status: \(status.label)")
         .padding(.horizontal, Spacing.sectionContent)
         .padding(.vertical, Spacing.compact)
         .background(status.color.opacity(Opacity.badgeBackground), in: Capsule())

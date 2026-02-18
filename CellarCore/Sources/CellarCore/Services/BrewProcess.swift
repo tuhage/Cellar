@@ -72,6 +72,16 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
             process.standardOutput = stdoutPipe
             process.standardError = stderrPipe
 
+            // Accumulate stderr concurrently to prevent deadlock.
+            // If the stderr buffer fills (~64KB) without being drained,
+            // the process blocks waiting for buffer space.
+            nonisolated(unsafe) var stderrChunks: [Data] = []
+            stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                guard !data.isEmpty else { return }
+                stderrChunks.append(data)
+            }
+
             stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
                 guard !data.isEmpty else { return }
@@ -82,9 +92,10 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
 
             process.terminationHandler = { terminatedProcess in
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                stderrPipe.fileHandleForReading.readabilityHandler = nil
 
                 if terminatedProcess.terminationStatus != 0 {
-                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    let stderrData = stderrChunks.reduce(Data(), +)
                     let stderr = String(data: stderrData, encoding: .utf8) ?? ""
                     continuation.finish(throwing: BrewError.processFailure(
                         exitCode: terminatedProcess.terminationStatus,
@@ -121,9 +132,13 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         brewCandidatePaths.contains { FileManager.default.fileExists(atPath: $0) }
     }
 
-    public static func resolveBrewPath() -> String {
+    private static let _resolvedPath: String = {
         brewCandidatePaths.first { FileManager.default.fileExists(atPath: $0) }
             ?? "/opt/homebrew/bin/brew"
+    }()
+
+    public static func resolveBrewPath() -> String {
+        _resolvedPath
     }
 
     private static func brewEnvironment() -> [String: String] {

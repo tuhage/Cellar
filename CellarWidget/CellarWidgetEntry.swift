@@ -12,6 +12,7 @@ struct CellarWidgetEntry: TimelineEntry {
     var outdatedCount: Int { snapshot.outdatedCount }
     var runningServiceNames: [String] { snapshot.runningServiceNames }
     var outdatedPackageNames: [String] { snapshot.outdatedPackageNames }
+    var lastUpdated: Date { snapshot.lastUpdated }
 
     static let placeholder = CellarWidgetEntry(date: .now, snapshot: .preview)
     static let empty = CellarWidgetEntry(date: .now, snapshot: .empty)

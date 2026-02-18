@@ -23,7 +23,7 @@ struct EmptyStateView: View {
     EmptyStateView(
         title: "No Formulae",
         systemImage: "shippingbox",
-        description: "Install formulae using the search tab."
+        description: "Installed formulae will appear here."
     )
 }
 

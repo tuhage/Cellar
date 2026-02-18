@@ -9,6 +9,8 @@ struct SearchView: View {
     @State private var hasSearched = false
     @State private var errorMessage: String?
     @State private var installingPackages: Set<String> = []
+    @State private var formulaToInstall: Formula?
+    @State private var caskToInstall: Cask?
 
     private var installedFormulae: [Formula] {
         formulaResults.filter(\.isInstalled)
@@ -61,6 +63,34 @@ struct SearchView: View {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             await search()
+        }
+        .confirmationDialog(
+            "Install \(formulaToInstall?.name ?? "")?",
+            isPresented: Binding(
+                get: { formulaToInstall != nil },
+                set: { if !$0 { formulaToInstall = nil } }
+            ),
+            presenting: formulaToInstall
+        ) { formula in
+            Button("Install") {
+                installFormula(formula)
+            }
+        } message: { formula in
+            Text("This will download and install \(formula.name) via Homebrew.")
+        }
+        .confirmationDialog(
+            "Install \(caskToInstall?.displayName ?? "")?",
+            isPresented: Binding(
+                get: { caskToInstall != nil },
+                set: { if !$0 { caskToInstall = nil } }
+            ),
+            presenting: caskToInstall
+        ) { cask in
+            Button("Install") {
+                installCask(cask)
+            }
+        } message: { cask in
+            Text("This will download and install \(cask.displayName) via Homebrew.")
         }
     }
 
@@ -116,7 +146,7 @@ struct SearchView: View {
                             formula: formula,
                             isInstalling: installingPackages.contains(formula.name)
                         ) {
-                            installFormula(formula)
+                            formulaToInstall = formula
                         }
                     }
                 } header: {
@@ -131,7 +161,7 @@ struct SearchView: View {
                             cask: cask,
                             isInstalling: installingPackages.contains(cask.token)
                         ) {
-                            installCask(cask)
+                            caskToInstall = cask
                         }
                     }
                 } header: {

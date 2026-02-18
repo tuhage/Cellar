@@ -9,6 +9,7 @@ struct CaskListView: View {
         KeyPathComparator(\.token)
     ]
     @State private var caskToUninstall: Cask?
+    @State private var caskToInstall: Cask?
     @State private var installStream: AsyncThrowingStream<String, Error>?
     @State private var installTitle: String?
 
@@ -32,7 +33,7 @@ struct CaskListView: View {
                 EmptyStateView(
                     title: "No Casks",
                     systemImage: "macwindow",
-                    description: "No installed casks found."
+                    description: "Installed casks will appear here."
                 )
             } else {
                 caskTable
@@ -72,6 +73,22 @@ struct CaskListView: View {
             }
         } message: { cask in
             Text("This will remove \(cask.displayName) and its associated files.")
+        }
+        .confirmationDialog(
+            "Install \(caskToInstall?.displayName ?? "")?",
+            isPresented: Binding(
+                get: { caskToInstall != nil },
+                set: { if !$0 { caskToInstall = nil } }
+            ),
+            presenting: caskToInstall
+        ) { cask in
+            Button("Install") {
+                let service = BrewService()
+                installTitle = "Installing \(cask.displayName)"
+                installStream = service.install(cask.token, isCask: true)
+            }
+        } message: { cask in
+            Text("This will download and install \(cask.displayName) via Homebrew.")
         }
         .installProgressSheet(stream: $installStream, title: $installTitle) {
             Task { await store.loadCasks(forceRefresh: true) }
@@ -163,9 +180,7 @@ struct CaskListView: View {
             Spacer()
 
             Button {
-                let service = BrewService()
-                installTitle = "Installing \(cask.displayName)"
-                installStream = service.install(cask.token, isCask: true)
+                caskToInstall = cask
             } label: {
                 Label("Install", systemImage: "arrow.down.circle")
             }

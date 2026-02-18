@@ -10,6 +10,7 @@ public struct WidgetSnapshot: Codable, Sendable {
     public let totalServices: Int
     public let outdatedCount: Int
     public let runningServiceNames: [String]
+    public let stoppedServiceNames: [String]
     public let outdatedPackageNames: [String]
     public let lastUpdated: Date
 
@@ -20,6 +21,7 @@ public struct WidgetSnapshot: Codable, Sendable {
         totalServices: Int,
         outdatedCount: Int,
         runningServiceNames: [String],
+        stoppedServiceNames: [String] = [],
         outdatedPackageNames: [String],
         lastUpdated: Date = .now
     ) {
@@ -29,8 +31,24 @@ public struct WidgetSnapshot: Codable, Sendable {
         self.totalServices = totalServices
         self.outdatedCount = outdatedCount
         self.runningServiceNames = runningServiceNames
+        self.stoppedServiceNames = stoppedServiceNames
         self.outdatedPackageNames = outdatedPackageNames
         self.lastUpdated = lastUpdated
+    }
+
+    // MARK: - Codable
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        totalFormulae = try container.decode(Int.self, forKey: .totalFormulae)
+        totalCasks = try container.decode(Int.self, forKey: .totalCasks)
+        runningServices = try container.decode(Int.self, forKey: .runningServices)
+        totalServices = try container.decode(Int.self, forKey: .totalServices)
+        outdatedCount = try container.decode(Int.self, forKey: .outdatedCount)
+        runningServiceNames = try container.decode([String].self, forKey: .runningServiceNames)
+        stoppedServiceNames = try container.decodeIfPresent([String].self, forKey: .stoppedServiceNames) ?? []
+        outdatedPackageNames = try container.decode([String].self, forKey: .outdatedPackageNames)
+        lastUpdated = try container.decode(Date.self, forKey: .lastUpdated)
     }
 
     // MARK: - Persistence
@@ -56,6 +74,7 @@ public struct WidgetSnapshot: Codable, Sendable {
             totalServices: summary.totalServices,
             outdatedCount: summary.updatesAvailable,
             runningServiceNames: services.filter(\.isRunning).map(\.name),
+            stoppedServiceNames: services.filter { !$0.isRunning }.map(\.name),
             outdatedPackageNames: summary.outdatedFormulae.map(\.name) + summary.outdatedCasks.map(\.token)
         )
     }
@@ -70,6 +89,7 @@ public struct WidgetSnapshot: Codable, Sendable {
             totalServices: 7,
             outdatedCount: 5,
             runningServiceNames: ["postgresql@16", "redis", "nginx", "dnsmasq"],
+            stoppedServiceNames: ["mysql", "memcached", "rabbitmq"],
             outdatedPackageNames: ["openssl@3", "node", "python@3.12", "git", "wget"]
         )
     }

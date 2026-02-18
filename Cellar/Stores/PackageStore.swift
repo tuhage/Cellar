@@ -100,7 +100,7 @@ final class PackageStore {
             formulae = try await Formula.all
             persistence.saveToCache(formulae, to: Self.formulaeCacheFile)
         } catch {
-            if formulae.isEmpty { errorMessage = error.localizedDescription }
+            errorMessage = error.localizedDescription
         }
         isLoading = false
     }
@@ -119,7 +119,7 @@ final class PackageStore {
             casks = try await Cask.all
             persistence.saveToCache(casks, to: Self.casksCacheFile)
         } catch {
-            if casks.isEmpty { errorMessage = error.localizedDescription }
+            errorMessage = error.localizedDescription
         }
         isLoading = false
     }
@@ -150,7 +150,7 @@ final class PackageStore {
 
             await SpotlightService.shared.indexAll(formulae: formulae, casks: casks)
         } catch {
-            if formulae.isEmpty && casks.isEmpty { errorMessage = error.localizedDescription }
+            errorMessage = error.localizedDescription
         }
         isLoading = false
     }
@@ -179,45 +179,63 @@ final class PackageStore {
         isLoading = false
     }
 
-    func upgradeAll() async {
-        isLoading = true
-        errorMessage = nil
+    var isUpgradingAll = false
+    private var upgradeAllTask: Task<Void, Never>?
 
-        let formulaeToUpgrade = outdatedFormulae
-        let casksToUpgrade = outdatedCasks
-        var failures: [String] = []
+    func upgradeAll() {
+        upgradeAllTask = Task {
+            isUpgradingAll = true
+            isLoading = true
+            errorMessage = nil
 
-        for formula in formulaeToUpgrade {
-            do {
-                try await formula.upgrade()
-            } catch {
-                failures.append(formula.name)
+            let formulaeToUpgrade = outdatedFormulae
+            let casksToUpgrade = outdatedCasks
+            var failures: [String] = []
+
+            for formula in formulaeToUpgrade {
+                guard !Task.isCancelled else { break }
+                do {
+                    try await formula.upgrade()
+                } catch {
+                    failures.append(formula.name)
+                }
             }
-        }
-        for cask in casksToUpgrade {
-            do {
-                try await cask.upgrade()
-            } catch {
-                failures.append(cask.token)
+            for cask in casksToUpgrade {
+                guard !Task.isCancelled else { break }
+                do {
+                    try await cask.upgrade()
+                } catch {
+                    failures.append(cask.token)
+                }
             }
-        }
 
-        do {
-            async let loadedFormulae = Formula.all
-            async let loadedCasks = Cask.all
-            formulae = try await loadedFormulae
-            casks = try await loadedCasks
-            persistence.saveToCache(formulae, to: Self.formulaeCacheFile)
-            persistence.saveToCache(casks, to: Self.casksCacheFile)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+            do {
+                async let loadedFormulae = Formula.all
+                async let loadedCasks = Cask.all
+                formulae = try await loadedFormulae
+                casks = try await loadedCasks
+                persistence.saveToCache(formulae, to: Self.formulaeCacheFile)
+                persistence.saveToCache(casks, to: Self.casksCacheFile)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
 
-        if !failures.isEmpty && errorMessage == nil {
-            errorMessage = "Failed to upgrade: \(failures.joined(separator: ", "))"
-        }
+            if Task.isCancelled {
+                if errorMessage == nil {
+                    errorMessage = "Upgrade cancelled. Some packages may have been upgraded."
+                }
+            } else if !failures.isEmpty && errorMessage == nil {
+                errorMessage = "Failed to upgrade: \(failures.joined(separator: ", "))"
+            }
 
-        isLoading = false
+            isLoading = false
+            isUpgradingAll = false
+            upgradeAllTask = nil
+        }
+    }
+
+    func cancelUpgradeAll() {
+        upgradeAllTask?.cancel()
     }
 
     func uninstall(_ formula: Formula) async {
@@ -307,8 +325,7 @@ final class PackageStore {
     func installFormula(name: String) async {
         installingPackages.insert(name)
         do {
-            let service = BrewService()
-            for try await _ in service.install(name, isCask: false) {}
+            try await Formula.install(name: name)
             try await refreshFormulae()
         } catch {
             errorMessage = error.localizedDescription

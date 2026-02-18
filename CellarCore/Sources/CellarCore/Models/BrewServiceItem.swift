@@ -33,6 +33,8 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
     public var id: String { name }
 
     public var isRunning: Bool { status == .started }
+    public var isError: Bool { status == .error }
+    public var isStopped: Bool { status == .stopped || status == .none }
 
     // MARK: Init
 

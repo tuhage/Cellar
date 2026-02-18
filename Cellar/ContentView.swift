@@ -2,7 +2,14 @@ import SwiftUI
 import CellarCore
 
 struct ContentView: View {
-    @State private var selection: SidebarItem? = .dashboard
+    @AppStorage("selectedSidebarItem") private var storedSelection: String = SidebarItem.dashboard.rawValue
+
+    private var selection: Binding<SidebarItem?> {
+        Binding(
+            get: { SidebarItem(rawValue: storedSelection) },
+            set: { newValue in storedSelection = (newValue ?? .dashboard).rawValue }
+        )
+    }
     @State private var isBrewInstalled = BrewProcess.isInstalled
 
     @Environment(PackageStore.self) private var packageStore
@@ -28,10 +35,10 @@ struct ContentView: View {
 
     private var mainContent: some View {
         NavigationSplitView {
-            SidebarView(selection: $selection)
+            SidebarView(selection: selection)
         } detail: {
-            if let selection {
-                DetailView(item: selection, selection: $selection)
+            if let item = selection.wrappedValue {
+                DetailView(item: item, selection: selection)
             } else {
                 ContentUnavailableView(
                     "Select an Item",
@@ -40,7 +47,7 @@ struct ContentView: View {
                 )
             }
         }
-        .urlSchemeHandler(selection: $selection)
+        .urlSchemeHandler(selection: selection)
         .task { await prefetchStores() }
     }
 

@@ -4,24 +4,19 @@ import CellarCore
 
 final class CellarFinderSyncExtension: FIFinderSync {
     private static let stopServiceNotification = Notification.Name("com.tuhage.Cellar.stopService")
+    private static let startServiceNotification = Notification.Name("com.tuhage.Cellar.startService")
     private static let brewfileBadgeIdentifier = "brewfile"
     private static let bundleIdentifier = "com.tuhage.Cellar"
-
-    private let monitoredPaths: [URL] = {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        return [
-            home.appendingPathComponent("Projects"),
-            home.appendingPathComponent("Developer"),
-            home.appendingPathComponent("Desktop"),
-            home.appendingPathComponent("Documents"),
-        ].filter { FileManager.default.fileExists(atPath: $0.path) }
-    }()
 
     override init() {
         super.init()
 
+        let paths = AppGroupStorage.finderSyncPaths
+            .map { URL(fileURLWithPath: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+
         let controller = FIFinderSyncController.default()
-        controller.directoryURLs = Set(monitoredPaths)
+        controller.directoryURLs = Set(paths)
 
         if let badgeImage = NSImage(systemSymbolName: "mug.fill", accessibilityDescription: "Brewfile") {
             controller.setBadgeImage(badgeImage, label: "Brewfile", forBadgeIdentifier: Self.brewfileBadgeIdentifier)
@@ -43,14 +38,16 @@ final class CellarFinderSyncExtension: FIFinderSync {
         }
 
         let menu = NSMenu(title: "Cellar")
-        let serviceNames = WidgetSnapshot.load()?.runningServiceNames ?? []
+        let snapshot = WidgetSnapshot.load()
+        let runningNames = snapshot?.runningServiceNames ?? []
+        let stoppedNames = snapshot?.stoppedServiceNames ?? []
 
-        if serviceNames.isEmpty {
-            let item = NSMenuItem(title: "No services running", action: nil, keyEquivalent: "")
+        if runningNames.isEmpty && stoppedNames.isEmpty {
+            let item = NSMenuItem(title: "No services available", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         } else {
-            for name in serviceNames {
+            for name in runningNames {
                 let stopItem = NSMenuItem(
                     title: "Stop \(name)",
                     action: #selector(stopServiceAction(_:)),
@@ -59,6 +56,21 @@ final class CellarFinderSyncExtension: FIFinderSync {
                 stopItem.representedObject = name
                 stopItem.target = self
                 menu.addItem(stopItem)
+            }
+
+            if !runningNames.isEmpty && !stoppedNames.isEmpty {
+                menu.addItem(.separator())
+            }
+
+            for name in stoppedNames {
+                let startItem = NSMenuItem(
+                    title: "Start \(name)",
+                    action: #selector(startServiceAction(_:)),
+                    keyEquivalent: ""
+                )
+                startItem.representedObject = name
+                startItem.target = self
+                menu.addItem(startItem)
             }
         }
 
@@ -77,6 +89,16 @@ final class CellarFinderSyncExtension: FIFinderSync {
         guard let serviceName = sender.representedObject as? String else { return }
         DistributedNotificationCenter.default().postNotificationName(
             Self.stopServiceNotification,
+            object: nil,
+            userInfo: ["serviceName": serviceName],
+            deliverImmediately: true
+        )
+    }
+
+    @objc private func startServiceAction(_ sender: NSMenuItem) {
+        guard let serviceName = sender.representedObject as? String else { return }
+        DistributedNotificationCenter.default().postNotificationName(
+            Self.startServiceNotification,
             object: nil,
             userInfo: ["serviceName": serviceName],
             deliverImmediately: true

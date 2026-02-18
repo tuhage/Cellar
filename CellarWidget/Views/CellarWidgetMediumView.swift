@@ -9,10 +9,21 @@ struct CellarWidgetMediumView: View {
     }
 
     var body: some View {
-        HStack(spacing: 16) {
-            servicesPanel
-            Divider()
-            outdatedPanel
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                servicesPanel
+                Divider()
+                outdatedPanel
+            }
+
+            Spacer(minLength: 0)
+
+            HStack {
+                Spacer()
+                Text("Updated \(entry.lastUpdated, style: .relative) ago")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .containerBackground(.fill.tertiary, for: .widget)
         .widgetURL(URL(string: "cellar://dashboard"))

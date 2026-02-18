@@ -4,7 +4,6 @@ import CellarCore
 struct OutdatedView: View {
     @Environment(PackageStore.self) private var store
 
-    @State private var isUpgradingAll = false
     @State private var isConfirmingUpgradeAll = false
 
     var body: some View {
@@ -20,7 +19,7 @@ struct OutdatedView: View {
                 EmptyStateView(
                     title: "Everything Up to Date",
                     systemImage: "checkmark.circle",
-                    description: "All packages are at their latest versions."
+                    description: "Outdated packages will appear here."
                 )
             } else {
                 outdatedList
@@ -40,7 +39,7 @@ struct OutdatedView: View {
                 } label: {
                     Label("Upgrade All", systemImage: "arrow.up.circle.fill")
                 }
-                .disabled(isUpgradingAll || (store.outdatedFormulae.isEmpty && store.outdatedCasks.isEmpty))
+                .disabled(store.isUpgradingAll || (store.outdatedFormulae.isEmpty && store.outdatedCasks.isEmpty))
             }
         }
         .task {
@@ -99,12 +98,12 @@ struct OutdatedView: View {
             }
         }
         .overlay(alignment: .top) {
-            if isUpgradingAll {
+            if store.isUpgradingAll {
                 upgradeAllBanner
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(AnimationToken.smooth, value: isUpgradingAll)
+        .animation(AnimationToken.smooth, value: store.isUpgradingAll)
     }
 
     // MARK: - Upgrade All Banner
@@ -115,6 +114,12 @@ struct OutdatedView: View {
                 .controlSize(.small)
             Text("Upgrading all packages\u{2026}")
                 .font(.callout)
+
+            Button("Cancel") {
+                store.cancelUpgradeAll()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
         .padding(.horizontal, Spacing.cardPadding)
         .padding(.vertical, Spacing.row)
@@ -126,17 +131,7 @@ struct OutdatedView: View {
     // MARK: - Actions
 
     private func upgradeAll() {
-        isUpgradingAll = true
-        Task {
-            let service = BrewService()
-            do {
-                for try await _ in service.upgradeAll() {}
-            } catch {
-                // Store will pick up errors on next reload
-            }
-            await store.loadAll()
-            isUpgradingAll = false
-        }
+        store.upgradeAll()
     }
 }
 

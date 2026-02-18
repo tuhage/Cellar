@@ -146,6 +146,7 @@ struct DashboardView: View {
                 Circle()
                     .fill(service.status.color)
                     .frame(width: IconSize.statusDot, height: IconSize.statusDot)
+                    .accessibilityLabel("\(service.status.label)")
 
                 Text(service.name)
                     .fontWeight(.medium)

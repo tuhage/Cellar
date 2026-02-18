@@ -70,10 +70,11 @@ private struct ExtensionsTab: View {
 
             Section {
                 FinderExtensionRow()
+                FinderMonitoredPathsRow()
             } header: {
                 Text("Finder Extension")
             } footer: {
-                Text("Badges folders containing a Brewfile and adds service controls to Finder\u{2019}s context menu.")
+                Text("Badges folders containing a Brewfile and adds service controls to Finder\u{2019}s context menu. Adding Desktop or Documents will trigger a system permission prompt.")
             }
         }
         .formStyle(.grouped)
@@ -293,6 +294,74 @@ private struct FinderExtensionRow: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             isEnabled = FIFinderSyncController.isExtensionEnabled
         }
+    }
+}
+
+// MARK: - Finder Monitored Paths
+
+private struct FinderMonitoredPathsRow: View {
+    @State private var paths: [String] = AppGroupStorage.finderSyncPaths
+
+    var body: some View {
+        LabeledContent("Monitored Folders") {
+            VStack(alignment: .trailing, spacing: Spacing.compact) {
+                ForEach(paths, id: \.self) { path in
+                    HStack(spacing: Spacing.related) {
+                        Text(abbreviate(path))
+                            .font(.callout)
+                            .fontDesign(.monospaced)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+
+                        Button {
+                            remove(path)
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(abbreviate(path))")
+                    }
+                }
+
+                Button("Add Folder\u{2026}") {
+                    addFolder()
+                }
+                .font(.callout)
+            }
+        }
+    }
+
+    private func abbreviate(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path.hasPrefix(home) {
+            return "~" + path.dropFirst(home.count)
+        }
+        return path
+    }
+
+    private func remove(_ path: String) {
+        paths.removeAll { $0 == path }
+        save()
+    }
+
+    private func addFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Folder to Monitor"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let path = url.path
+
+        guard !paths.contains(path) else { return }
+        paths.append(path)
+        save()
+    }
+
+    private func save() {
+        AppGroupStorage.finderSyncPaths = paths
     }
 }
 

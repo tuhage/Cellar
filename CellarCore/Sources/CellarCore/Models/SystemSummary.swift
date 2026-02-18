@@ -27,6 +27,12 @@ public struct SystemSummary: Codable, Sendable {
         totalFormulae + totalCasks
     }
 
+    /// Whether any installed packages have available updates.
+    public var hasOutdatedPackages: Bool { updatesAvailable > 0 }
+
+    /// Whether any services are in an error state.
+    public var hasFailedServices: Bool { services.contains(where: \.isError) }
+
     // MARK: Init
 
     public init(
@@ -83,20 +89,6 @@ public struct SystemSummary: Codable, Sendable {
             recentlyInstalled: Array(recentlyInstalled),
             taps: taps
         )
-    }
-
-    // MARK: Cache
-
-    private static let cacheFileName = "dashboard-cache.json"
-
-    /// Writes this summary to the shared App Group container.
-    public func saveToCache() {
-        AppGroupStorage.save(self, to: Self.cacheFileName)
-    }
-
-    /// Reads the most recent cached summary from the shared App Group container.
-    public static func loadFromCache() -> SystemSummary? {
-        AppGroupStorage.load(SystemSummary.self, from: cacheFileName)
     }
 
     // MARK: Preview

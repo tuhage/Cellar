@@ -40,8 +40,6 @@ final class DashboardStore {
             if let cached = persistence.loadCached(SystemSummary.self, from: Self.cacheFile, maxAge: Self.cacheMaxAge) {
                 summary = cached.data
                 if cached.isFresh && !forceRefresh { return }
-            } else if let cached = SystemSummary.loadFromCache() {
-                summary = cached
             }
         } else if !forceRefresh,
                   let cached = persistence.loadCached(SystemSummary.self, from: Self.cacheFile, maxAge: Self.cacheMaxAge),
@@ -70,12 +68,9 @@ final class DashboardStore {
             )
             summary = loadedSummary
             persistence.saveToCache(loadedSummary, to: Self.cacheFile)
-            loadedSummary.saveToCache()
             writeWidgetSnapshot(summary: loadedSummary, services: services)
         } catch {
-            if summary == nil {
-                errorMessage = error.localizedDescription
-            }
+            errorMessage = error.localizedDescription
         }
         isLoading = false
     }

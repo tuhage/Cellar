@@ -28,6 +28,9 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
 
     public var id: String { name }
 
+    /// Whether this formula requires user attention (outdated, deprecated, or disabled).
+    public var needsAttention: Bool { outdated || deprecated || disabled }
+
     // MARK: Init
 
     public init(
@@ -73,6 +76,11 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
     }
 
     // MARK: Actions
+
+    public static func install(name: String) async throws {
+        let service = BrewService()
+        for try await _ in service.install(name, isCask: false) {}
+    }
 
     public func upgrade() async throws {
         let service = BrewService()

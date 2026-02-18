@@ -26,6 +26,13 @@ struct CellarWidgetLargeView: View {
             }
 
             Spacer(minLength: 0)
+
+            HStack {
+                Spacer()
+                Text("Updated \(entry.lastUpdated, style: .relative) ago")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .containerBackground(.fill.tertiary, for: .widget)
         .widgetURL(URL(string: "cellar://dashboard"))

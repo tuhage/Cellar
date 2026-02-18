@@ -21,6 +21,15 @@ struct CellarCLI {
             case "stop":
                 let name = try requireArgument(from: arguments, for: "stop")
                 try await StopCommand.run(serviceName: name)
+            case "restart":
+                let name = try requireArgument(from: arguments, for: "restart")
+                try await RestartCommand.run(serviceName: name)
+            case "search":
+                let query = try requireArgument(from: arguments, for: "search")
+                try await SearchCommand.run(query: query)
+            case "list":
+                let filter = parseListFilter(from: arguments)
+                try await ListCommand.run(filter: filter)
             case "health":
                 try await HealthCommand.run()
             case "cleanup":
@@ -28,7 +37,7 @@ struct CellarCLI {
             case "help", "--help", "-h":
                 HelpCommand.run()
             case "version", "--version", "-v":
-                print("cellar 1.0.0")
+                print("cellar \(AppVersion.current)")
             default:
                 TerminalOutput.printError("Unknown command: \(command)")
                 print("")
@@ -47,6 +56,13 @@ struct CellarCLI {
         }
         return value
     }
+
+    private static func parseListFilter(from arguments: [String]) -> ListCommand.Filter {
+        let flags = Set(arguments.dropFirst())
+        if flags.contains("--formulae") { return .formulae }
+        if flags.contains("--casks") { return .casks }
+        return .all
+    }
 }
 
 enum CLIError: LocalizedError {
@@ -55,7 +71,11 @@ enum CLIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingArgument(let command):
-            "Missing service name. Usage: cellar \(command) <service>"
+            let argument: String = switch command {
+            case "search": "<query>"
+            default: "<service>"
+            }
+            return "Missing argument. Usage: cellar \(command) \(argument)"
         }
     }
 }

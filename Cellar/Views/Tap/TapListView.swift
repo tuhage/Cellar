@@ -26,7 +26,7 @@ struct TapListView: View {
                 EmptyStateView(
                     title: "No Taps",
                     systemImage: "spigot",
-                    description: "No Homebrew taps are installed."
+                    description: "Homebrew taps will appear here."
                 )
             } else {
                 tapTable

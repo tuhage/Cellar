@@ -58,7 +58,7 @@ final class ServiceStore {
         do {
             try await refreshServices()
         } catch {
-            if services.isEmpty { errorMessage = error.localizedDescription }
+            errorMessage = error.localizedDescription
         }
         isLoading = false
     }

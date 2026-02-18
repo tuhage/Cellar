@@ -21,7 +21,7 @@ struct ServiceListView: View {
                 EmptyStateView(
                     title: "No Services",
                     systemImage: "gearshape.2",
-                    description: "No Homebrew services are installed."
+                    description: "Homebrew services will appear here."
                 )
             } else {
                 serviceTable
@@ -149,6 +149,8 @@ private struct ServiceStatusBadge: View {
             Text(status.label)
                 .font(.callout)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Status: \(status.label)")
         .onAppear {
             if status == .started { isPulsing = true }
         }

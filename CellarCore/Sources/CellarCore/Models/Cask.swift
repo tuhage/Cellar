@@ -20,6 +20,9 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
 
     public var id: String { token }
 
+    /// Whether this cask requires user attention (outdated, deprecated, or disabled).
+    public var needsAttention: Bool { outdated || deprecated || disabled }
+
     /// The primary display name — first entry of the `name` array,
     /// falling back to the token.
     public var displayName: String {

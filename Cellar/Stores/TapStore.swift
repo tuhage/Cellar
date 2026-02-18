@@ -52,13 +52,15 @@ final class TapStore {
         do {
             try await refreshTaps()
         } catch {
-            if taps.isEmpty { errorMessage = error.localizedDescription }
+            errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
     /// Adds a tap by name and provides a stream for progress output.
     func addTap(_ name: String) {
+        isLoading = true
+        errorMessage = nil
         let service = BrewService()
         actionStream = service.addTap(name)
     }
@@ -79,6 +81,7 @@ final class TapStore {
     /// Dismisses the active action stream overlay.
     func dismissAction() {
         actionStream = nil
+        isLoading = false
     }
 
     // MARK: Private

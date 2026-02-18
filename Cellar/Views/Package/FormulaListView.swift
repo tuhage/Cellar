@@ -9,6 +9,7 @@ struct FormulaListView: View {
         KeyPathComparator(\.name)
     ]
     @State private var formulaToUninstall: Formula?
+    @State private var formulaToInstall: Formula?
     @State private var installStream: AsyncThrowingStream<String, Error>?
     @State private var installTitle: String?
 
@@ -32,7 +33,7 @@ struct FormulaListView: View {
                 EmptyStateView(
                     title: "No Formulae",
                     systemImage: "shippingbox",
-                    description: "No installed formulae found."
+                    description: "Installed formulae will appear here."
                 )
             } else {
                 formulaTable
@@ -72,6 +73,22 @@ struct FormulaListView: View {
             }
         } message: { formula in
             Text("This will remove \(formula.name) and its associated files.")
+        }
+        .confirmationDialog(
+            "Install \(formulaToInstall?.name ?? "")?",
+            isPresented: Binding(
+                get: { formulaToInstall != nil },
+                set: { if !$0 { formulaToInstall = nil } }
+            ),
+            presenting: formulaToInstall
+        ) { formula in
+            Button("Install") {
+                let service = BrewService()
+                installTitle = "Installing \(formula.name)"
+                installStream = service.install(formula.name, isCask: false)
+            }
+        } message: { formula in
+            Text("This will download and install \(formula.name) via Homebrew.")
         }
         .installProgressSheet(stream: $installStream, title: $installTitle) {
             Task { await store.loadFormulae(forceRefresh: true) }
@@ -165,9 +182,7 @@ struct FormulaListView: View {
             Spacer()
 
             Button {
-                let service = BrewService()
-                installTitle = "Installing \(formula.name)"
-                installStream = service.install(formula.name, isCask: false)
+                formulaToInstall = formula
             } label: {
                 Label("Install", systemImage: "arrow.down.circle")
             }
