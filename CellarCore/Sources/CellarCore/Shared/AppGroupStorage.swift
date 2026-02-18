@@ -71,7 +71,13 @@ public enum AppGroupStorage {
         do {
             try data.write(to: url, options: .atomic)
         } catch {
-            logger.error("Failed to write '\(fileName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+            // .atomic can fail in App Group containers — fall back to direct write.
+            logger.warning("Atomic write failed for '\(fileName, privacy: .public)', retrying direct write: \(error.localizedDescription, privacy: .public)")
+            do {
+                try data.write(to: url)
+            } catch {
+                logger.error("Failed to write '\(fileName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
