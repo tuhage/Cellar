@@ -1,32 +1,31 @@
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# Xcode
-build/
-DerivedData/
-*.xcodeproj/xcuserdata/
-*.xcworkspace/xcuserdata/
-*.xcodeproj/project.xcworkspace/xcuserstate
-*.xccheckout
-*.moved-aside
-*.hmap
-*.ipa
-*.dSYM.zip
-*.dSYM
-
-# Swift Package Manager
-.swiftpm/
-.build/
-CellarCore/.build/
-Package.resolved
 
 # Claude
-.claude/*
-
 # Project
-CLAUDE.md
-TODO.md
+# Swift Package Manager
+# Xcode
+# macOS
+*.dSYM
+*.dSYM.zip
 *.dmg
+*.hmap
+*.ipa
+*.moved-aside
+*.xccheckout
+*.xcodeproj/project.xcworkspace/xcuserstate
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+.AppleDouble
+.DS_Store
+.LSOverride
+._*
+.build/
+.claude/*
+.swiftpm/
+CLAUDE.md
+CellarCore/.build/
+DerivedData/
+Package.resolved
+TODO.md
+build/
+docs/
+scripts/
