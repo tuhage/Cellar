@@ -1,4 +1,6 @@
 import Foundation
+import os
+import CellarCore
 
 nonisolated final class CLIInstallService: Sendable {
 
@@ -46,7 +48,15 @@ nonisolated final class CLIInstallService: Sendable {
         }
 
         // Check if it's a symlink pointing to our bundled binary
-        if let destination = try? fileManager.destinationOfSymbolicLink(atPath: installPath) {
+        let destination: String?
+        do {
+            destination = try fileManager.destinationOfSymbolicLink(atPath: installPath)
+        } catch {
+            Log.cliInstall.notice("Could not read symlink at '\(installPath, privacy: .private)': \(error.localizedDescription, privacy: .public)")
+            destination = nil
+        }
+
+        if let destination {
             if destination == bundledBinaryPath {
                 return .installed(path: installPath)
             }

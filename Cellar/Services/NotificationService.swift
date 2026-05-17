@@ -1,4 +1,6 @@
 import UserNotifications
+import os
+import CellarCore
 
 nonisolated final class NotificationService: Sendable {
     static let shared = NotificationService()
@@ -7,7 +9,13 @@ nonisolated final class NotificationService: Sendable {
 
     func requestPermission() async {
         let center = UNUserNotificationCenter.current()
-        try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+        do {
+            try await center.requestAuthorization(options: [.alert, .sound, .badge])
+        } catch let error as UNError where error.code == .notificationsNotAllowed {
+            Log.notifications.info("Notification permission denied by user")
+        } catch {
+            Log.notifications.error("Notification authorization request failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Send
@@ -25,7 +33,11 @@ nonisolated final class NotificationService: Sendable {
         )
 
         let center = UNUserNotificationCenter.current()
-        try? await center.add(request)
+        do {
+            try await center.add(request)
+        } catch {
+            Log.notifications.error("Failed to add notification '\(identifier, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Convenience

@@ -4,7 +4,7 @@ import os
 /// Provides shared storage via App Group container for cross-target data sharing
 /// (main app, widget, Finder extension).
 public enum AppGroupStorage {
-    private static let logger = Logger(subsystem: "com.tuhage.Cellar", category: "AppGroupStorage")
+    private static let logger = Log.storage
 
     public static let groupIdentifier = "group.com.tuhage.Cellar"
 

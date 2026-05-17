@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - CacheEntry
 
@@ -35,7 +36,15 @@ public nonisolated final class PersistenceService: Sendable {
     }
 
     public func loadOrDefault<T: Decodable>(_ type: T.Type, from fileName: String, default defaultValue: T) -> T {
-        (try? load(type, from: fileName)) ?? defaultValue
+        do {
+            return try load(type, from: fileName)
+        } catch let error as DecodingError {
+            Log.persistence.error("Corrupted cache '\(fileName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+            return defaultValue
+        } catch {
+            Log.persistence.debug("'\(fileName, privacy: .public)' not available, using default: \(error.localizedDescription, privacy: .public)")
+            return defaultValue
+        }
     }
 
     // MARK: - Write
@@ -54,14 +63,23 @@ public nonisolated final class PersistenceService: Sendable {
     /// Loads cached data and returns it along with freshness status.
     /// Returns `nil` if no cache exists or if decoding fails.
     public func loadCached<T: Codable & Sendable>(_ type: T.Type, from fileName: String, maxAge: TimeInterval) -> (data: T, isFresh: Bool)? {
-        guard let entry = try? load(CacheEntry<T>.self, from: fileName) else { return nil }
-        return (data: entry.data, isFresh: entry.isValid(maxAge: maxAge))
+        do {
+            let entry = try load(CacheEntry<T>.self, from: fileName)
+            return (data: entry.data, isFresh: entry.isValid(maxAge: maxAge))
+        } catch {
+            Log.persistence.debug("Cache miss for '\(fileName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     /// Wraps data in a `CacheEntry` with the current timestamp and saves it.
     public func saveToCache<T: Codable & Sendable>(_ data: T, to fileName: String) {
-        let entry = CacheEntry(data: data)
-        try? save(entry, to: fileName)
+        do {
+            let entry = CacheEntry(data: data)
+            try save(entry, to: fileName)
+        } catch {
+            Log.persistence.error("Failed to write cache '\(fileName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Checks whether a fresh fetch is needed, restoring cached data when the

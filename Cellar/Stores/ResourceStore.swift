@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import CellarCore
+import os
 
 // MARK: - ResourceStore
 
@@ -51,10 +52,16 @@ final class ResourceStore: LoadableStore {
         for service in runningServices {
             guard let pid = service.pid else { continue }
 
-            guard let output = try? await runCommand(
-                "/bin/ps",
-                ["-p", "\(pid)", "-o", "%cpu=,%mem=,rss="]
-            ) else { continue }
+            let output: String
+            do {
+                output = try await runCommand(
+                    "/bin/ps",
+                    ["-p", "\(pid)", "-o", "%cpu=,%mem=,rss="]
+                )
+            } catch {
+                Log.resources.error("ps command failed for service '\(service.name, privacy: .public)' pid=\(pid, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                continue
+            }
 
             let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }

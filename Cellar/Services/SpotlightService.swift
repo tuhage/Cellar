@@ -1,5 +1,6 @@
 import CoreSpotlight
 import CellarCore
+import os
 
 nonisolated final class SpotlightService: Sendable {
     static let shared = SpotlightService()
@@ -10,10 +11,14 @@ nonisolated final class SpotlightService: Sendable {
     func indexAll(formulae: [Formula], casks: [Cask]) async {
         let index = CSSearchableIndex.default()
 
-        try? await index.deleteSearchableItems(withDomainIdentifiers: [
-            Self.formulaeDomain,
-            Self.casksDomain,
-        ])
+        do {
+            try await index.deleteSearchableItems(withDomainIdentifiers: [
+                Self.formulaeDomain,
+                Self.casksDomain,
+            ])
+        } catch {
+            Log.spotlight.notice("Failed to clear Spotlight index: \(error.localizedDescription, privacy: .public)")
+        }
 
         let formulaeItems = formulae.map { formula in
             makeItem(
@@ -35,7 +40,11 @@ nonisolated final class SpotlightService: Sendable {
             )
         }
 
-        try? await index.indexSearchableItems(formulaeItems + caskItems)
+        do {
+            try await index.indexSearchableItems(formulaeItems + caskItems)
+        } catch {
+            Log.spotlight.error("Failed to index \(formulaeItems.count + caskItems.count, privacy: .public) Spotlight items: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func makeItem(
