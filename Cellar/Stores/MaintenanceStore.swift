@@ -24,7 +24,7 @@ final class MaintenanceStore {
     // MARK: Dependencies
 
     private let persistence = PersistenceService()
-    private let service = BrewService()
+    private let service = BrewService.shared
 
     private static let scheduleFileName = "maintenance_schedule.json"
     private static let reportsFileName = "maintenance_reports.json"

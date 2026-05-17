@@ -61,8 +61,7 @@ final class TapStore {
     func addTap(_ name: String) {
         isLoading = true
         errorMessage = nil
-        let service = BrewService()
-        actionStream = service.addTap(name)
+        actionStream = BrewService.shared.addTap(name)
     }
 
     /// Removes a tap and reloads the tap list.

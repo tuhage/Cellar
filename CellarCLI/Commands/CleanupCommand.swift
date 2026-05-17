@@ -5,7 +5,7 @@ enum CleanupCommand {
         TerminalOutput.printHeader("Homebrew Cleanup")
         print("")
 
-        let service = BrewService()
+        let service = BrewService.shared
 
         for try await line in service.cleanup() {
             print(line)

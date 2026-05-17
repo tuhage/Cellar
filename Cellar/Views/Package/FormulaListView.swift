@@ -83,9 +83,8 @@ struct FormulaListView: View {
             presenting: formulaToInstall
         ) { formula in
             Button("Install") {
-                let service = BrewService()
                 installTitle = "Installing \(formula.name)"
-                installStream = service.install(formula.name, isCask: false)
+                installStream = BrewService.shared.install(formula.name, isCask: false)
             }
         } message: { formula in
             Text("This will download and install \(formula.name) via Homebrew.")

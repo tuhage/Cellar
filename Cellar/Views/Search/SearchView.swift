@@ -199,8 +199,7 @@ struct SearchView: View {
         installingPackages.insert(formula.name)
         Task {
             do {
-                let service = BrewService()
-                for try await _ in service.install(formula.name, isCask: false) {}
+                for try await _ in BrewService.shared.install(formula.name, isCask: false) {}
             } catch {
                 errorMessage = error.localizedDescription
             }

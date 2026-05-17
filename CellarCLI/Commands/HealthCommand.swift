@@ -7,7 +7,7 @@ enum HealthCommand {
         print("Running \(TerminalOutput.info("brew doctor"))...")
         print("")
 
-        let output = try await BrewService().doctor()
+        let output = try await BrewService.shared.doctor()
 
         if output.contains("Your system is ready to brew") {
             TerminalOutput.printSuccess("Your system is ready to brew.")

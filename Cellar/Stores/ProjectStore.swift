@@ -36,7 +36,7 @@ final class ProjectStore {
     // MARK: Dependencies
 
     private let persistence = PersistenceService()
-    private let service = BrewService()
+    private let service = BrewService.shared
 
     private static let fileName = "project_environments.json"
 

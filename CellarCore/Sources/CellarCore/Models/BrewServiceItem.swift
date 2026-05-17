@@ -59,26 +59,22 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
     // MARK: Actions
 
     public func start() async throws {
-        let service = BrewService()
-        try await service.startService(name)
+        try await BrewService.shared.startService(name)
     }
 
     public func stop() async throws {
-        let service = BrewService()
-        try await service.stopService(name)
+        try await BrewService.shared.stopService(name)
     }
 
     public func restart() async throws {
-        let service = BrewService()
-        try await service.restartService(name)
+        try await BrewService.shared.restartService(name)
     }
 
     // MARK: Factory Methods
 
     public static var all: [BrewServiceItem] {
         get async throws {
-            let service = BrewService()
-            let data = try await service.listServicesData()
+            let data = try await BrewService.shared.listServicesData()
             if data.isEmpty { return [] }
             var items = try JSONDecoder().decode([BrewServiceItem].self, from: data)
 

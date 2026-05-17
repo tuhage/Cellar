@@ -83,16 +83,14 @@ public struct Tap: Identifiable, Codable, Hashable, Sendable {
     // MARK: Actions
 
     public func remove() async throws {
-        let service = BrewService()
-        try await service.removeTap(name)
+        try await BrewService.shared.removeTap(name)
     }
 
     // MARK: Factory Methods
 
     public static var all: [Tap] {
         get async throws {
-            let service = BrewService()
-            let data = try await service.listTapsData()
+            let data = try await BrewService.shared.listTapsData()
             if data.isEmpty { return [] }
             return try JSONDecoder().decode([Tap].self, from: data)
         }

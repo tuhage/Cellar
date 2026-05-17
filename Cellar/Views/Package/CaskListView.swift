@@ -83,9 +83,8 @@ struct CaskListView: View {
             presenting: caskToInstall
         ) { cask in
             Button("Install") {
-                let service = BrewService()
                 installTitle = "Installing \(cask.displayName)"
-                installStream = service.install(cask.token, isCask: true)
+                installStream = BrewService.shared.install(cask.token, isCask: true)
             }
         } message: { cask in
             Text("This will download and install \(cask.displayName) via Homebrew.")

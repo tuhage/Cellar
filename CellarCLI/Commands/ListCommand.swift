@@ -9,7 +9,7 @@ enum ListCommand {
     }
 
     static func run(filter: Filter) async throws {
-        let service = BrewService()
+        let service = BrewService.shared
 
         switch filter {
         case .all:

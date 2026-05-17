@@ -2,7 +2,7 @@ import CellarCore
 
 enum SearchCommand {
     static func run(query: String) async throws {
-        let service = BrewService()
+        let service = BrewService.shared
 
         async let formulaeNames = service.searchFormulae(query)
         async let caskNames = service.searchCasks(query)

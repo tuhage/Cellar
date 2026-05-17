@@ -78,28 +78,23 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
     // MARK: Actions
 
     public static func install(name: String) async throws {
-        let service = BrewService()
-        for try await _ in service.install(name, isCask: false) {}
+        for try await _ in BrewService.shared.install(name, isCask: false) {}
     }
 
     public func upgrade() async throws {
-        let service = BrewService()
-        for try await _ in service.upgrade(name) {}
+        for try await _ in BrewService.shared.upgrade(name) {}
     }
 
     public func uninstall() async throws {
-        let service = BrewService()
-        try await service.uninstall(name)
+        try await BrewService.shared.uninstall(name)
     }
 
     public func pin() async throws {
-        let service = BrewService()
-        try await service.pin(name)
+        try await BrewService.shared.pin(name)
     }
 
     public func unpin() async throws {
-        let service = BrewService()
-        try await service.unpin(name)
+        try await BrewService.shared.unpin(name)
     }
 
     // MARK: Factory Methods
@@ -107,8 +102,7 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
     /// All installed formulae.
     public static var all: [Formula] {
         get async throws {
-            let service = BrewService()
-            let data = try await service.listFormulaeData()
+            let data = try await BrewService.shared.listFormulaeData()
             let response = try JSONDecoder().decode(BrewJSONResponse.self, from: data)
             return response.formulae
         }
@@ -117,8 +111,7 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
     /// Search for formulae by query. Returns stub `Formula` values with names only,
     /// since `brew search` returns newline-separated names (not full JSON).
     public static func search(for query: String) async throws -> [Formula] {
-        let service = BrewService()
-        let names = try await service.searchFormulae(query)
+        let names = try await BrewService.shared.searchFormulae(query)
         return names.map { Formula.stub(name: $0) }
     }
 

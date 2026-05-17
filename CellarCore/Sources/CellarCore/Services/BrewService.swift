@@ -1,6 +1,8 @@
 import Foundation
 
 public nonisolated final class BrewService: Sendable {
+    public static let shared = BrewService()
+
     private let process: BrewProcessProtocol
 
     public init(process: BrewProcessProtocol = BrewProcess()) {

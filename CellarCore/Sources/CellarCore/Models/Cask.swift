@@ -65,18 +65,15 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
     // MARK: Actions
 
     public func install() async throws {
-        let service = BrewService()
-        for try await _ in service.install(token, isCask: true) {}
+        for try await _ in BrewService.shared.install(token, isCask: true) {}
     }
 
     public func uninstall() async throws {
-        let service = BrewService()
-        try await service.uninstall(token)
+        try await BrewService.shared.uninstall(token)
     }
 
     public func upgrade() async throws {
-        let service = BrewService()
-        for try await _ in service.upgrade(token) {}
+        for try await _ in BrewService.shared.upgrade(token) {}
     }
 
     // MARK: Factory Methods
@@ -84,8 +81,7 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
     /// All installed casks.
     public static var all: [Cask] {
         get async throws {
-            let service = BrewService()
-            let data = try await service.listCasksData()
+            let data = try await BrewService.shared.listCasksData()
             let response = try JSONDecoder().decode(BrewJSONResponse.self, from: data)
             return response.casks ?? []
         }
@@ -94,8 +90,7 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
     /// Search for casks by query. Returns stub `Cask` values with tokens only,
     /// since `brew search` returns newline-separated names (not full JSON).
     public static func search(for query: String) async throws -> [Cask] {
-        let service = BrewService()
-        let tokens = try await service.searchCasks(query)
+        let tokens = try await BrewService.shared.searchCasks(query)
         return tokens.map { Cask.stub(token: $0) }
     }
 

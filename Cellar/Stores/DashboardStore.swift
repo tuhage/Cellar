@@ -27,7 +27,7 @@ final class DashboardStore {
 
     // MARK: Dependencies
 
-    private let service = BrewService()
+    private let service = BrewService.shared
     private let persistence = PersistenceService()
     private static let cacheMaxAge: TimeInterval = 300
     private static let cacheFile = "cache-dashboard.json"

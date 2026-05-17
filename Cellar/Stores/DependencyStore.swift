@@ -29,7 +29,7 @@ final class DependencyStore {
 
     private let service: BrewService
 
-    init(service: BrewService = BrewService()) {
+    init(service: BrewService = .shared) {
         self.service = service
     }
 

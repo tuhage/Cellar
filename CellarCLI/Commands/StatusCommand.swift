@@ -3,7 +3,7 @@ import CellarCore
 
 enum StatusCommand {
     static func run() async throws {
-        let service = BrewService()
+        let service = BrewService.shared
 
         async let formulaeData = service.listFormulaeData()
         async let casksData = service.listCasksData()
