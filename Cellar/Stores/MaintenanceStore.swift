@@ -8,7 +8,7 @@ import CellarCore
 /// and persists a history of maintenance reports.
 @Observable
 @MainActor
-final class MaintenanceStore {
+final class MaintenanceStore: LoadableStore {
 
     // MARK: Data
 
@@ -17,7 +17,7 @@ final class MaintenanceStore {
 
     // MARK: State
 
-    var isRunning = false
+    var isLoading = false
     var errorMessage: String?
     var currentAction: String?
 
@@ -71,7 +71,7 @@ final class MaintenanceStore {
 
     /// Runs `brew cleanup` and records a report.
     func runCleanup() async {
-        isRunning = true
+        isLoading = true
         currentAction = "Running cleanup\u{2026}"
         errorMessage = nil
 
@@ -98,13 +98,13 @@ final class MaintenanceStore {
             errorMessage = "Cleanup failed: \(error.localizedDescription)"
         }
 
-        isRunning = false
+        isLoading = false
         currentAction = nil
     }
 
     /// Runs `brew doctor` and records a report.
     func runHealthCheck() async {
-        isRunning = true
+        isLoading = true
         currentAction = "Running health check\u{2026}"
         errorMessage = nil
 
@@ -127,7 +127,7 @@ final class MaintenanceStore {
             errorMessage = "Health check failed: \(error.localizedDescription)"
         }
 
-        isRunning = false
+        isLoading = false
         currentAction = nil
     }
 

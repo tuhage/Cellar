@@ -50,7 +50,7 @@ struct MaintenanceView: View {
             }
             .formStyle(.grouped)
 
-            if store.isRunning {
+            if store.isLoading {
                 runningOverlay
             }
         }
@@ -62,7 +62,7 @@ struct MaintenanceView: View {
                 } label: {
                     Label("Run All", systemImage: "play.fill")
                 }
-                .disabled(store.isRunning)
+                .disabled(store.isLoading)
             }
         }
         .task {
@@ -82,7 +82,7 @@ struct MaintenanceView: View {
                 } label: {
                     Label("Run Cleanup", systemImage: "trash")
                 }
-                .disabled(store.isRunning)
+                .disabled(store.isLoading)
 
                 Spacer()
 
@@ -91,7 +91,7 @@ struct MaintenanceView: View {
                 } label: {
                     Label("Run Health Check", systemImage: "heart.text.square")
                 }
-                .disabled(store.isRunning)
+                .disabled(store.isLoading)
             }
 
             if let errorMessage = store.errorMessage {

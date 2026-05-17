@@ -10,7 +10,7 @@ import CellarCore
 /// operations. Views bind to this store for the services list UI.
 @Observable
 @MainActor
-final class ServiceStore {
+final class ServiceStore: LoadableStore {
 
     // MARK: Data
 

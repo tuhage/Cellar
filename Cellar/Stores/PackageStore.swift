@@ -10,7 +10,7 @@ import CellarCore
 /// package types. Views bind to this store for the main package list UI.
 @Observable
 @MainActor
-final class PackageStore {
+final class PackageStore: LoadableStore {
 
     // MARK: Data
 

@@ -10,7 +10,7 @@ import CellarCore
 /// Views bind to this store for the resource monitoring UI.
 @Observable
 @MainActor
-final class ResourceStore {
+final class ResourceStore: LoadableStore {
 
     // MARK: Data
 

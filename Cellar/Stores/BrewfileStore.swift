@@ -32,7 +32,7 @@ enum BrewfileCreationMode: String, CaseIterable, Identifiable {
 /// the Brewfile management UI.
 @Observable
 @MainActor
-final class BrewfileStore {
+final class BrewfileStore: LoadableStore {
 
     // MARK: Data
 

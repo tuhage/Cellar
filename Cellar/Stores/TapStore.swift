@@ -10,7 +10,7 @@ import CellarCore
 /// Views bind to this store for the tap list UI.
 @Observable
 @MainActor
-final class TapStore {
+final class TapStore: LoadableStore {
 
     // MARK: Data
 

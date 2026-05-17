@@ -10,7 +10,7 @@ import WidgetKit
 /// tasks: upgrade all, cleanup, and health check.
 @Observable
 @MainActor
-final class DashboardStore {
+final class DashboardStore: LoadableStore {
 
     // MARK: Data
 

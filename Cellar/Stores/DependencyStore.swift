@@ -11,7 +11,7 @@ import CellarCore
 /// for the dependency graph UI.
 @Observable
 @MainActor
-final class DependencyStore {
+final class DependencyStore: LoadableStore {
 
     // MARK: Data
 

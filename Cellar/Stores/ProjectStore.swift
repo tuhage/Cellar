@@ -8,7 +8,7 @@ import CellarCore
 /// and package tracking. Views bind to this store for the project management UI.
 @Observable
 @MainActor
-final class ProjectStore {
+final class ProjectStore: LoadableStore {
 
     // MARK: Data
 
