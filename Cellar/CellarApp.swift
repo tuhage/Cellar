@@ -102,10 +102,10 @@ private final class FinderSyncNotificationObserver {
         }
     }
 
-    private static func handleServiceNotification(
+    nonisolated private static func handleServiceNotification(
         _ notification: Notification,
         serviceStore: ServiceStore,
-        action: @escaping (BrewServiceItem) async -> Void
+        action: @escaping @Sendable (BrewServiceItem) async -> Void
     ) {
         guard let serviceName = notification.userInfo?["serviceName"] as? String else { return }
         Task { @MainActor in
