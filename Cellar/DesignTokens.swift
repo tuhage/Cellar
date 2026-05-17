@@ -170,6 +170,23 @@ nonisolated enum Opacity {
     static let subtleBorder: Double = 0.08
 }
 
+// MARK: - WindowSize
+
+nonisolated enum WindowSize {
+    /// 400 pt — Add item sheet width (add service, add package sheets)
+    static let addItemSheet: CGFloat = 400
+    /// 420 pt — Narrow sheet/content column (add profile sheet, project intro)
+    static let narrowSheet: CGFloat = 420
+    /// 500 pt — Medium sheet minimum width (profile manager)
+    static let mediumSheet: CGFloat = 500
+    /// 400 pt — Medium sheet minimum height (profile manager)
+    static let mediumSheetHeight: CGFloat = 400
+    /// 700 pt — Full detail sheet width (previews, large sheets)
+    static let fullDetailWidth: CGFloat = 700
+    /// 600 pt — Full detail sheet height (previews, large sheets)
+    static let fullDetailHeight: CGFloat = 600
+}
+
 // MARK: - HoverableCardButtonStyle
 
 /// A button style that elevates shadow on hover and scales down on press.

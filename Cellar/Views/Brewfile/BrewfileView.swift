@@ -506,7 +506,7 @@ struct BrewfileView: View {
                 }
             }
         }
-        .frame(minWidth: 500, minHeight: 400)
+        .frame(minWidth: WindowSize.mediumSheet, minHeight: WindowSize.mediumSheetHeight)
     }
 
     // MARK: - Add Profile Sheet
@@ -567,7 +567,7 @@ struct BrewfileView: View {
             }
         }
         .padding()
-        .frame(width: 420)
+        .frame(width: WindowSize.narrowSheet)
     }
 
     // MARK: - Helpers
@@ -616,5 +616,5 @@ struct BrewfileView: View {
         BrewfileView()
             .environment(BrewfileStore())
     }
-    .frame(width: 700, height: 600)
+    .frame(width: WindowSize.fullDetailWidth, height: WindowSize.fullDetailHeight)
 }

@@ -188,7 +188,7 @@ struct ProjectListView: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 420)
+                    .frame(maxWidth: WindowSize.narrowSheet)
             }
 
             VStack(alignment: .leading, spacing: Spacing.sectionContent) {
@@ -211,7 +211,7 @@ struct ProjectListView: View {
                     description: "Activate a project to start all its services. Deactivate to stop them when you're done."
                 )
             }
-            .frame(maxWidth: 420)
+            .frame(maxWidth: WindowSize.narrowSheet)
 
             Button {
                 newProjectName = ""
@@ -559,7 +559,7 @@ struct ProjectListView: View {
             }
         }
         .padding()
-        .frame(width: 400)
+        .frame(width: WindowSize.addItemSheet)
     }
 
     // MARK: - Add Package Sheet
@@ -599,7 +599,7 @@ struct ProjectListView: View {
             }
         }
         .padding()
-        .frame(width: 400)
+        .frame(width: WindowSize.addItemSheet)
     }
 }
 
