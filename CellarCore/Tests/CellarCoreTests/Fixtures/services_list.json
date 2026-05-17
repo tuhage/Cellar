@@ -1,0 +1,20 @@
+[
+  {
+    "name": "postgresql@16",
+    "status": "started",
+    "user": "tuhage",
+    "file": "/opt/homebrew/opt/postgresql@16/homebrew.mxcl.postgresql@16.plist",
+    "exit_code": 0,
+    "pid": 12345,
+    "registered": true
+  },
+  {
+    "name": "redis",
+    "status": "stopped",
+    "user": null,
+    "file": null,
+    "exit_code": null,
+    "pid": null,
+    "registered": false
+  }
+]

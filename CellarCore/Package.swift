@@ -10,5 +10,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "CellarCore"),
+        .testTarget(
+            name: "CellarCoreTests",
+            dependencies: ["CellarCore"],
+            path: "Tests/CellarCoreTests",
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

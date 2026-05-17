@@ -1,0 +1,31 @@
+{
+  "formulae": [
+    {
+      "name": "openssl@3",
+      "full_name": "openssl@3",
+      "desc": "Cryptography and SSL/TLS Toolkit",
+      "license": "Apache-2.0",
+      "homepage": "https://openssl.org/",
+      "versions": { "stable": "3.6.0" },
+      "deprecated": false,
+      "disabled": false,
+      "outdated": true,
+      "pinned": false,
+      "keg_only": false,
+      "dependencies": ["ca-certificates"],
+      "build_dependencies": [],
+      "installed": [
+        {
+          "version": "3.6.0",
+          "installed_on_request": false,
+          "installed_as_dependency": true,
+          "time": 1768746915,
+          "runtime_dependencies": [
+            { "full_name": "ca-certificates", "version": "2025-12-02" }
+          ]
+        }
+      ]
+    }
+  ],
+  "casks": []
+}

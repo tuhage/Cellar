@@ -1,0 +1,18 @@
+{
+  "formulae": [],
+  "casks": [
+    {
+      "token": "firefox",
+      "full_token": "firefox",
+      "name": ["Mozilla Firefox"],
+      "desc": "Web browser",
+      "homepage": "https://www.mozilla.org/firefox/",
+      "version": "147.0.2",
+      "installed": "147.0.2",
+      "outdated": false,
+      "auto_updates": true,
+      "deprecated": false,
+      "disabled": false
+    }
+  ]
+}

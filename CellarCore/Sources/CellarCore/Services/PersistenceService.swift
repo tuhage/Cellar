@@ -27,6 +27,11 @@ public nonisolated final class PersistenceService: Sendable {
         self.baseURL = appSupport.appendingPathComponent("Cellar", isDirectory: true)
     }
 
+    /// Test-only initializer — allows injecting a custom base URL for isolation.
+    public init(baseURL: URL) {
+        self.baseURL = baseURL
+    }
+
     // MARK: - Read
 
     public func load<T: Decodable>(_ type: T.Type, from fileName: String) throws -> T {
