@@ -19,6 +19,12 @@ struct AppCommands: Commands {
             }
         }
 
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates\u{2026}") {
+                NotificationCenter.default.post(name: .checkForUpdates, object: nil)
+            }
+        }
+
         CommandMenu("Packages") {
             Button("Refresh All") {
                 NotificationCenter.default.post(name: .refreshAll, object: nil)
@@ -54,4 +60,5 @@ extension Notification.Name {
     static let upgradeAll = Notification.Name("cellar.upgradeAll")
     static let cleanup = Notification.Name("cellar.cleanup")
     static let refreshServices = Notification.Name("cellar.refreshServices")
+    static let checkForUpdates = Notification.Name("cellar.checkForUpdates")
 }

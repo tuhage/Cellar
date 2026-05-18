@@ -85,52 +85,127 @@ private struct ExtensionsTab: View {
 // MARK: - About
 
 private struct AboutTab: View {
-    private static let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     private static let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
 
     var body: some View {
-        VStack(spacing: Spacing.section) {
-            Spacer()
+        Form {
+            Section {
+                VStack(spacing: Spacing.sectionContent) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.extraLarge))
+                        .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
 
-            VStack(spacing: Spacing.sectionContent) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .frame(width: 96, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.extraLarge))
-                    .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
-
-                VStack(spacing: Spacing.compact) {
                     Text("Cellar")
-                        .font(.title.bold())
+                        .font(.title2.bold())
 
-                    Text("Version \(Self.appVersion) (\(Self.buildNumber))")
-                        .font(.subheadline)
+                    Text("Build \(Self.buildNumber)")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Spacing.sectionContent)
             }
 
-            BrewInfoRow()
-                .frame(maxWidth: 300)
+            UpdateSection()
 
-            Spacer()
-
-            HStack(spacing: Spacing.cardPadding) {
-                if let brewURL = URL(string: "https://brew.sh") {
-                    Link(destination: brewURL) {
-                        Text("Homebrew Website")
-                    }
-                }
-
-                if let repoURL = URL(string: "https://github.com/tuhage/Cellar") {
-                    Link(destination: repoURL) {
-                        Text("GitHub")
-                    }
-                }
+            Section {
+                BrewInfoRow()
+            } header: {
+                Text("Homebrew")
             }
-            .font(.caption)
-            .padding(.bottom, Spacing.cardPadding)
+
+            Section {
+                HStack(spacing: Spacing.cardPadding) {
+                    if let brewURL = URL(string: "https://brew.sh") {
+                        Link("Homebrew Website", destination: brewURL)
+                    }
+                    if let repoURL = URL(string: "https://github.com/tuhage/Cellar") {
+                        Link("GitHub", destination: repoURL)
+                    }
+                }
+            } header: {
+                Text("Links")
+            }
         }
-        .frame(maxWidth: .infinity)
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - Update Section
+
+private struct UpdateSection: View {
+    @Environment(UpdateStore.self) private var store
+
+    var body: some View {
+        Section("Updates") {
+            LabeledContent("Current Version") {
+                Text(store.currentVersion)
+                    .foregroundStyle(.secondary)
+            }
+
+            if store.isLoading {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Checking\u{2026}")
+                        .foregroundStyle(.secondary)
+                }
+            } else if let release = store.latestRelease, store.hasUpdate {
+                updateAvailableRow(release: release)
+            } else if store.latestRelease != nil {
+                Label("You\u{2019}re on the latest version", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+
+            if let errorMessage = store.errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+            }
+
+            Button(store.isLoading ? "Checking\u{2026}" : "Check for Updates") {
+                Task { await store.check() }
+            }
+            .disabled(store.isLoading)
+        }
+    }
+
+    @ViewBuilder
+    private func updateAvailableRow(release: ReleaseInfo) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.item) {
+            HStack {
+                Image(systemName: "arrow.up.circle.fill")
+                    .foregroundStyle(.tint)
+                Text("Version \(release.version) is available")
+                    .font(.headline)
+                Spacer()
+                Text(release.publishedAt, format: .dateTime.day().month().year())
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+
+            if !release.body.isEmpty {
+                let preview = release.body.count > 400
+                    ? String(release.body.prefix(400)) + "\u{2026}"
+                    : release.body
+                Text(.init(preview))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(6)
+            }
+
+            HStack {
+                Link("View on GitHub", destination: release.htmlUrl)
+                Spacer()
+                Button("Skip This Version") {
+                    store.skipCurrentRelease()
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(.vertical, Spacing.item)
     }
 }
 
@@ -141,26 +216,21 @@ private struct BrewInfoRow: View {
     @State private var brewPrefix = ""
 
     var body: some View {
-        VStack(spacing: Spacing.item) {
-            row(label: "Brew", value: brewVersion)
-            if !brewPrefix.isEmpty {
-                row(label: "Prefix", value: brewPrefix)
+        LabeledContent("Version") {
+            Text(brewVersion)
+                .fontDesign(.monospaced)
+                .foregroundStyle(.secondary)
+        }
+        .task { await loadBrewInfo() }
+
+        if !brewPrefix.isEmpty {
+            LabeledContent("Prefix") {
+                Text(brewPrefix)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
         }
-        .padding(Spacing.sectionContent)
-        .cardStyle(cornerRadius: CornerRadius.card)
-        .task { await loadBrewInfo() }
-    }
-
-    private func row(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .fontDesign(.monospaced)
-        }
-        .font(.callout)
     }
 
     private func loadBrewInfo() async {
@@ -367,4 +437,5 @@ private struct FinderMonitoredPathsRow: View {
 
 #Preview {
     SettingsView()
+        .environment(UpdateStore())
 }

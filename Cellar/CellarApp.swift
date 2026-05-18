@@ -12,6 +12,7 @@ struct CellarApp: App {
     @State private var resourceStore = ResourceStore()
     @State private var projectStore = ProjectStore()
     @State private var maintenanceStore = MaintenanceStore()
+    @State private var updateStore = UpdateStore()
 
     private let notificationObserver = FinderSyncNotificationObserver()
 
@@ -26,10 +27,15 @@ struct CellarApp: App {
                 .environment(resourceStore)
                 .environment(projectStore)
                 .environment(maintenanceStore)
+                .environment(updateStore)
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     handleSpotlightActivity(activity)
                 }
                 .task { notificationObserver.register(serviceStore: serviceStore) }
+                .task { await updateStore.checkIfStale() }
+                .onReceive(NotificationCenter.default.publisher(for: .checkForUpdates)) { _ in
+                    Task { await updateStore.check() }
+                }
         }
         .commands { AppCommands() }
 
@@ -41,6 +47,7 @@ struct CellarApp: App {
 
         Settings {
             SettingsView()
+                .environment(updateStore)
         }
 
         MenuBarExtra("Cellar", systemImage: "mug") {
