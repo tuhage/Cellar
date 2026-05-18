@@ -1,6 +1,7 @@
 import SwiftUI
 import CellarCore
 import CoreSpotlight
+import UserNotifications
 
 @main
 struct CellarApp: App {
@@ -13,6 +14,8 @@ struct CellarApp: App {
     @State private var projectStore = ProjectStore()
     @State private var maintenanceStore = MaintenanceStore()
     @State private var updateStore = UpdateStore()
+    @State private var activityStore = ActivityStore()
+    @State private var notificationDelegate = ActivityNotificationDelegate()
 
     private let notificationObserver = FinderSyncNotificationObserver()
 
@@ -28,13 +31,26 @@ struct CellarApp: App {
                 .environment(projectStore)
                 .environment(maintenanceStore)
                 .environment(updateStore)
+                .environment(activityStore)
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     handleSpotlightActivity(activity)
                 }
                 .task { notificationObserver.register(serviceStore: serviceStore) }
                 .task { await updateStore.checkIfStale() }
+                .task {
+                    await ActivityNotificationService.shared.requestPermission()
+                    UNUserNotificationCenter.current().delegate = notificationDelegate
+                    wireStores()
+                }
                 .onReceive(NotificationCenter.default.publisher(for: .checkForUpdates)) { _ in
                     Task { await updateStore.check() }
+                }
+                .onChange(of: activityStore.operations) {
+                    for op in activityStore.operations {
+                        guard !op.isRunning else { continue }
+                        guard case .upgradeAll = op.kind else { continue }
+                        ActivityNotificationService.shared.notifyCompletion(of: op)
+                    }
                 }
         }
         .commands { AppCommands() }
@@ -57,6 +73,17 @@ struct CellarApp: App {
                 .environment(maintenanceStore)
         }
         .menuBarExtraStyle(.menu)
+    }
+
+    // MARK: - Store Wiring
+
+    private func wireStores() {
+        packageStore.activityStore = activityStore
+        serviceStore.activityStore = activityStore
+        tapStore.activityStore = activityStore
+        brewfileStore.activityStore = activityStore
+        maintenanceStore.activityStore = activityStore
+        projectStore.activityStore = activityStore
     }
 
     // MARK: - Spotlight

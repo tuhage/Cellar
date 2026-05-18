@@ -144,7 +144,11 @@ private struct OutdatedPackageRow: View {
     let targetVersion: String
     let upgradeAction: () -> Void
 
-    @State private var isUpgrading = false
+    @Environment(ActivityStore.self) private var activityStore
+
+    private var isUpgrading: Bool {
+        activityStore.isActive(target: name)
+    }
 
     var body: some View {
         HStack {
@@ -177,7 +181,6 @@ private struct OutdatedPackageRow: View {
             }
 
             Button {
-                isUpgrading = true
                 upgradeAction()
             } label: {
                 if isUpgrading {
@@ -203,6 +206,7 @@ private struct OutdatedPackageRow: View {
     NavigationStack {
         OutdatedView()
             .environment(PackageStore())
+            .environment(ActivityStore())
     }
     .frame(width: 600, height: 500)
 }

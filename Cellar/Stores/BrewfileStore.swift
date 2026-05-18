@@ -68,6 +68,10 @@ final class BrewfileStore: LoadableStore {
         return FileManager.default.fileExists(atPath: profile.path)
     }
 
+    // MARK: Activity
+
+    var activityStore: ActivityStore?
+
     // MARK: Dependencies
 
     private let persistence = PersistenceService()
@@ -167,6 +171,7 @@ final class BrewfileStore: LoadableStore {
     func exportBrewfile(to profile: BrewfileProfile) async {
         isLoading = true
         errorMessage = nil
+        let opID = activityStore?.register(kind: .brewfileInstall)
         do {
             try await service.bundleDump(to: profile.path)
             // Update last exported timestamp
@@ -175,8 +180,10 @@ final class BrewfileStore: LoadableStore {
                 saveProfiles()
             }
             loadBrewfileContent(for: profile)
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = "Export failed: \(error.localizedDescription)"
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
         isLoading = false
     }
@@ -202,35 +209,44 @@ final class BrewfileStore: LoadableStore {
     /// Runs `brew bundle cleanup` to remove packages not listed in the Brewfile.
     func cleanupBrewfile(for profile: BrewfileProfile) {
         actionTitle = "Brewfile Cleanup"
-        actionStream = AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    let output = try await self.service.bundleCleanup(at: profile.path)
-                    let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    continuation.yield(message.isEmpty ? "Nothing to clean up." : message)
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
+        let opID = activityStore?.register(kind: .brewfileCleanup)
+        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
+        Task {
+            do {
+                let output = try await self.service.bundleCleanup(at: profile.path)
+                let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                let line = message.isEmpty ? "Nothing to clean up." : message
+                if let opID { activityStore?.appendLog(opID, line) }
+                continuation.yield(line)
+                continuation.finish()
+                if let opID { activityStore?.setStatus(opID, .succeeded) }
+            } catch {
+                continuation.finish(throwing: error)
+                if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
             }
         }
+        actionStream = stream
     }
 
     /// Starts a streaming install session via the action stream.
     func beginInstall(from profile: BrewfileProfile) {
         actionTitle = "Installing from Brewfile"
-        actionStream = AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for try await line in self.service.bundleInstall(from: profile.path) {
-                        continuation.yield(line)
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
+        let opID = activityStore?.register(kind: .brewfileInstall)
+        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
+        Task {
+            do {
+                for try await line in self.service.bundleInstall(from: profile.path) {
+                    if let opID { activityStore?.appendLog(opID, line) }
+                    continuation.yield(line)
                 }
+                continuation.finish()
+                if let opID { activityStore?.setStatus(opID, .succeeded) }
+            } catch {
+                continuation.finish(throwing: error)
+                if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
             }
         }
+        actionStream = stream
     }
 
     /// Dismisses the current action stream.

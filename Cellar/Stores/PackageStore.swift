@@ -33,6 +33,10 @@ final class PackageStore: LoadableStore {
     var isSearchingCasks = false
     var installingPackages: Set<String> = []
 
+    // MARK: Activity
+
+    var activityStore: ActivityStore?
+
     // MARK: Cache
 
     private let persistence = PersistenceService()
@@ -156,24 +160,38 @@ final class PackageStore: LoadableStore {
     }
 
     func upgrade(_ formula: Formula) async {
+        guard activityStore?.isActive(target: formula.name) != true else {
+            errorMessage = "\(formula.name) is already in progress"
+            return
+        }
+        let opID = activityStore?.register(kind: .upgrade(name: formula.name, isCask: false))
         isLoading = true
         errorMessage = nil
         do {
             try await formula.upgrade()
             try await refreshFormulae()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
     func upgrade(_ cask: Cask) async {
+        guard activityStore?.isActive(target: cask.token) != true else {
+            errorMessage = "\(cask.token) is already in progress"
+            return
+        }
+        let opID = activityStore?.register(kind: .upgrade(name: cask.token, isCask: true))
         isLoading = true
         errorMessage = nil
         do {
             try await cask.upgrade()
             try await refreshCasks()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
             errorMessage = error.localizedDescription
         }
         isLoading = false
@@ -183,6 +201,7 @@ final class PackageStore: LoadableStore {
     private var upgradeAllTask: Task<Void, Never>?
 
     func upgradeAll() {
+        let opID = activityStore?.register(kind: .upgradeAll(count: totalOutdated))
         upgradeAllTask = Task {
             isUpgradingAll = true
             isLoading = true
@@ -221,11 +240,15 @@ final class PackageStore: LoadableStore {
             }
 
             if Task.isCancelled {
+                if let opID { activityStore?.setStatus(opID, .cancelled) }
                 if errorMessage == nil {
                     errorMessage = "Upgrade cancelled. Some packages may have been upgraded."
                 }
             } else if !failures.isEmpty && errorMessage == nil {
+                if let opID { activityStore?.setStatus(opID, .failed(reason: "Failed to upgrade: \(failures.joined(separator: ", "))")) }
                 errorMessage = "Failed to upgrade: \(failures.joined(separator: ", "))"
+            } else {
+                if let opID { activityStore?.setStatus(opID, .succeeded) }
             }
 
             isLoading = false
@@ -239,6 +262,11 @@ final class PackageStore: LoadableStore {
     }
 
     func uninstall(_ formula: Formula) async {
+        guard activityStore?.isActive(target: formula.name) != true else {
+            errorMessage = "\(formula.name) is already in progress"
+            return
+        }
+        let opID = activityStore?.register(kind: .uninstall(name: formula.name, isCask: false))
         isLoading = true
         errorMessage = nil
         do {
@@ -247,13 +275,20 @@ final class PackageStore: LoadableStore {
             if selectedFormulaId == formula.id {
                 selectedFormulaId = nil
             }
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
     func uninstall(_ cask: Cask) async {
+        guard activityStore?.isActive(target: cask.token) != true else {
+            errorMessage = "\(cask.token) is already in progress"
+            return
+        }
+        let opID = activityStore?.register(kind: .uninstall(name: cask.token, isCask: true))
         isLoading = true
         errorMessage = nil
         do {
@@ -262,7 +297,9 @@ final class PackageStore: LoadableStore {
             if selectedCaskId == cask.id {
                 selectedCaskId = nil
             }
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
             errorMessage = error.localizedDescription
         }
         isLoading = false
@@ -323,22 +360,36 @@ final class PackageStore: LoadableStore {
     // MARK: Install
 
     func installFormula(name: String) async {
+        guard activityStore?.isActive(target: name) != true else {
+            errorMessage = "\(name) is already in progress"
+            return
+        }
+        let opID = activityStore?.register(kind: .install(name: name, isCask: false))
         installingPackages.insert(name)
         do {
             try await Formula.install(name: name)
             try await refreshFormulae()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
             errorMessage = error.localizedDescription
         }
         installingPackages.remove(name)
     }
 
     func installCask(_ cask: Cask) async {
+        guard activityStore?.isActive(target: cask.token) != true else {
+            errorMessage = "\(cask.token) is already in progress"
+            return
+        }
+        let opID = activityStore?.register(kind: .install(name: cask.token, isCask: true))
         installingPackages.insert(cask.token)
         do {
             try await cask.install()
             try await refreshCasks()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
             errorMessage = error.localizedDescription
         }
         installingPackages.remove(cask.token)

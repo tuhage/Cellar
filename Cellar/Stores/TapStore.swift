@@ -23,6 +23,10 @@ final class TapStore: LoadableStore {
     var searchQuery = ""
     var actionStream: AsyncThrowingStream<String, Error>?
 
+    // MARK: Activity
+
+    var activityStore: ActivityStore?
+
     // MARK: Cache
 
     private let persistence = PersistenceService()
@@ -59,20 +63,47 @@ final class TapStore: LoadableStore {
 
     /// Adds a tap by name and provides a stream for progress output.
     func addTap(_ name: String) {
+        guard activityStore?.isActive(target: name) != true else {
+            errorMessage = "\(name) is already in progress"
+            return
+        }
         isLoading = true
         errorMessage = nil
-        actionStream = BrewService.shared.addTap(name)
+        let opID = activityStore?.register(kind: .tapAdd(url: name))
+        let underlying = BrewService.shared.addTap(name)
+        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
+        Task {
+            do {
+                for try await line in underlying {
+                    if let opID { activityStore?.appendLog(opID, line) }
+                    continuation.yield(line)
+                }
+                continuation.finish()
+                if let opID { activityStore?.setStatus(opID, .succeeded) }
+                await load(forceRefresh: true)
+            } catch {
+                continuation.finish(throwing: error)
+                if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+                isLoading = false
+                errorMessage = error.localizedDescription
+            }
+        }
+        actionStream = stream
     }
 
     /// Removes a tap and reloads the tap list.
     func removeTap(_ tap: Tap) async {
+        guard activityStore?.isActive(target: tap.name) != true else { return }
         isLoading = true
         errorMessage = nil
+        let opID = activityStore?.register(kind: .tapRemove(name: tap.name))
         do {
             try await tap.remove()
             try await refreshTaps()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = error.localizedDescription
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
         isLoading = false
     }

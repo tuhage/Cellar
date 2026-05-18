@@ -33,6 +33,10 @@ final class ProjectStore: LoadableStore {
         return projects.first { $0.id == activeProjectId }
     }
 
+    // MARK: Activity
+
+    var activityStore: ActivityStore?
+
     // MARK: Dependencies
 
     private let persistence = PersistenceService()
@@ -102,8 +106,10 @@ final class ProjectStore: LoadableStore {
 
     /// Activates a project by starting all its services.
     func activate(_ project: ProjectEnvironment) async {
+        guard activityStore?.isActive(target: project.name) != true else { return }
         isLoading = true
         errorMessage = nil
+        let opID = activityStore?.register(kind: .projectActivate(name: project.name))
 
         // If another project is active, deactivate it first
         if let currentActive = activeProject, currentActive.id != project.id {
@@ -116,8 +122,10 @@ final class ProjectStore: LoadableStore {
             }
             activeProjectId = project.id
             saveActiveId()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = "Failed to activate project: \(error.localizedDescription)"
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
         isLoading = false
     }
@@ -127,6 +135,7 @@ final class ProjectStore: LoadableStore {
         guard let project = activeProject else { return }
         isLoading = true
         errorMessage = nil
+        let opID = activityStore?.register(kind: .projectDeactivate(name: project.name))
 
         do {
             for serviceName in project.services {
@@ -134,8 +143,10 @@ final class ProjectStore: LoadableStore {
             }
             activeProjectId = nil
             saveActiveId()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = "Failed to deactivate project: \(error.localizedDescription)"
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
         isLoading = false
     }

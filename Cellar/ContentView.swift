@@ -47,6 +47,11 @@ struct ContentView: View {
                 )
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                ActivityToolbarButton()
+            }
+        }
         .urlSchemeHandler(selection: selection)
         .task { await prefetchStores() }
     }
@@ -105,4 +110,5 @@ private struct DetailView: View {
         .environment(ResourceStore())
         .environment(ProjectStore())
         .environment(MaintenanceStore())
+        .environment(ActivityStore())
 }

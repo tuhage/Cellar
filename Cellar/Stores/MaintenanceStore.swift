@@ -21,6 +21,10 @@ final class MaintenanceStore: LoadableStore {
     var errorMessage: String?
     var currentAction: String?
 
+    // MARK: Activity
+
+    var activityStore: ActivityStore?
+
     // MARK: Dependencies
 
     private let persistence = PersistenceService()
@@ -74,11 +78,12 @@ final class MaintenanceStore: LoadableStore {
         isLoading = true
         currentAction = "Running cleanup\u{2026}"
         errorMessage = nil
+        let opID = activityStore?.register(kind: .cleanup)
 
         do {
             var output = ""
-            let stream = service.cleanup()
-            for try await line in stream {
+            for try await line in service.cleanup() {
+                if let opID { activityStore?.appendLog(opID, line) }
                 output += line
             }
 
@@ -94,8 +99,10 @@ final class MaintenanceStore: LoadableStore {
 
             saveSettings()
             saveReports()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = "Cleanup failed: \(error.localizedDescription)"
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
 
         isLoading = false
@@ -107,9 +114,13 @@ final class MaintenanceStore: LoadableStore {
         isLoading = true
         currentAction = "Running health check\u{2026}"
         errorMessage = nil
+        let opID = activityStore?.register(kind: .healthCheck)
 
         do {
             let output = try await service.doctor()
+            output.split(separator: "\n").forEach {
+                if let opID { activityStore?.appendLog(opID, String($0)) }
+            }
 
             let summary = healthCheckSummary(from: output)
             let report = MaintenanceReport(
@@ -123,8 +134,10 @@ final class MaintenanceStore: LoadableStore {
 
             saveSettings()
             saveReports()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = "Health check failed: \(error.localizedDescription)"
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
 
         isLoading = false

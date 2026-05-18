@@ -10,8 +10,6 @@ struct FormulaListView: View {
     ]
     @State private var formulaToUninstall: Formula?
     @State private var formulaToInstall: Formula?
-    @State private var installStream: AsyncThrowingStream<String, Error>?
-    @State private var installTitle: String?
 
     private var isSearching: Bool {
         !store.searchQuery.isEmpty
@@ -83,14 +81,10 @@ struct FormulaListView: View {
             presenting: formulaToInstall
         ) { formula in
             Button("Install") {
-                installTitle = "Installing \(formula.name)"
-                installStream = BrewService.shared.install(formula.name, isCask: false)
+                Task { await store.installFormula(name: formula.name) }
             }
         } message: { formula in
             Text("This will download and install \(formula.name) via Homebrew.")
-        }
-        .installProgressSheet(stream: $installStream, title: $installTitle) {
-            Task { await store.loadFormulae(forceRefresh: true) }
         }
     }
 

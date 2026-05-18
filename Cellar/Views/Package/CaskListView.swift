@@ -10,8 +10,6 @@ struct CaskListView: View {
     ]
     @State private var caskToUninstall: Cask?
     @State private var caskToInstall: Cask?
-    @State private var installStream: AsyncThrowingStream<String, Error>?
-    @State private var installTitle: String?
 
     private var isSearching: Bool {
         !store.searchQuery.isEmpty
@@ -83,14 +81,10 @@ struct CaskListView: View {
             presenting: caskToInstall
         ) { cask in
             Button("Install") {
-                installTitle = "Installing \(cask.displayName)"
-                installStream = BrewService.shared.install(cask.token, isCask: true)
+                Task { await store.installCask(cask) }
             }
         } message: { cask in
             Text("This will download and install \(cask.displayName) via Homebrew.")
-        }
-        .installProgressSheet(stream: $installStream, title: $installTitle) {
-            Task { await store.loadCasks(forceRefresh: true) }
         }
     }
 

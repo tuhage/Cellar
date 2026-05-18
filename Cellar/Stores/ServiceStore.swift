@@ -22,6 +22,10 @@ final class ServiceStore: LoadableStore {
     var errorMessage: String?
     var selectedServiceId: String?
 
+    // MARK: Activity
+
+    var activityStore: ActivityStore?
+
     // MARK: Cache
 
     private let persistence = PersistenceService()
@@ -65,39 +69,51 @@ final class ServiceStore: LoadableStore {
 
     /// Starts a service and reloads the service list.
     func start(_ service: BrewServiceItem) async {
+        guard activityStore?.isActive(target: service.name) != true else { return }
         isLoading = true
         errorMessage = nil
+        let opID = activityStore?.register(kind: .serviceStart(name: service.name))
         do {
             try await service.start()
             try await refreshServices()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = error.localizedDescription
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
         isLoading = false
     }
 
     /// Stops a service and reloads the service list.
     func stop(_ service: BrewServiceItem) async {
+        guard activityStore?.isActive(target: service.name) != true else { return }
         isLoading = true
         errorMessage = nil
+        let opID = activityStore?.register(kind: .serviceStop(name: service.name))
         do {
             try await service.stop()
             try await refreshServices()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = error.localizedDescription
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
         isLoading = false
     }
 
     /// Restarts a service and reloads the service list.
     func restart(_ service: BrewServiceItem) async {
+        guard activityStore?.isActive(target: service.name) != true else { return }
         isLoading = true
         errorMessage = nil
+        let opID = activityStore?.register(kind: .serviceRestart(name: service.name))
         do {
             try await service.restart()
             try await refreshServices()
+            if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
             errorMessage = error.localizedDescription
+            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
         }
         isLoading = false
     }
