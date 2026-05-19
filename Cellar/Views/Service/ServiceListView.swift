@@ -8,6 +8,8 @@ struct ServiceListView: View {
     @State private var sortOrder: [KeyPathComparator<BrewServiceItem>] = [
         KeyPathComparator(\.name)
     ]
+    @State private var serviceToKill: BrewServiceItem?
+    @State private var serviceToUninstall: BrewServiceItem?
 
     var body: some View {
         Group {
@@ -85,6 +87,18 @@ struct ServiceListView: View {
                     .foregroundStyle(service.user != nil ? .primary : .quaternary)
             }
             .width(min: 60, ideal: 100)
+
+            TableColumn("") { service in
+                Menu {
+                    serviceContextMenu(for: service)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .frame(width: 20)
+            }
+            .width(28)
         }
         .contextMenu(forSelectionType: BrewServiceItem.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
@@ -94,6 +108,36 @@ struct ServiceListView: View {
         } primaryAction: { _ in }
         .onChange(of: sortOrder) { _, newOrder in
             store.services.sort(using: newOrder)
+        }
+        .confirmationDialog(
+            "Force stop \(serviceToKill?.name ?? "this service")?",
+            isPresented: Binding(
+                get: { serviceToKill != nil },
+                set: { if !$0 { serviceToKill = nil } }
+            ),
+            presenting: serviceToKill
+        ) { service in
+            Button("Force Stop", role: .destructive) {
+                Task { await store.kill(service) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { service in
+            Text("Force stop \(service.name)? This immediately kills the process (SIGKILL) — the service may not clean up properly.")
+        }
+        .confirmationDialog(
+            "Uninstall \(serviceToUninstall?.name ?? "this formula")?",
+            isPresented: Binding(
+                get: { serviceToUninstall != nil },
+                set: { if !$0 { serviceToUninstall = nil } }
+            ),
+            presenting: serviceToUninstall
+        ) { service in
+            Button("Uninstall", role: .destructive) {
+                Task { await store.uninstall(service) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { service in
+            Text("Uninstall \(service.name)? This stops the service and removes the formula from Homebrew.")
         }
     }
 
@@ -109,6 +153,12 @@ struct ServiceListView: View {
             }
 
             Button {
+                serviceToKill = service
+            } label: {
+                Label("Force Stop", systemImage: "bolt.slash.circle")
+            }
+
+            Button {
                 Task { await store.restart(service) }
             } label: {
                 Label("Restart", systemImage: "arrow.clockwise.circle")
@@ -119,6 +169,14 @@ struct ServiceListView: View {
             } label: {
                 Label("Start", systemImage: "play.circle")
             }
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            serviceToUninstall = service
+        } label: {
+            Label("Uninstall", systemImage: "trash")
         }
     }
 }

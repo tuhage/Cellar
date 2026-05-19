@@ -95,6 +95,10 @@ public nonisolated final class BrewService: Sendable {
         try await runChecked(["services", "restart", name])
     }
 
+    public func killService(_ name: String) async throws {
+        try await runChecked(["services", "kill", name])
+    }
+
     // MARK: - Taps
 
     public func listTapsData() async throws -> Data {

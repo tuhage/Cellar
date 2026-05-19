@@ -41,6 +41,7 @@ extension BrewOperation {
         case serviceStart(name: String)
         case serviceStop(name: String)
         case serviceRestart(name: String)
+        case serviceKill(name: String)
         case tapAdd(url: String)
         case tapRemove(name: String)
         case brewfileInstall
@@ -60,6 +61,7 @@ extension BrewOperation {
             case .serviceStart(let name): "Starting \(name)"
             case .serviceStop(let name): "Stopping \(name)"
             case .serviceRestart(let name): "Restarting \(name)"
+            case .serviceKill(let name): "Force stopping \(name)"
             case .tapAdd(let url): "Adding tap \(url)"
             case .tapRemove(let name): "Removing tap \(name)"
             case .brewfileInstall: "Installing from Brewfile"
@@ -80,6 +82,7 @@ extension BrewOperation {
             case .serviceStart: "play.circle"
             case .serviceStop: "stop.circle"
             case .serviceRestart: "arrow.clockwise.circle"
+            case .serviceKill: "bolt.slash.circle"
             case .tapAdd: "plus.circle"
             case .tapRemove: "minus.circle"
             case .brewfileInstall: "doc.badge.arrow.up"
@@ -101,6 +104,7 @@ extension BrewOperation {
                  .serviceStart(let name),
                  .serviceStop(let name),
                  .serviceRestart(let name),
+                 .serviceKill(let name),
                  .tapRemove(let name),
                  .projectActivate(let name),
                  .projectDeactivate(let name):

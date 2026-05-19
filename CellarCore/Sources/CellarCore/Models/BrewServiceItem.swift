@@ -70,6 +70,10 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
         try await BrewService.shared.restartService(name)
     }
 
+    public func kill() async throws {
+        try await BrewService.shared.killService(name)
+    }
+
     // MARK: Factory Methods
 
     public static var all: [BrewServiceItem] {
