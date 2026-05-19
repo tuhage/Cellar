@@ -32,6 +32,30 @@ final class ServiceStore: LoadableStore {
     private static let cacheMaxAge: TimeInterval = 300
     private static let cacheFile = "cache-services.json"
 
+    // MARK: Filter State
+
+    private static let showsUnusedKey = "com.tuhage.Cellar.services.showsUnused"
+    private static let showsHiddenKey = "com.tuhage.Cellar.services.showsHidden"
+    private static let hiddenServicesKey = "com.tuhage.Cellar.services.hiddenNames"
+
+    /// Whether to show services with `.none` status (never started, formula metadata only).
+    var showsUnusedServices: Bool {
+        didSet { UserDefaults.standard.set(showsUnusedServices, forKey: Self.showsUnusedKey) }
+    }
+
+    /// Whether to show services the user has manually hidden.
+    var showsHiddenServices: Bool {
+        didSet { UserDefaults.standard.set(showsHiddenServices, forKey: Self.showsHiddenKey) }
+    }
+
+    /// Names the user has manually hidden via context menu.
+    private(set) var hiddenServiceNames: Set<String> {
+        didSet {
+            let array = Array(hiddenServiceNames).sorted()
+            UserDefaults.standard.set(array, forKey: Self.hiddenServicesKey)
+        }
+    }
+
     // MARK: Computed
 
     var runningServices: [BrewServiceItem] {
@@ -44,6 +68,47 @@ final class ServiceStore: LoadableStore {
 
     var runningCount: Int {
         runningServices.count
+    }
+
+    /// Filtered list for the view — respects unused and hidden filters.
+    var visibleServices: [BrewServiceItem] {
+        services.filter { service in
+            if service.status == .none && !showsUnusedServices { return false }
+            if hiddenServiceNames.contains(service.name) && !showsHiddenServices { return false }
+            return true
+        }
+    }
+
+    var unusedCount: Int {
+        services.filter { $0.status == .none }.count
+    }
+
+    var hiddenCount: Int {
+        services.filter { hiddenServiceNames.contains($0.name) }.count
+    }
+
+    // MARK: Init
+
+    init() {
+        let defaults = UserDefaults.standard
+        self.showsUnusedServices = defaults.bool(forKey: Self.showsUnusedKey)
+        self.showsHiddenServices = defaults.bool(forKey: Self.showsHiddenKey)
+        let hiddenArray = defaults.stringArray(forKey: Self.hiddenServicesKey) ?? []
+        self.hiddenServiceNames = Set(hiddenArray)
+    }
+
+    // MARK: Hide / Unhide
+
+    func hide(_ service: BrewServiceItem) {
+        hiddenServiceNames.insert(service.name)
+    }
+
+    func unhide(_ service: BrewServiceItem) {
+        hiddenServiceNames.remove(service.name)
+    }
+
+    func unhideAll() {
+        hiddenServiceNames.removeAll()
     }
 
     // MARK: Actions

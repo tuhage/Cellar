@@ -32,6 +32,43 @@ struct ServiceListView: View {
         .navigationTitle("Services")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button {
+                        store.showsUnusedServices.toggle()
+                    } label: {
+                        Label(
+                            "Show Unused Services",
+                            systemImage: store.showsUnusedServices ? "checkmark" : ""
+                        )
+                    }
+
+                    Button {
+                        store.showsHiddenServices.toggle()
+                    } label: {
+                        Label(
+                            "Show Hidden Services",
+                            systemImage: store.showsHiddenServices ? "checkmark" : ""
+                        )
+                    }
+                    .disabled(store.hiddenCount == 0)
+
+                    if store.hiddenCount > 0 {
+                        Divider()
+                        Button("Unhide All (\(store.hiddenCount))") {
+                            store.unhideAll()
+                        }
+                    }
+                } label: {
+                    Image(
+                        systemName: hasActiveFilters
+                            ? "line.3.horizontal.decrease.circle.fill"
+                            : "line.3.horizontal.decrease.circle"
+                    )
+                }
+                .help("Filter services")
+            }
+
+            ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
                     await store.load(forceRefresh: true)
                 }
@@ -57,8 +94,12 @@ struct ServiceListView: View {
 
     // MARK: - Table
 
+    private var hasActiveFilters: Bool {
+        !store.showsUnusedServices || (store.hiddenCount > 0 && !store.showsHiddenServices)
+    }
+
     private var serviceTable: some View {
-        Table(store.services, selection: $selectedServiceID, sortOrder: $sortOrder) {
+        Table(store.visibleServices, selection: $selectedServiceID, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.name) { service in
                 Text(service.name)
                     .fontWeight(.medium)
@@ -180,6 +221,22 @@ struct ServiceListView: View {
             serviceToUninstall = service
         } label: {
             Label("Uninstall", systemImage: "trash")
+        }
+
+        Divider()
+
+        if store.hiddenServiceNames.contains(service.name) {
+            Button {
+                store.unhide(service)
+            } label: {
+                Label("Show in List", systemImage: "eye")
+            }
+        } else {
+            Button {
+                store.hide(service)
+            } label: {
+                Label("Hide from List", systemImage: "eye.slash")
+            }
         }
     }
 }
