@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import CellarCore
 
@@ -21,6 +22,7 @@ struct AppCommands: Commands {
 
         CommandGroup(after: .appInfo) {
             Button("Check for Updates\u{2026}") {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 NotificationCenter.default.post(name: .checkForUpdates, object: nil)
             }
         }
