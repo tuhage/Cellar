@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import CellarCore
 
@@ -21,10 +20,7 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .appInfo) {
-            Button("Check for Updates\u{2026}") {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                NotificationCenter.default.post(name: .checkForUpdates, object: nil)
-            }
+            CheckForUpdatesMenuButton()
         }
 
         CommandMenu("Packages") {
@@ -51,6 +47,21 @@ struct AppCommands: Commands {
                 NotificationCenter.default.post(name: .refreshServices, object: nil)
             }
             .keyboardShortcut("r", modifiers: [.command, .option])
+        }
+    }
+}
+
+// MARK: - CheckForUpdatesMenuButton
+
+/// A `View` wrapper so we can access `@Environment(\.openSettings)` from
+/// within the `Commands` DSL, which does not support environment directly.
+private struct CheckForUpdatesMenuButton: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button("Check for Updates\u{2026}") {
+            openSettings()
+            NotificationCenter.default.post(name: .checkForUpdates, object: nil)
         }
     }
 }
