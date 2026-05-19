@@ -68,8 +68,8 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
         for try await _ in BrewService.shared.install(token, isCask: true) {}
     }
 
-    public func uninstall() async throws {
-        try await BrewService.shared.uninstall(token)
+    public func uninstall(force: Bool = false) async throws {
+        try await BrewService.shared.uninstall(token, force: force)
     }
 
     public func upgrade() async throws {

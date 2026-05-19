@@ -4,6 +4,7 @@ import SwiftUI
 struct ActivityRow: View {
     let operation: BrewOperation
     let onCancel: (() -> Void)?
+    let onForceRetry: (() -> Void)?
 
     @State private var isLogExpanded = false
 
@@ -24,6 +25,20 @@ struct ActivityRow: View {
                 }
                 Spacer()
                 statusIndicator
+            }
+
+            if case .failed = operation.status, let onForceRetry {
+                HStack {
+                    Spacer()
+                    Button(action: onForceRetry) {
+                        Label("Retry (force)", systemImage: "arrow.clockwise.circle.fill")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .tint(.orange)
+                }
+                .padding(.top, Spacing.compact)
             }
 
             if !operation.log.isEmpty {
@@ -93,7 +108,8 @@ struct ActivityRow: View {
             kind: .upgrade(name: "openssl@3", isCask: false),
             log: ["Downloading openssl@3-3.6.0.bottle.tar.gz", "Installing openssl@3"]
         ),
-        onCancel: {}
+        onCancel: {},
+        onForceRetry: nil
     )
     .padding()
     .frame(width: 340)
@@ -106,7 +122,22 @@ struct ActivityRow: View {
             status: .succeeded,
             completedAt: Date()
         ),
-        onCancel: nil
+        onCancel: nil,
+        onForceRetry: nil
+    )
+    .padding()
+    .frame(width: 340)
+}
+
+#Preview("Failed with force retry") {
+    ActivityRow(
+        operation: BrewOperation(
+            kind: .uninstall(name: "openssl@3", isCask: false),
+            status: .failed(reason: "Refusing to uninstall openssl@3 because it is required by curl"),
+            completedAt: Date()
+        ),
+        onCancel: nil,
+        onForceRetry: {}
     )
     .padding()
     .frame(width: 340)

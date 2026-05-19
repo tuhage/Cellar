@@ -85,8 +85,8 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         for try await _ in BrewService.shared.upgrade(name) {}
     }
 
-    public func uninstall() async throws {
-        try await BrewService.shared.uninstall(name)
+    public func uninstall(force: Bool = false) async throws {
+        try await BrewService.shared.uninstall(name, force: force)
     }
 
     public func pin() async throws {

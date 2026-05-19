@@ -135,6 +135,9 @@ struct ServiceListView: View {
             Button("Uninstall", role: .destructive) {
                 Task { await store.uninstall(service) }
             }
+            Button("Force Uninstall (ignore dependencies)", role: .destructive) {
+                Task { await store.uninstall(service, force: true) }
+            }
             Button("Cancel", role: .cancel) {}
         } message: { service in
             Text("Uninstall \(service.name)? This stops the service and removes the formula from Homebrew.")

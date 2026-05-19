@@ -69,6 +69,10 @@ struct FormulaListView: View {
             Button("Uninstall", role: .destructive) {
                 Task { await store.uninstall(formula) }
             }
+            Button("Force Uninstall (ignore dependencies)", role: .destructive) {
+                Task { await store.uninstall(formula, force: true) }
+            }
+            Button("Cancel", role: .cancel) {}
         } message: { formula in
             Text("This will remove \(formula.name) and its associated files.")
         }

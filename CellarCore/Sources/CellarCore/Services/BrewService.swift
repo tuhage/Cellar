@@ -50,8 +50,11 @@ public nonisolated final class BrewService: Sendable {
         return process.stream(args)
     }
 
-    public func uninstall(_ name: String) async throws {
-        try await runChecked(["uninstall", name])
+    public func uninstall(_ name: String, force: Bool = false) async throws {
+        var args = ["uninstall"]
+        if force { args.append("--ignore-dependencies") }
+        args.append(name)
+        try await runChecked(args)
     }
 
     public func upgrade(_ name: String) -> AsyncThrowingStream<String, Error> {

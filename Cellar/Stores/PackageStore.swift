@@ -261,7 +261,7 @@ final class PackageStore: LoadableStore {
         upgradeAllTask?.cancel()
     }
 
-    func uninstall(_ formula: Formula) async {
+    func uninstall(_ formula: Formula, force: Bool = false) async {
         guard activityStore?.isActive(target: formula.name) != true else {
             errorMessage = "\(formula.name) is already in progress"
             return
@@ -270,7 +270,7 @@ final class PackageStore: LoadableStore {
         isLoading = true
         errorMessage = nil
         do {
-            try await formula.uninstall()
+            try await formula.uninstall(force: force)
             try await refreshFormulae()
             if selectedFormulaId == formula.id {
                 selectedFormulaId = nil
@@ -283,7 +283,7 @@ final class PackageStore: LoadableStore {
         isLoading = false
     }
 
-    func uninstall(_ cask: Cask) async {
+    func uninstall(_ cask: Cask, force: Bool = false) async {
         guard activityStore?.isActive(target: cask.token) != true else {
             errorMessage = "\(cask.token) is already in progress"
             return
@@ -292,7 +292,7 @@ final class PackageStore: LoadableStore {
         isLoading = true
         errorMessage = nil
         do {
-            try await cask.uninstall()
+            try await cask.uninstall(force: force)
             try await refreshCasks()
             if selectedCaskId == cask.id {
                 selectedCaskId = nil

@@ -69,6 +69,10 @@ struct CaskListView: View {
             Button("Uninstall", role: .destructive) {
                 Task { await store.uninstall(cask) }
             }
+            Button("Force Uninstall (ignore dependencies)", role: .destructive) {
+                Task { await store.uninstall(cask, force: true) }
+            }
+            Button("Cancel", role: .cancel) {}
         } message: { cask in
             Text("This will remove \(cask.displayName) and its associated files.")
         }

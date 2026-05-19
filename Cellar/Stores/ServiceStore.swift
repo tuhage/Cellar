@@ -122,7 +122,7 @@ final class ServiceStore: LoadableStore {
     }
 
     /// Uninstalls the formula backing a service and reloads the service list.
-    func uninstall(_ service: BrewServiceItem) async {
+    func uninstall(_ service: BrewServiceItem, force: Bool = false) async {
         guard activityStore?.isActive(target: service.name) != true else {
             errorMessage = "\(service.name) is already in progress"
             return
@@ -131,7 +131,7 @@ final class ServiceStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .uninstall(name: service.name, isCask: false))
         do {
-            try await BrewService.shared.uninstall(service.name)
+            try await BrewService.shared.uninstall(service.name, force: force)
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
