@@ -53,6 +53,8 @@ struct ActivityToolbarButton: View {
             return AnyShapeStyle(.tint)
         } else if hasFailures {
             return AnyShapeStyle(.red)
+        } else if hasOps {
+            return AnyShapeStyle(.primary)
         } else {
             return AnyShapeStyle(.secondary)
         }
