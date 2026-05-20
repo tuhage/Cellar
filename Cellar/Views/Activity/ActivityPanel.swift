@@ -99,11 +99,9 @@ struct ActivityPanel: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Clear Completed") {
+            ClearCompletedButton(isDisabled: completedCount == 0) {
                 store.clearCompleted()
             }
-            .controlSize(.small)
-            .disabled(completedCount == 0)
         }
         .padding(Spacing.item)
     }
@@ -124,6 +122,25 @@ struct ActivityPanel: View {
         } else {
             return ""
         }
+    }
+}
+
+// MARK: - Clear Completed Button
+
+private struct ClearCompletedButton: View {
+    var isDisabled: Bool
+    var action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button("Clear Completed", action: action)
+            .controlSize(.small)
+            .disabled(isDisabled)
+            .foregroundStyle(isHovered && !isDisabled ? .primary : .secondary)
+            .animation(AnimationToken.interactive, value: isHovered)
+            .onHover { isHovered = $0 }
+            .help("Remove completed and failed entries from the list")
     }
 }
 

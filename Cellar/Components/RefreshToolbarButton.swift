@@ -12,6 +12,7 @@ struct RefreshToolbarButton: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .disabled(isLoading)
+        .help("Refresh")
     }
 }
 

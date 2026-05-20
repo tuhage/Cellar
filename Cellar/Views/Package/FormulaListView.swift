@@ -234,6 +234,7 @@ struct FormulaListView: View {
         .onChange(of: sortOrder) { _, newOrder in
             store.formulae.sort(using: newOrder)
         }
+        .animation(AnimationToken.smooth, value: store.filteredFormulae)
     }
 
     // MARK: - Context Menu

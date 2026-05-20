@@ -17,6 +17,7 @@ struct AppCommands: Commands {
             Button("Keyboard Shortcuts") {
                 openWindow(id: "keyboard-shortcuts")
             }
+            .keyboardShortcut("/", modifiers: .command)
         }
 
         CommandGroup(after: .appInfo) {

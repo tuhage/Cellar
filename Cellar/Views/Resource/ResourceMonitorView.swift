@@ -7,6 +7,13 @@ struct ResourceMonitorView: View {
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(ResourceStore.self) private var store
 
+    @State private var searchText = ""
+
+    private var filteredUsages: [ResourceUsage] {
+        guard !searchText.isEmpty else { return store.sortedUsages }
+        return store.sortedUsages.filter { $0.serviceName.localizedCaseInsensitiveContains(searchText) }
+    }
+
     var body: some View {
         Group {
             if store.isLoading && store.diskUsage == nil && store.usages.isEmpty {
@@ -21,6 +28,7 @@ struct ResourceMonitorView: View {
             }
         }
         .navigationTitle("Resources")
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search services")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
@@ -180,6 +188,8 @@ struct ResourceMonitorView: View {
 
             if store.sortedUsages.isEmpty {
                 serviceEmptyState
+            } else if filteredUsages.isEmpty {
+                serviceEmptyState
             } else {
                 resourceSummary
                 resourceTable
@@ -211,7 +221,7 @@ struct ResourceMonitorView: View {
 
     private var resourceTable: some View {
         VStack(spacing: 0) {
-            Table(store.sortedUsages) {
+            Table(filteredUsages) {
                 TableColumn("Service") { usage in
                     HStack(spacing: Spacing.item) {
                         Circle()
@@ -250,7 +260,7 @@ struct ResourceMonitorView: View {
                 .width(min: 80, ideal: 120)
             }
             .tableStyle(.inset(alternatesRowBackgrounds: true))
-            .frame(minHeight: CGFloat(store.sortedUsages.count) * 32 + 32)
+            .frame(minHeight: CGFloat(filteredUsages.count) * 32 + 32)
         }
         .cardStyle()
     }

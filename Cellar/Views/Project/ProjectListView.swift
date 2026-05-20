@@ -19,10 +19,17 @@ struct ProjectListView: View {
     @State private var missingPackages: [String] = []
     @State private var isConfirmingDeleteProject = false
     @State private var projectToDelete: ProjectEnvironment?
+    @State private var searchText = ""
+
+    private var filteredProjects: [ProjectEnvironment] {
+        guard !searchText.isEmpty else { return store.projects }
+        return store.projects.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
 
     var body: some View {
         mainContent
             .navigationTitle("Projects")
+            .searchable(text: $searchText, placement: .toolbar, prompt: "Search projects")
             .toolbar { toolbarContent }
             .sheet(isPresented: $isAddingProject) { addProjectSheet }
             .sheet(isPresented: $isAddingService) { addServiceSheet }
@@ -62,7 +69,7 @@ struct ProjectListView: View {
                 emptyProjectList
             } else {
                 List(selection: $store.selectedProjectId) {
-                    ForEach(store.projects) { project in
+                    ForEach(filteredProjects) { project in
                         projectRow(project)
                             .tag(project.id)
                             .contextMenu {
@@ -320,7 +327,7 @@ struct ProjectListView: View {
             }
         }
         .padding()
-        .frame(width: 440)
+        .frame(width: WindowSize.narrowSheet)
     }
 
     // MARK: - Add Service Sheet

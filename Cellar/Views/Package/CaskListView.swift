@@ -244,6 +244,7 @@ struct CaskListView: View {
         .onChange(of: sortOrder) { _, newOrder in
             store.casks.sort(using: newOrder)
         }
+        .animation(AnimationToken.smooth, value: store.filteredCasks)
     }
 
     // MARK: - Context Menu

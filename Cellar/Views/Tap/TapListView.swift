@@ -205,7 +205,7 @@ private struct AddTapSheet: View {
             }
         }
         .padding()
-        .frame(width: 360)
+        .frame(width: WindowSize.compactSheet)
     }
 }
 

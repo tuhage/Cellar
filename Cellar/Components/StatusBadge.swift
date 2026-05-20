@@ -25,6 +25,7 @@ struct StatusBadge: View {
         .foregroundStyle(color)
         .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
         .transition(.scale.combined(with: .opacity))
+        .help(text)
     }
 }
 

@@ -6,6 +6,7 @@ struct SidebarView: View {
 
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
+    @Environment(TapStore.self) private var tapStore
 
     var body: some View {
         List(selection: $selection) {
@@ -33,6 +34,8 @@ struct SidebarView: View {
             packageStore.totalOutdated
         case .services:
             serviceStore.runningCount
+        case .taps:
+            tapStore.taps.count
         default:
             0
         }
@@ -45,6 +48,7 @@ struct SidebarView: View {
         SidebarView(selection: $selection)
             .environment(PackageStore())
             .environment(ServiceStore())
+            .environment(TapStore())
     } detail: {
         Text(selection?.title ?? "Select an item")
     }

@@ -15,6 +15,12 @@ struct BrewfileView: View {
     @State private var newProfilePath = ""
     @State private var newProfileMode: BrewfileCreationMode = .empty
     @State private var isConfirmingCleanup = false
+    @State private var searchText = ""
+
+    private func filteredEntries(_ entries: [BrewfileContent.Entry]) -> [BrewfileContent.Entry] {
+        guard !searchText.isEmpty else { return entries }
+        return entries.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
 
     var body: some View {
         Group {
@@ -40,6 +46,7 @@ struct BrewfileView: View {
             }
         }
         .navigationTitle("Brewfile")
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search packages")
         .toolbar { toolbarContent }
         .sheet(isPresented: $isAddingProfile) { addProfileSheet }
         .sheet(isPresented: $isEditingRaw) { rawEditorSheet }
@@ -335,33 +342,39 @@ struct BrewfileView: View {
 
     @ViewBuilder
     private var packageListSections: some View {
+        let taps = filteredEntries(store.parsedContent.taps)
+        let formulae = filteredEntries(store.parsedContent.formulae)
+        let casks = filteredEntries(store.parsedContent.casks)
+
         if store.parsedContent.isEmpty {
             emptyPackagesView
+        } else if taps.isEmpty && formulae.isEmpty && casks.isEmpty {
+            ContentUnavailableView.search(text: searchText)
         } else {
-            if !store.parsedContent.taps.isEmpty {
+            if !taps.isEmpty {
                 packageSection(
                     title: "Taps",
                     systemImage: "spigot",
                     color: .gray,
-                    entries: store.parsedContent.taps
+                    entries: taps
                 )
             }
 
-            if !store.parsedContent.formulae.isEmpty {
+            if !formulae.isEmpty {
                 packageSection(
                     title: "Formulae",
                     systemImage: "terminal",
                     color: .blue,
-                    entries: store.parsedContent.formulae
+                    entries: formulae
                 )
             }
 
-            if !store.parsedContent.casks.isEmpty {
+            if !casks.isEmpty {
                 packageSection(
                     title: "Casks",
                     systemImage: "macwindow",
                     color: .purple,
-                    entries: store.parsedContent.casks
+                    entries: casks
                 )
             }
         }
@@ -444,6 +457,13 @@ struct BrewfileView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
+            RefreshToolbarButton(isLoading: store.isLoading) {
+                store.loadProfiles()
+                if let profile = store.selectedProfile {
+                    store.loadBrewfileContent(for: profile)
+                }
+            }
+
             Button {
                 isEditingRaw = true
             } label: {

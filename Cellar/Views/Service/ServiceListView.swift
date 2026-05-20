@@ -150,6 +150,7 @@ struct ServiceListView: View {
         .onChange(of: sortOrder) { _, newOrder in
             store.services.sort(using: newOrder)
         }
+        .animation(AnimationToken.smooth, value: store.visibleServices)
         .confirmationDialog(
             "Force stop \(serviceToKill?.name ?? "this service")?",
             isPresented: Binding(
@@ -269,6 +270,7 @@ private struct ServiceStatusBadge: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Status: \(status.label)")
+        .help("Status: \(status.label)")
         .onAppear {
             if status == .started { isPulsing = true }
         }

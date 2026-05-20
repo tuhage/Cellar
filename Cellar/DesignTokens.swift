@@ -173,9 +173,11 @@ nonisolated enum Opacity {
 // MARK: - WindowSize
 
 nonisolated enum WindowSize {
+    /// 360 pt — Compact sheet width (add tap sheet)
+    static let compactSheet: CGFloat = 360
     /// 400 pt — Add item sheet width (add service, add package sheets)
     static let addItemSheet: CGFloat = 400
-    /// 420 pt — Narrow sheet/content column (add profile sheet, project intro)
+    /// 420 pt — Narrow sheet/content column (add profile sheet, add project sheet)
     static let narrowSheet: CGFloat = 420
     /// 500 pt — Medium sheet minimum width (profile manager)
     static let mediumSheet: CGFloat = 500

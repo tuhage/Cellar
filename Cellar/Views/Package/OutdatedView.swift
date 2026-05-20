@@ -5,6 +5,17 @@ struct OutdatedView: View {
     @Environment(PackageStore.self) private var store
 
     @State private var isConfirmingUpgradeAll = false
+    @State private var searchText = ""
+
+    private var filteredFormulae: [Formula] {
+        guard !searchText.isEmpty else { return store.outdatedFormulae }
+        return store.outdatedFormulae.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var filteredCasks: [Cask] {
+        guard !searchText.isEmpty else { return store.outdatedCasks }
+        return store.outdatedCasks.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+    }
 
     var body: some View {
         Group {
@@ -26,6 +37,7 @@ struct OutdatedView: View {
             }
         }
         .navigationTitle("Outdated")
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search outdated packages")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
@@ -63,9 +75,9 @@ struct OutdatedView: View {
 
     private var outdatedList: some View {
         List {
-            if !store.outdatedFormulae.isEmpty {
+            if !filteredFormulae.isEmpty {
                 Section {
-                    ForEach(store.outdatedFormulae) { formula in
+                    ForEach(filteredFormulae) { formula in
                         OutdatedPackageRow(
                             name: formula.name,
                             description: formula.desc,
@@ -76,13 +88,13 @@ struct OutdatedView: View {
                         }
                     }
                 } header: {
-                    CountedSectionHeader(title: "Formulae", systemImage: "terminal", count: store.outdatedFormulae.count)
+                    CountedSectionHeader(title: "Formulae", systemImage: "terminal", count: filteredFormulae.count)
                 }
             }
 
-            if !store.outdatedCasks.isEmpty {
+            if !filteredCasks.isEmpty {
                 Section {
-                    ForEach(store.outdatedCasks) { cask in
+                    ForEach(filteredCasks) { cask in
                         OutdatedPackageRow(
                             name: cask.displayName,
                             description: cask.desc,
@@ -93,7 +105,7 @@ struct OutdatedView: View {
                         }
                     }
                 } header: {
-                    CountedSectionHeader(title: "Casks", systemImage: "macwindow", count: store.outdatedCasks.count)
+                    CountedSectionHeader(title: "Casks", systemImage: "macwindow", count: filteredCasks.count)
                 }
             }
         }

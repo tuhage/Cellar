@@ -4,6 +4,16 @@ import CellarCore
 struct MaintenanceView: View {
     @Environment(MaintenanceStore.self) private var store
 
+    @State private var searchText = ""
+
+    private var filteredReports: [MaintenanceReport] {
+        guard !searchText.isEmpty else { return store.reports }
+        return store.reports.filter {
+            $0.type.title.localizedCaseInsensitiveContains(searchText)
+            || $0.summary.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
     var body: some View {
         @Bindable var store = store
 
@@ -55,6 +65,7 @@ struct MaintenanceView: View {
             }
         }
         .navigationTitle("Maintenance")
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search reports")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -126,8 +137,14 @@ struct MaintenanceView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, Spacing.item)
+            } else if filteredReports.isEmpty {
+                Text("No reports matching \"\(searchText)\"")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, Spacing.item)
             } else {
-                ForEach(store.reports) { report in
+                ForEach(filteredReports) { report in
                     MaintenanceReportRow(report: report)
                 }
             }
