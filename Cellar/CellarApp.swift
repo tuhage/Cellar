@@ -53,7 +53,7 @@ struct CellarApp: App {
                     }
                 }
         }
-        .defaultSize(width: 1200, height: 760)
+        .defaultSize(width: 1320, height: 820)
         .commands { AppCommands() }
 
         Window("Keyboard Shortcuts", id: "keyboard-shortcuts") {

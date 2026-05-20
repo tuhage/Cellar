@@ -36,6 +36,7 @@ struct ContentView: View {
     private var mainContent: some View {
         NavigationSplitView {
             SidebarView(selection: selection)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
         } detail: {
             if let item = selection.wrappedValue {
                 DetailView(item: item, selection: selection)
