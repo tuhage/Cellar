@@ -6,13 +6,16 @@ import os
 public enum AppGroupStorage {
     private static let logger = Log.storage
 
-    public static let groupIdentifier = "group.com.tuhage.Cellar"
+    /// Team-ID-prefixed groups are authorized directly from the code signature
+    /// on macOS and don't require the identifier in a provisioning profile.
+    public static let groupIdentifier = "23H73A78A7.com.tuhage.Cellar"
 
     /// Returns the shared App Group container URL.
     ///
-    /// `containerURL(forSecurityApplicationGroupIdentifier:)` returns `nil`
-    /// for non-sandboxed apps, so we fall back to the well-known path that
-    /// macOS uses for group containers.
+    /// If the entitlement cannot be authorized, use target-local Application
+    /// Support storage. Never address `~/Library/Group Containers` manually:
+    /// macOS 15+ protects those paths and correctly prompts for access when the
+    /// caller isn't recognized as a member of the group.
     public static var containerURL: URL {
         if let url = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: groupIdentifier
@@ -20,11 +23,14 @@ public enum AppGroupStorage {
             return url
         }
 
-        // Non-sandboxed fallback — same path macOS uses for group containers.
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let url = home
-            .appendingPathComponent("Library/Group Containers")
-            .appendingPathComponent(groupIdentifier)
+        logger.error("App Group container is unavailable; using target-local storage")
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first!
+        let url = appSupport
+            .appendingPathComponent("Cellar", isDirectory: true)
+            .appendingPathComponent("Shared", isDirectory: true)
 
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
