@@ -124,8 +124,16 @@ struct ServiceListView: View {
             .width(min: 60, ideal: 80)
 
             TableColumn("User") { service in
-                Text(service.user ?? "--")
-                    .foregroundStyle(service.user != nil ? .primary : .quaternary)
+                HStack(spacing: Spacing.related) {
+                    Text(service.user ?? "--")
+                        .foregroundStyle(service.user != nil ? .primary : .quaternary)
+                    if service.requiresRoot {
+                        Image(systemName: "lock.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .help("Runs as root — actions require your administrator password.")
+                    }
+                }
             }
             .width(min: 60, ideal: 100)
 

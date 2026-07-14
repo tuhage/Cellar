@@ -133,35 +133,35 @@ final class ServiceStore: LoadableStore {
     }
 
     /// Starts a service and reloads the service list.
+    /// Services registered under `root` are started with elevated privileges.
     func start(_ service: BrewServiceItem) async {
         guard activityStore?.isActive(target: service.name) != true else { return }
         isLoading = true
         errorMessage = nil
         let opID = activityStore?.register(kind: .serviceStart(name: service.name))
         do {
-            try await service.start()
+            try await service.start(privileged: service.requiresRoot)
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = error.localizedDescription
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            handleActionFailure(error, opID: opID)
         }
         isLoading = false
     }
 
     /// Stops a service and reloads the service list.
+    /// Services registered under `root` are stopped with elevated privileges.
     func stop(_ service: BrewServiceItem) async {
         guard activityStore?.isActive(target: service.name) != true else { return }
         isLoading = true
         errorMessage = nil
         let opID = activityStore?.register(kind: .serviceStop(name: service.name))
         do {
-            try await service.stop()
+            try await service.stop(privileged: service.requiresRoot)
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = error.localizedDescription
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            handleActionFailure(error, opID: opID)
         }
         isLoading = false
     }
@@ -207,23 +207,35 @@ final class ServiceStore: LoadableStore {
     }
 
     /// Restarts a service and reloads the service list.
+    /// Services registered under `root` are restarted with elevated privileges.
     func restart(_ service: BrewServiceItem) async {
         guard activityStore?.isActive(target: service.name) != true else { return }
         isLoading = true
         errorMessage = nil
         let opID = activityStore?.register(kind: .serviceRestart(name: service.name))
         do {
-            try await service.restart()
+            try await service.restart(privileged: service.requiresRoot)
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = error.localizedDescription
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            handleActionFailure(error, opID: opID)
         }
         isLoading = false
     }
 
     // MARK: Private
+
+    /// Surfaces an action failure. A user-dismissed admin prompt
+    /// (`BrewError.cancelled`) is treated as a quiet cancellation rather
+    /// than an error.
+    private func handleActionFailure(_ error: Error, opID: UUID?) {
+        if case BrewError.cancelled = error {
+            if let opID { activityStore?.setStatus(opID, .cancelled) }
+            return
+        }
+        errorMessage = error.localizedDescription
+        if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+    }
 
     private func refreshServices() async throws {
         services = try await BrewServiceItem.all

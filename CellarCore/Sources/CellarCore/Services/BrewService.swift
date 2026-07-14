@@ -86,16 +86,16 @@ public nonisolated final class BrewService: Sendable {
         try await runJSON(["services", "list", "--json"])
     }
 
-    public func startService(_ name: String) async throws {
-        try await runChecked(["services", "start", name])
+    public func startService(_ name: String, privileged: Bool = false) async throws {
+        try await runChecked(["services", "start", name], privileged: privileged)
     }
 
-    public func stopService(_ name: String) async throws {
-        try await runChecked(["services", "stop", name])
+    public func stopService(_ name: String, privileged: Bool = false) async throws {
+        try await runChecked(["services", "stop", name], privileged: privileged)
     }
 
-    public func restartService(_ name: String) async throws {
-        try await runChecked(["services", "restart", name])
+    public func restartService(_ name: String, privileged: Bool = false) async throws {
+        try await runChecked(["services", "restart", name], privileged: privileged)
     }
 
     public func killService(_ name: String) async throws {
@@ -185,8 +185,10 @@ public nonisolated final class BrewService: Sendable {
     // MARK: - Private
 
     @discardableResult
-    private func runChecked(_ arguments: [String]) async throws -> ProcessOutput {
-        let output = try await process.run(arguments)
+    private func runChecked(_ arguments: [String], privileged: Bool = false) async throws -> ProcessOutput {
+        let output = privileged
+            ? try await process.runPrivileged(arguments)
+            : try await process.run(arguments)
         guard output.exitCode == 0 else {
             throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
         }

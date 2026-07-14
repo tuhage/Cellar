@@ -36,6 +36,10 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
     public var isError: Bool { status == .error }
     public var isStopped: Bool { status == .stopped || status == .none }
 
+    /// Whether this service is registered under `root` (a system LaunchDaemon).
+    /// Such services must be managed with elevated privileges.
+    public var requiresRoot: Bool { user == "root" }
+
     // MARK: Init
 
     public init(
@@ -58,16 +62,16 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
 
     // MARK: Actions
 
-    public func start() async throws {
-        try await BrewService.shared.startService(name)
+    public func start(privileged: Bool = false) async throws {
+        try await BrewService.shared.startService(name, privileged: privileged)
     }
 
-    public func stop() async throws {
-        try await BrewService.shared.stopService(name)
+    public func stop(privileged: Bool = false) async throws {
+        try await BrewService.shared.stopService(name, privileged: privileged)
     }
 
-    public func restart() async throws {
-        try await BrewService.shared.restartService(name)
+    public func restart(privileged: Bool = false) async throws {
+        try await BrewService.shared.restartService(name, privileged: privileged)
     }
 
     public func kill() async throws {

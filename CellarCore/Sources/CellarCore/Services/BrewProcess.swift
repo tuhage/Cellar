@@ -5,6 +5,18 @@ import Foundation
 public protocol BrewProcessProtocol: Sendable {
     func run(_ arguments: [String]) async throws -> ProcessOutput
     func stream(_ arguments: [String]) -> AsyncThrowingStream<String, Error>
+
+    /// Runs `brew` as root via the macOS admin authentication prompt
+    /// (Touch ID / password). Used for services registered under `root`.
+    func runPrivileged(_ arguments: [String]) async throws -> ProcessOutput
+}
+
+public extension BrewProcessProtocol {
+    /// Default routes to the unprivileged path so test doubles need not
+    /// implement privileged execution.
+    func runPrivileged(_ arguments: [String]) async throws -> ProcessOutput {
+        try await run(arguments)
+    }
 }
 
 public struct ProcessOutput: Sendable {
@@ -58,6 +70,43 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
             stderr: String(data: stderrData, encoding: .utf8) ?? "",
             exitCode: process.terminationStatus
         )
+    }
+
+    public func runPrivileged(_ arguments: [String]) async throws -> ProcessOutput {
+        let shellCommand = Self.privilegedShellCommand(brewPath: brewPath, arguments: arguments)
+        let appleScript = "do shell script \(Self.appleScriptQuoted(shellCommand)) with administrator privileges"
+
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", appleScript]
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+        } catch {
+            throw BrewError.brewNotFound
+        }
+
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+
+        guard process.terminationStatus == 0 else {
+            // osascript reports a user-dismissed auth dialog as error -128.
+            if stderr.contains("-128") || stderr.localizedCaseInsensitiveContains("User canceled") {
+                throw BrewError.cancelled
+            }
+            throw BrewError.processFailure(exitCode: process.terminationStatus, stderr: stderr)
+        }
+
+        return ProcessOutput(stdout: stdout, stderr: stderr, exitCode: 0)
     }
 
     public func stream(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
@@ -146,5 +195,28 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
         env["HOMEBREW_NO_INSTALL_CLEANUP"] = "1"
         return env
+    }
+
+    // MARK: - Privileged Command Building
+
+    /// Builds the `/bin/sh` command that `do shell script` runs as root.
+    /// Each component is single-quoted so service names and paths are safe.
+    private static func privilegedShellCommand(brewPath: String, arguments: [String]) -> String {
+        let parts = [brewPath] + arguments
+        let quoted = parts.map(shellQuoted).joined(separator: " ")
+        return "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 \(quoted)"
+    }
+
+    /// Wraps a string in single quotes for `/bin/sh`, escaping embedded quotes.
+    private static func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// Wraps a string as an AppleScript double-quoted literal.
+    private static func appleScriptQuoted(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
     }
 }
