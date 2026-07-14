@@ -22,7 +22,9 @@ extension LoadableStore {
 
     /// Runs `block`, managing `isLoading` and surfacing any thrown error into `errorMessage`.
     /// Returns `nil` if `block` throws; returns the value otherwise.
-    func withLoading<T>(_ block: () async throws -> T) async -> T? {
+    func withLoading<T: Sendable>(
+        _ block: @MainActor () async throws -> T
+    ) async -> T? {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }

@@ -368,6 +368,7 @@ private struct DependencyDetailView: View {
     .frame(width: 900, height: 600)
 }
 
+@MainActor
 private func previewDependencyStore() -> DependencyStore {
     let store = DependencyStore()
     store.graph = DependencyGraph.preview
