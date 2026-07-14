@@ -111,21 +111,50 @@ final class ProjectStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .projectActivate(name: project.name))
 
-        // If another project is active, deactivate it first
-        if let currentActive = activeProject, currentActive.id != project.id {
-            await deactivate()
-        }
-
+        let previousProject = activeProject?.id == project.id ? nil : activeProject
+        var stoppedPreviousServices: [String] = []
+        var startedNewServices: [String] = []
         do {
-            for serviceName in project.services {
-                try await service.startService(serviceName)
+            try await withCancellableActivity(activityStore, id: opID) {
+                if let previousProject {
+                    for serviceName in previousProject.services {
+                        try await self.service.stopService(serviceName)
+                        stoppedPreviousServices.append(serviceName)
+                    }
+                }
+
+                for serviceName in project.services {
+                    try await self.service.startService(serviceName)
+                    startedNewServices.append(serviceName)
+                }
             }
             activeProjectId = project.id
             saveActiveId()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = "Failed to activate project: \(error.localizedDescription)"
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            // Restore the exact pre-activation state as far as possible.
+            var rollbackFailures: [String] = []
+            for serviceName in startedNewServices.reversed() {
+                do { try await service.stopService(serviceName) }
+                catch { rollbackFailures.append("stop \(serviceName)") }
+            }
+            for serviceName in stoppedPreviousServices {
+                do { try await service.startService(serviceName) }
+                catch { rollbackFailures.append("restart \(serviceName)") }
+            }
+            activeProjectId = previousProject?.id
+            saveActiveId()
+
+            let rollbackNote = rollbackFailures.isEmpty
+                ? " Previous state was restored."
+                : " Rollback also failed for: \(rollbackFailures.joined(separator: ", "))."
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) {
+                errorMessage = "Failed to activate project: \(error.localizedDescription).\(rollbackNote)"
+            }
         }
         isLoading = false
     }
@@ -137,16 +166,33 @@ final class ProjectStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .projectDeactivate(name: project.name))
 
+        var stoppedServices: [String] = []
         do {
-            for serviceName in project.services {
-                try await service.stopService(serviceName)
+            try await withCancellableActivity(activityStore, id: opID) {
+                for serviceName in project.services {
+                    try await self.service.stopService(serviceName)
+                    stoppedServices.append(serviceName)
+                }
             }
             activeProjectId = nil
             saveActiveId()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = "Failed to deactivate project: \(error.localizedDescription)"
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            var rollbackFailures: [String] = []
+            for serviceName in stoppedServices {
+                do { try await service.startService(serviceName) }
+                catch { rollbackFailures.append(serviceName) }
+            }
+            let rollbackNote = rollbackFailures.isEmpty
+                ? " Previous state was restored."
+                : " Could not restart: \(rollbackFailures.joined(separator: ", "))."
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) {
+                errorMessage = "Failed to deactivate project: \(error.localizedDescription).\(rollbackNote)"
+            }
         }
         isLoading = false
     }

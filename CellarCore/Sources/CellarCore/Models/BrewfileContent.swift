@@ -86,15 +86,16 @@ public struct BrewfileContent: Sendable, Equatable {
     private static func extractName(from raw: String) -> String {
         var value = raw.trimmingCharacters(in: .whitespaces)
 
-        // Remove surrounding quotes
-        if (value.hasPrefix("\"") && value.hasSuffix("\""))
-            || (value.hasPrefix("'") && value.hasSuffix("'")) {
-            value = String(value.dropFirst().dropLast())
-        } else if let quoteEnd = value.firstIndex(of: "\"") ?? value.firstIndex(of: "'") {
-            // Handle: "name", restart_service: true
-            let start = value.index(after: value.startIndex)
-            if value.first == "\"" || value.first == "'" {
-                value = String(value[start..<quoteEnd])
+        // Read the matching closing quote after the opening quote. Looking for
+        // the first quote in the whole string would find the opening quote and
+        // create an invalid range for lines with trailing options.
+        if let quote = value.first, quote == "\"" || quote == "'" {
+            let contentStart = value.index(after: value.startIndex)
+            if let quoteEnd = value[contentStart...].firstIndex(of: quote) {
+                value = String(value[contentStart..<quoteEnd])
+            } else {
+                // Malformed lines are kept readable instead of crashing.
+                value = String(value.dropFirst())
             }
         }
 

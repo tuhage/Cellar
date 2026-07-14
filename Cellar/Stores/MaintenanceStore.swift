@@ -64,6 +64,9 @@ final class MaintenanceStore: LoadableStore {
 
     /// Persists the current report history to disk.
     private func saveReports() {
+        if reports.count > 100 {
+            reports = Array(reports.prefix(100))
+        }
         do {
             try persistence.save(reports, to: Self.reportsFileName)
         } catch {
@@ -81,10 +84,13 @@ final class MaintenanceStore: LoadableStore {
         let opID = activityStore?.register(kind: .cleanup)
 
         do {
-            var output = ""
-            for try await line in service.cleanup() {
-                if let opID { activityStore?.appendLog(opID, line) }
-                output += line
+            let output = try await withCancellableActivity(activityStore, id: opID) {
+                var output = ""
+                for try await line in self.service.cleanup() {
+                    if let opID { self.activityStore?.appendLog(opID, line) }
+                    output += line + "\n"
+                }
+                return output
             }
 
             let summary = cleanupSummary(from: output)
@@ -101,8 +107,13 @@ final class MaintenanceStore: LoadableStore {
             saveReports()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = "Cleanup failed: \(error.localizedDescription)"
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) {
+                errorMessage = "Cleanup failed: \(error.localizedDescription)"
+            }
         }
 
         isLoading = false
@@ -117,7 +128,9 @@ final class MaintenanceStore: LoadableStore {
         let opID = activityStore?.register(kind: .healthCheck)
 
         do {
-            let output = try await service.doctor()
+            let output = try await withCancellableActivity(activityStore, id: opID) {
+                try await self.service.doctor()
+            }
             output.split(separator: "\n").forEach {
                 if let opID { activityStore?.appendLog(opID, String($0)) }
             }
@@ -136,8 +149,13 @@ final class MaintenanceStore: LoadableStore {
             saveReports()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = "Health check failed: \(error.localizedDescription)"
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) {
+                errorMessage = "Health check failed: \(error.localizedDescription)"
+            }
         }
 
         isLoading = false
@@ -153,6 +171,7 @@ final class MaintenanceStore: LoadableStore {
 
     /// Checks if any scheduled task is overdue and runs it.
     func checkSchedule() async {
+        guard !isLoading else { return }
         if schedule.isCleanupOverdue {
             await runCleanup()
         }

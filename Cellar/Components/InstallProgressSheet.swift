@@ -9,6 +9,7 @@ struct InstallProgressSheet: ViewModifier {
     @Binding var stream: AsyncThrowingStream<String, Error>?
     @Binding var title: String?
     var onDismiss: () -> Void
+    @State private var isComplete = false
 
     func body(content: Content) -> some View {
         content.sheet(isPresented: Binding(
@@ -19,7 +20,8 @@ struct InstallProgressSheet: ViewModifier {
                 VStack(spacing: 0) {
                     ProcessOutputView(
                         title: title ?? "Installing",
-                        stream: stream
+                        stream: stream,
+                        onCompletion: { isComplete = true }
                     )
 
                     Divider()
@@ -32,6 +34,7 @@ struct InstallProgressSheet: ViewModifier {
                         .buttonStyle(.borderedProminent)
                         .controlSize(.regular)
                         .keyboardShortcut(.defaultAction)
+                        .disabled(!isComplete)
                     }
                     .padding()
                 }
@@ -42,8 +45,10 @@ struct InstallProgressSheet: ViewModifier {
     }
 
     private func dismiss() {
+        guard isComplete else { return }
         stream = nil
         title = nil
+        isComplete = false
         onDismiss()
     }
 }

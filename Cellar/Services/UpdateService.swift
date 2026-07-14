@@ -73,13 +73,7 @@ nonisolated final class UpdateService: Sendable {
     /// Returns `true` if `latest` is strictly greater than `current` using
     /// semantic-version comparison ("1.10.0" > "1.2.0" — not string compare).
     static func isUpdateAvailable(current: String, latest: String) -> Bool {
-        let lhs = versionComponents(current)
-        let rhs = versionComponents(latest)
-        return rhs.lexicographicallyPrecedes(lhs) == false && rhs != lhs
-    }
-
-    private static func versionComponents(_ version: String) -> [Int] {
-        version.split(separator: ".").map { Int($0) ?? 0 }
+        SemanticVersion(latest) > SemanticVersion(current)
     }
 
     static var currentVersion: String {

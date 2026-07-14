@@ -4,12 +4,30 @@ import CellarCore
 struct ServiceListView: View {
     @Environment(ServiceStore.self) private var store
 
-    @State private var selectedServiceID: BrewServiceItem.ID?
     @State private var sortOrder: [KeyPathComparator<BrewServiceItem>] = [
         KeyPathComparator(\.name)
     ]
     @State private var serviceToKill: BrewServiceItem?
     @State private var serviceToUninstall: BrewServiceItem?
+
+    private var selectedServiceID: Binding<BrewServiceItem.ID?> {
+        Binding(
+            get: { store.selectedServiceId },
+            set: { store.selectedServiceId = $0 }
+        )
+    }
+
+    private var selectedService: BrewServiceItem? {
+        guard let id = store.selectedServiceId else { return nil }
+        return store.services.first { $0.id == id }
+    }
+
+    private var isInspectorPresented: Binding<Bool> {
+        Binding(
+            get: { selectedService != nil },
+            set: { if !$0 { store.selectedServiceId = nil } }
+        )
+    }
 
     var body: some View {
         Group {
@@ -90,6 +108,12 @@ struct ServiceListView: View {
         .task {
             await store.load()
         }
+        .inspector(isPresented: isInspectorPresented) {
+            if let selectedService {
+                ServiceDetailView(service: selectedService)
+                    .inspectorColumnWidth(min: 360, ideal: 420, max: 540)
+            }
+        }
     }
 
     // MARK: - Table
@@ -99,7 +123,7 @@ struct ServiceListView: View {
     }
 
     private var serviceTable: some View {
-        Table(store.visibleServices, selection: $selectedServiceID, sortOrder: $sortOrder) {
+        Table(store.visibleServices, selection: selectedServiceID, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.name) { service in
                 Text(service.name)
                     .fontWeight(.medium)

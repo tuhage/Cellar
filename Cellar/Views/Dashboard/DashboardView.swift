@@ -7,6 +7,8 @@ struct DashboardView: View {
     @Binding var selection: SidebarItem?
     @State private var dashboardStore = DashboardStore()
     @Environment(PackageStore.self) private var packageStore
+    @Environment(ServiceStore.self) private var serviceStore
+    @Environment(TapStore.self) private var tapStore
 
     var body: some View {
         Group {
@@ -20,7 +22,7 @@ struct DashboardView: View {
                 dashboardContent(summary)
             } else if let errorMessage = dashboardStore.errorMessage {
                 ErrorView(message: errorMessage) {
-                    Task { await dashboardStore.load() }
+                    Task { await refresh(forceRefresh: true) }
                 }
             } else {
                 LoadingView(message: "Loading Dashboard\u{2026}")
@@ -30,13 +32,18 @@ struct DashboardView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: dashboardStore.isLoading) {
-                    await dashboardStore.load(forceRefresh: true)
+                    await refresh(forceRefresh: true)
                 }
             }
         }
         .task {
-            await dashboardStore.load()
+            dashboardStore.restoreCachedSummary()
+            await refresh()
         }
+        .onChange(of: packageStore.formulae) { updateSummary() }
+        .onChange(of: packageStore.casks) { updateSummary() }
+        .onChange(of: serviceStore.services) { updateSummary() }
+        .onChange(of: tapStore.taps) { updateSummary() }
     }
 
     // MARK: - Content
@@ -179,9 +186,11 @@ struct DashboardView: View {
                         : "All up to date",
                     systemImage: "arrow.up.circle.fill",
                     color: .orange,
-                    isDisabled: summary.updatesAvailable == 0 || dashboardStore.isPerformingAction
+                    isDisabled: summary.updatesAvailable == 0
+                        || dashboardStore.isPerformingAction
+                        || packageStore.isUpgradingAll
                 ) {
-                    dashboardStore.upgradeAll()
+                    packageStore.upgradeAll()
                 }
 
                 QuickActionButton(
@@ -205,6 +214,37 @@ struct DashboardView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Shared Store Coordination
+
+    private func refresh(forceRefresh: Bool = false) async {
+        dashboardStore.isLoading = true
+        dashboardStore.errorMessage = nil
+
+        async let packages: () = packageStore.loadAll(forceRefresh: forceRefresh)
+        async let services: () = serviceStore.load(forceRefresh: forceRefresh)
+        async let taps: () = tapStore.load(forceRefresh: forceRefresh)
+        _ = await (packages, services, taps)
+
+        updateSummary()
+        dashboardStore.errorMessage = packageStore.errorMessage
+            ?? serviceStore.errorMessage
+            ?? tapStore.errorMessage
+        dashboardStore.isLoading = false
+    }
+
+    private func updateSummary() {
+        guard !packageStore.formulae.isEmpty
+                || !packageStore.casks.isEmpty
+                || !serviceStore.services.isEmpty
+                || !tapStore.taps.isEmpty else { return }
+        dashboardStore.update(
+            formulae: packageStore.formulae,
+            casks: packageStore.casks,
+            services: serviceStore.services,
+            taps: tapStore.taps
+        )
     }
 
     // MARK: - Recently Installed Section

@@ -8,10 +8,15 @@ struct ActionOutputView: View {
     let title: String
     let stream: AsyncThrowingStream<String, Error>
     let onDismiss: () -> Void
+    @State private var isComplete = false
 
     var body: some View {
         VStack(spacing: 0) {
-            ProcessOutputView(title: title, stream: stream)
+            ProcessOutputView(
+                title: title,
+                stream: stream,
+                onCompletion: { isComplete = true }
+            )
 
             Divider()
 
@@ -21,6 +26,7 @@ struct ActionOutputView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
                     .keyboardShortcut(.defaultAction)
+                    .disabled(!isComplete)
             }
             .padding()
             .background {

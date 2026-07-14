@@ -173,7 +173,9 @@ final class BrewfileStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .brewfileInstall)
         do {
-            try await service.bundleDump(to: profile.path)
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await self.service.bundleDump(to: profile.path)
+            }
             // Update last exported timestamp
             if let index = profiles.firstIndex(where: { $0.id == profile.id }) {
                 profiles[index].lastExported = Date()
@@ -182,8 +184,13 @@ final class BrewfileStore: LoadableStore {
             loadBrewfileContent(for: profile)
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = "Export failed: \(error.localizedDescription)"
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) {
+                errorMessage = "Export failed: \(error.localizedDescription)"
+            }
         }
         isLoading = false
     }
@@ -211,7 +218,7 @@ final class BrewfileStore: LoadableStore {
         actionTitle = "Brewfile Cleanup"
         let opID = activityStore?.register(kind: .brewfileCleanup)
         let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
-        Task {
+        let task = Task {
             do {
                 let output = try await self.service.bundleCleanup(at: profile.path)
                 let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -222,8 +229,16 @@ final class BrewfileStore: LoadableStore {
                 if let opID { activityStore?.setStatus(opID, .succeeded) }
             } catch {
                 continuation.finish(throwing: error)
-                if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+                if let opID {
+                    activityStore?.setStatus(
+                        opID,
+                        Task.isCancelled ? .cancelled : .failed(reason: error.localizedDescription)
+                    )
+                }
             }
+        }
+        if let opID {
+            activityStore?.setCancellationHandler(opID) { task.cancel() }
         }
         actionStream = stream
     }
@@ -233,7 +248,7 @@ final class BrewfileStore: LoadableStore {
         actionTitle = "Installing from Brewfile"
         let opID = activityStore?.register(kind: .brewfileInstall)
         let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
-        Task {
+        let task = Task {
             do {
                 for try await line in self.service.bundleInstall(from: profile.path) {
                     if let opID { activityStore?.appendLog(opID, line) }
@@ -243,8 +258,16 @@ final class BrewfileStore: LoadableStore {
                 if let opID { activityStore?.setStatus(opID, .succeeded) }
             } catch {
                 continuation.finish(throwing: error)
-                if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+                if let opID {
+                    activityStore?.setStatus(
+                        opID,
+                        Task.isCancelled ? .cancelled : .failed(reason: error.localizedDescription)
+                    )
+                }
             }
+        }
+        if let opID {
+            activityStore?.setCancellationHandler(opID) { task.cancel() }
         }
         actionStream = stream
     }

@@ -168,12 +168,17 @@ final class PackageStore: LoadableStore {
         isLoading = true
         errorMessage = nil
         do {
-            try await formula.upgrade()
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await formula.upgrade()
+            }
             try await refreshFormulae()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
-            errorMessage = error.localizedDescription
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) { errorMessage = error.localizedDescription }
         }
         isLoading = false
     }
@@ -187,12 +192,17 @@ final class PackageStore: LoadableStore {
         isLoading = true
         errorMessage = nil
         do {
-            try await cask.upgrade()
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await cask.upgrade()
+            }
             try await refreshCasks()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
-            errorMessage = error.localizedDescription
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) { errorMessage = error.localizedDescription }
         }
         isLoading = false
     }
@@ -201,8 +211,9 @@ final class PackageStore: LoadableStore {
     private var upgradeAllTask: Task<Void, Never>?
 
     func upgradeAll() {
+        guard upgradeAllTask == nil else { return }
         let opID = activityStore?.register(kind: .upgradeAll(count: totalOutdated))
-        upgradeAllTask = Task {
+        let task = Task {
             isUpgradingAll = true
             isLoading = true
             errorMessage = nil
@@ -216,6 +227,7 @@ final class PackageStore: LoadableStore {
                 do {
                     try await formula.upgrade()
                 } catch {
+                    if Task.isCancelled { break }
                     failures.append(formula.name)
                 }
             }
@@ -224,6 +236,7 @@ final class PackageStore: LoadableStore {
                 do {
                     try await cask.upgrade()
                 } catch {
+                    if Task.isCancelled { break }
                     failures.append(cask.token)
                 }
             }
@@ -255,6 +268,10 @@ final class PackageStore: LoadableStore {
             isUpgradingAll = false
             upgradeAllTask = nil
         }
+        upgradeAllTask = task
+        if let opID {
+            activityStore?.setCancellationHandler(opID) { task.cancel() }
+        }
     }
 
     func cancelUpgradeAll() {
@@ -270,15 +287,20 @@ final class PackageStore: LoadableStore {
         isLoading = true
         errorMessage = nil
         do {
-            try await formula.uninstall(force: force)
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await formula.uninstall(force: force)
+            }
             try await refreshFormulae()
             if selectedFormulaId == formula.id {
                 selectedFormulaId = nil
             }
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
-            errorMessage = error.localizedDescription
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) { errorMessage = error.localizedDescription }
         }
         isLoading = false
     }
@@ -292,15 +314,20 @@ final class PackageStore: LoadableStore {
         isLoading = true
         errorMessage = nil
         do {
-            try await cask.uninstall(force: force)
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await cask.uninstall(force: force)
+            }
             try await refreshCasks()
             if selectedCaskId == cask.id {
                 selectedCaskId = nil
             }
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
-            errorMessage = error.localizedDescription
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) { errorMessage = error.localizedDescription }
         }
         isLoading = false
     }
@@ -367,12 +394,17 @@ final class PackageStore: LoadableStore {
         let opID = activityStore?.register(kind: .install(name: name, isCask: false))
         installingPackages.insert(name)
         do {
-            try await Formula.install(name: name)
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await Formula.install(name: name)
+            }
             try await refreshFormulae()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
-            errorMessage = error.localizedDescription
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) { errorMessage = error.localizedDescription }
         }
         installingPackages.remove(name)
     }
@@ -385,12 +417,17 @@ final class PackageStore: LoadableStore {
         let opID = activityStore?.register(kind: .install(name: cask.token, isCask: true))
         installingPackages.insert(cask.token)
         do {
-            try await cask.install()
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await cask.install()
+            }
             try await refreshCasks()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
-            errorMessage = error.localizedDescription
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) { errorMessage = error.localizedDescription }
         }
         installingPackages.remove(cask.token)
     }

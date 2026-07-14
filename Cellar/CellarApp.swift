@@ -38,9 +38,12 @@ struct CellarApp: App {
                 .task { notificationObserver.register(serviceStore: serviceStore) }
                 .task { await updateStore.checkIfStale() }
                 .task {
-                    await ActivityNotificationService.shared.requestPermission()
-                    UNUserNotificationCenter.current().delegate = notificationDelegate
                     wireStores()
+                    maintenanceStore.loadSettings()
+                    maintenanceStore.loadReports()
+                    UNUserNotificationCenter.current().delegate = notificationDelegate
+                    await ActivityNotificationService.shared.requestPermission()
+                    await runMaintenanceScheduler()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .checkForUpdates)) { _ in
                     Task { await updateStore.check() }
@@ -87,6 +90,20 @@ struct CellarApp: App {
         projectStore.activityStore = activityStore
     }
 
+    private func runMaintenanceScheduler() async {
+        guard BrewProcess.isInstalled else { return }
+        await maintenanceStore.checkSchedule()
+
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: .seconds(3_600))
+            } catch {
+                return
+            }
+            await maintenanceStore.checkSchedule()
+        }
+    }
+
     // MARK: - Spotlight
 
     private func handleSpotlightActivity(_ activity: NSUserActivity) {
@@ -95,8 +112,10 @@ struct CellarApp: App {
         }
 
         if identifier.hasPrefix("formula:") {
+            UserDefaults.standard.set(SidebarItem.formulae.rawValue, forKey: "selectedSidebarItem")
             packageStore.selectedFormulaId = String(identifier.dropFirst("formula:".count))
         } else if identifier.hasPrefix("cask:") {
+            UserDefaults.standard.set(SidebarItem.casks.rawValue, forKey: "selectedSidebarItem")
             packageStore.selectedCaskId = String(identifier.dropFirst("cask:".count))
         }
     }
@@ -144,7 +163,12 @@ private final class FinderSyncNotificationObserver {
     ) {
         guard let serviceName = notification.userInfo?["serviceName"] as? String else { return }
         Task { @MainActor in
-            guard let service = serviceStore.services.first(where: { $0.name == serviceName }) else { return }
+            if serviceStore.services.isEmpty {
+                await serviceStore.load(forceRefresh: true)
+            }
+            guard let service = serviceStore.services.first(where: { $0.name == serviceName }) else {
+                return
+            }
             await action(service)
         }
     }

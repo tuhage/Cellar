@@ -76,11 +76,6 @@ struct MaintenanceView: View {
                 .disabled(store.isLoading)
             }
         }
-        .task {
-            store.loadSettings()
-            store.loadReports()
-            await store.checkSchedule()
-        }
     }
 
     // MARK: - Actions Section

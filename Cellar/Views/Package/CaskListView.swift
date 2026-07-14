@@ -4,7 +4,6 @@ import CellarCore
 struct CaskListView: View {
     @Environment(PackageStore.self) private var store
 
-    @State private var selectedCaskID: Cask.ID?
     @State private var sortOrder: [KeyPathComparator<Cask>] = [
         KeyPathComparator(\.token)
     ]
@@ -13,6 +12,25 @@ struct CaskListView: View {
 
     private var isSearching: Bool {
         !store.searchQuery.isEmpty
+    }
+
+    private var selectedCaskID: Binding<Cask.ID?> {
+        Binding(
+            get: { store.selectedCaskId },
+            set: { store.selectedCaskId = $0 }
+        )
+    }
+
+    private var selectedCask: Cask? {
+        guard let id = store.selectedCaskId else { return nil }
+        return store.casks.first { $0.id == id }
+    }
+
+    private var isInspectorPresented: Binding<Bool> {
+        Binding(
+            get: { selectedCask != nil },
+            set: { if !$0 { store.selectedCaskId = nil } }
+        )
     }
 
     var body: some View {
@@ -48,6 +66,12 @@ struct CaskListView: View {
         }
         .task {
             await store.loadCasks()
+        }
+        .inspector(isPresented: isInspectorPresented) {
+            if let selectedCask {
+                PackageDetailView(package: .cask(selectedCask))
+                    .inspectorColumnWidth(min: 360, ideal: 440, max: 560)
+            }
         }
         .task(id: store.searchQuery) {
             guard !store.searchQuery.isEmpty else {
@@ -100,6 +124,8 @@ struct CaskListView: View {
                 Section {
                     ForEach(store.filteredCasks) { cask in
                         installedCaskRow(cask)
+                            .contentShape(Rectangle())
+                            .onTapGesture { store.selectedCaskId = cask.id }
                             .contextMenu { caskContextMenu(for: cask) }
                     }
                 } header: {
@@ -189,7 +215,7 @@ struct CaskListView: View {
     // MARK: - Table
 
     private var caskTable: some View {
-        Table(store.filteredCasks, selection: $selectedCaskID, sortOrder: $sortOrder) {
+        Table(store.filteredCasks, selection: selectedCaskID, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.token) { cask in
                 VStack(alignment: .leading, spacing: Spacing.textPair) {
                     Text(cask.displayName)

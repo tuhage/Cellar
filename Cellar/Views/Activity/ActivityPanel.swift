@@ -19,7 +19,9 @@ struct ActivityPanel: View {
                         ForEach(store.operations) { op in
                             ActivityRow(
                                 operation: op,
-                                onCancel: op.isRunning ? { store.cancel(op.id) } : nil,
+                                onCancel: op.isRunning && store.canCancel(op.id)
+                                    ? { store.cancel(op.id) }
+                                    : nil,
                                 onForceRetry: shouldOfferForceRetry(op) ? { forceRetry(op) } : nil
                             )
                             .padding(.horizontal, Spacing.cardPadding)

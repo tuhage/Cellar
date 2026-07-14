@@ -293,6 +293,7 @@ struct ResourceMonitorView: View {
     // MARK: - Helpers
 
     private func refresh() async {
+        await serviceStore.load()
         await store.loadAll(services: serviceStore.services)
     }
 

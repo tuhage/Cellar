@@ -15,7 +15,7 @@ struct ContentView: View {
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(TapStore.self) private var tapStore
-    @Environment(ResourceStore.self) private var resourceStore
+    @Environment(MaintenanceStore.self) private var maintenanceStore
 
     var body: some View {
         Group {
@@ -54,18 +54,29 @@ struct ContentView: View {
             }
         }
         .urlSchemeHandler(selection: selection)
-        .task { await prefetchStores() }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshAll)) { _ in
+            guard isBrewInstalled else { return }
+            Task { await refreshAll() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .upgradeAll)) { _ in
+            guard isBrewInstalled else { return }
+            packageStore.upgradeAll()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cleanup)) { _ in
+            guard isBrewInstalled else { return }
+            Task { await maintenanceStore.runCleanup() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshServices)) { _ in
+            guard isBrewInstalled else { return }
+            Task { await serviceStore.load(forceRefresh: true) }
+        }
     }
 
-    /// Eagerly loads all brew-dependent stores on launch so every
-    /// section has fresh data when the user navigates to it.
-    private func prefetchStores() async {
+    private func refreshAll() async {
         async let packages: () = packageStore.loadAll(forceRefresh: true)
         async let services: () = serviceStore.load(forceRefresh: true)
         async let taps: () = tapStore.load(forceRefresh: true)
         _ = await (packages, services, taps)
-
-        await resourceStore.loadAll(services: serviceStore.services)
     }
 }
 

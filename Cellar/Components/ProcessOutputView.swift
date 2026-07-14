@@ -4,6 +4,7 @@ import CellarCore
 struct ProcessOutputView: View {
     let title: String
     let stream: AsyncThrowingStream<String, Error>
+    var onCompletion: (() -> Void)? = nil
 
     @State private var lines: [String] = []
     @State private var isRunning = true
@@ -85,6 +86,7 @@ struct ProcessOutputView: View {
             self.error = error.localizedDescription
         }
         isRunning = false
+        onCompletion?()
     }
 }
 

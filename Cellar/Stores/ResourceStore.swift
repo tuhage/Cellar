@@ -22,6 +22,7 @@ final class ResourceStore: LoadableStore {
 
     var isLoading = false
     var errorMessage: String?
+    private var homebrewPrefix: String?
 
     // MARK: Computed
 
@@ -85,8 +86,11 @@ final class ResourceStore: LoadableStore {
 
     func loadDiskUsage() async {
         do {
-            async let homebrewSize = fetchDirectorySize("/opt/homebrew")
-            async let cellarSize = fetchDirectorySize("/opt/homebrew/Cellar")
+            let prefix = try await resolveHomebrewPrefix()
+            async let homebrewSize = fetchDirectorySize(prefix)
+            async let cellarSize = fetchDirectorySize(
+                URL(fileURLWithPath: prefix).appendingPathComponent("Cellar").path
+            )
             async let cacheSize = fetchDirectorySize(
                 NSHomeDirectory() + "/Library/Caches/Homebrew"
             )
@@ -114,6 +118,20 @@ final class ResourceStore: LoadableStore {
     }
 
     // MARK: - Private Helpers
+
+    private func resolveHomebrewPrefix() async throws -> String {
+        if let homebrewPrefix { return homebrewPrefix }
+        let output = try await BrewProcess().run(["--prefix"])
+        guard output.exitCode == 0 else {
+            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
+        }
+        let prefix = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prefix.isEmpty else {
+            throw BrewError.parsingFailure(context: "Homebrew returned an empty prefix")
+        }
+        homebrewPrefix = prefix
+        return prefix
+    }
 
     /// Fetches the human-readable size of a directory using `du -sh`.
     private func fetchDirectorySize(_ path: String) async throws -> String {

@@ -79,7 +79,7 @@ struct MenuBarView: View {
             .disabled(true)
 
             Button("Upgrade All") {
-                Task { await packageStore.upgradeAll() }
+                packageStore.upgradeAll()
             }
         }
     }

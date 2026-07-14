@@ -14,6 +14,14 @@ struct ReleaseInfo: Decodable, Sendable, Equatable {
         case publishedAt = "published_at"
     }
 
+    nonisolated init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        tagName = try container.decode(String.self, forKey: .tagName)
+        htmlUrl = try container.decode(URL.self, forKey: .htmlUrl)
+        body = try container.decode(String.self, forKey: .body)
+        publishedAt = try container.decode(Date.self, forKey: .publishedAt)
+    }
+
     /// Strips the "v" prefix from `tagName`. E.g. "v1.2.0" → "1.2.0".
     var version: String {
         tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName

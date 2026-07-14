@@ -72,7 +72,7 @@ final class TapStore: LoadableStore {
         let opID = activityStore?.register(kind: .tapAdd(url: name))
         let underlying = BrewService.shared.addTap(name)
         let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
-        Task {
+        let task = Task {
             do {
                 for try await line in underlying {
                     if let opID { activityStore?.appendLog(opID, line) }
@@ -83,10 +83,18 @@ final class TapStore: LoadableStore {
                 await load(forceRefresh: true)
             } catch {
                 continuation.finish(throwing: error)
-                if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+                if let opID {
+                    activityStore?.setStatus(
+                        opID,
+                        Task.isCancelled ? .cancelled : .failed(reason: error.localizedDescription)
+                    )
+                }
                 isLoading = false
                 errorMessage = error.localizedDescription
             }
+        }
+        if let opID {
+            activityStore?.setCancellationHandler(opID) { task.cancel() }
         }
         actionStream = stream
     }
@@ -98,12 +106,17 @@ final class TapStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .tapRemove(name: tap.name))
         do {
-            try await tap.remove()
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await tap.remove()
+            }
             try await refreshTaps()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = error.localizedDescription
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            if let opID {
+                activityStore?.setStatus(opID, isOperationCancellation(error)
+                    ? .cancelled : .failed(reason: error.localizedDescription))
+            }
+            if !isOperationCancellation(error) { errorMessage = error.localizedDescription }
         }
         isLoading = false
     }

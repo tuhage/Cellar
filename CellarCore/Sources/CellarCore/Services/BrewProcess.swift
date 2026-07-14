@@ -41,34 +41,10 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
     }
 
     public func run(_ arguments: [String]) async throws -> ProcessOutput {
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-
-        process.executableURL = URL(fileURLWithPath: brewPath)
-        process.arguments = arguments
-        process.environment = Self.brewEnvironment()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-        } catch {
-            throw BrewError.brewNotFound
-        }
-
-        // Read pipe data before waiting for termination to avoid deadlock.
-        // If the process fills the pipe buffer (~64KB), it blocks until the
-        // buffer is drained. Reading here prevents that.
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-        process.waitUntilExit()
-
-        return ProcessOutput(
-            stdout: String(data: stdoutData, encoding: .utf8) ?? "",
-            stderr: String(data: stderrData, encoding: .utf8) ?? "",
-            exitCode: process.terminationStatus
+        try await Self.execute(
+            executableURL: URL(fileURLWithPath: brewPath),
+            arguments: arguments,
+            environment: Self.brewEnvironment()
         )
     }
 
@@ -76,95 +52,184 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         let shellCommand = Self.privilegedShellCommand(brewPath: brewPath, arguments: arguments)
         let appleScript = "do shell script \(Self.appleScriptQuoted(shellCommand)) with administrator privileges"
 
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
+        let output = try await Self.execute(
+            executableURL: URL(fileURLWithPath: "/usr/bin/osascript"),
+            arguments: ["-e", appleScript],
+            environment: nil
+        )
 
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", appleScript]
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-        } catch {
-            throw BrewError.brewNotFound
-        }
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-
-        guard process.terminationStatus == 0 else {
+        guard output.exitCode == 0 else {
             // osascript reports a user-dismissed auth dialog as error -128.
-            if stderr.contains("-128") || stderr.localizedCaseInsensitiveContains("User canceled") {
+            if output.stderr.contains("-128")
+                || output.stderr.localizedCaseInsensitiveContains("User canceled") {
                 throw BrewError.cancelled
             }
-            throw BrewError.processFailure(exitCode: process.terminationStatus, stderr: stderr)
+            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
         }
 
-        return ProcessOutput(stdout: stdout, stderr: stderr, exitCode: 0)
+        return output
     }
 
     public func stream(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            nonisolated(unsafe) let process = Process()
-            let stdoutPipe = Pipe()
-            let stderrPipe = Pipe()
-
-            process.executableURL = URL(fileURLWithPath: self.brewPath)
-            process.arguments = arguments
-            process.environment = Self.brewEnvironment()
-            process.standardOutput = stdoutPipe
-            process.standardError = stderrPipe
-
-            // Accumulate stderr concurrently to prevent deadlock.
-            // If the stderr buffer fills (~64KB) without being drained,
-            // the process blocks waiting for buffer space.
-            nonisolated(unsafe) var stderrChunks: [Data] = []
-            stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else { return }
-                stderrChunks.append(data)
-            }
-
-            stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else { return }
-                if let line = String(data: data, encoding: .utf8) {
-                    continuation.yield(line)
+            let worker = Task {
+                do {
+                    try await Self.executeStreaming(
+                        executableURL: URL(fileURLWithPath: self.brewPath),
+                        arguments: arguments,
+                        environment: Self.brewEnvironment(),
+                        continuation: continuation
+                    )
+                } catch is CancellationError {
+                    continuation.finish(throwing: BrewError.cancelled)
+                } catch {
+                    continuation.finish(throwing: error)
                 }
-            }
-
-            process.terminationHandler = { terminatedProcess in
-                stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                stderrPipe.fileHandleForReading.readabilityHandler = nil
-
-                if terminatedProcess.terminationStatus != 0 {
-                    let stderrData = stderrChunks.reduce(Data(), +)
-                    let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-                    continuation.finish(throwing: BrewError.processFailure(
-                        exitCode: terminatedProcess.terminationStatus,
-                        stderr: stderr
-                    ))
-                } else {
-                    continuation.finish()
-                }
-            }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.finish(throwing: BrewError.brewNotFound)
             }
 
             continuation.onTermination = { @Sendable _ in
-                if process.isRunning {
-                    process.terminate()
+                worker.cancel()
+            }
+        }
+    }
+
+    // MARK: - Process Execution
+
+    /// Executes a process while draining stdout and stderr concurrently.
+    /// Cancellation terminates the underlying process instead of only
+    /// cancelling the Swift task that is waiting for it.
+    private static func execute(
+        executableURL: URL,
+        arguments: [String],
+        environment: [String: String]?
+    ) async throws -> ProcessOutput {
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        let state = ProcessCancellationState(process: process)
+
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.environment = environment
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            do {
+                try process.run()
+            } catch {
+                throw BrewError.brewNotFound
+            }
+            state.processDidLaunch()
+
+            async let stdoutData = readAll(from: stdoutPipe.fileHandleForReading)
+            async let stderrData = readAll(from: stderrPipe.fileHandleForReading)
+            async let exitCode = waitForExit(process)
+
+            let result = await (stdoutData, stderrData, exitCode)
+            try Task.checkCancellation()
+            return ProcessOutput(
+                stdout: String(decoding: result.0, as: UTF8.self),
+                stderr: String(decoding: result.1, as: UTF8.self),
+                exitCode: result.2
+            )
+        } onCancel: {
+            state.cancel()
+        }
+    }
+
+    private static func executeStreaming(
+        executableURL: URL,
+        arguments: [String],
+        environment: [String: String]?,
+        continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) async throws {
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        let state = ProcessCancellationState(process: process)
+
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.environment = environment
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            do {
+                try process.run()
+            } catch {
+                throw BrewError.brewNotFound
+            }
+            state.processDidLaunch()
+
+            async let stdout: Void = readLines(
+                from: stdoutPipe.fileHandleForReading,
+                continuation: continuation
+            )
+            async let stderrData = readAll(from: stderrPipe.fileHandleForReading)
+            async let exitCode = waitForExit(process)
+
+            let (_, errorData, status) = await (stdout, stderrData, exitCode)
+            try Task.checkCancellation()
+            guard status == 0 else {
+                throw BrewError.processFailure(
+                    exitCode: status,
+                    stderr: String(decoding: errorData, as: UTF8.self)
+                )
+            }
+            continuation.finish()
+        } onCancel: {
+            state.cancel()
+        }
+    }
+
+    private static func readAll(from handle: FileHandle) async -> Data {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: (try? handle.readToEnd()) ?? Data())
+            }
+        }
+    }
+
+    /// Reads complete UTF-8 lines without losing characters that happen to be
+    /// split across pipe reads. A final unterminated line is also delivered.
+    private static func readLines(
+        from handle: FileHandle,
+        continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) async {
+        await withCheckedContinuation { finished in
+            DispatchQueue.global(qos: .utility).async {
+                var buffer = Data()
+
+                while true {
+                    let chunk = handle.availableData
+                    guard !chunk.isEmpty else { break }
+                    buffer.append(chunk)
+
+                    while let newline = buffer.firstIndex(of: 0x0A) {
+                        var lineData = buffer[..<newline]
+                        if lineData.last == 0x0D { lineData = lineData.dropLast() }
+                        continuation.yield(String(decoding: lineData, as: UTF8.self))
+                        buffer.removeSubrange(...newline)
+                    }
                 }
+
+                if !buffer.isEmpty {
+                    continuation.yield(String(decoding: buffer, as: UTF8.self))
+                }
+                finished.resume()
+            }
+        }
+    }
+
+    private static func waitForExit(_ process: Process) async -> Int32 {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                process.waitUntilExit()
+                continuation.resume(returning: process.terminationStatus)
             }
         }
     }
@@ -218,5 +283,32 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return "\"\(escaped)\""
+    }
+}
+
+/// `Process` is not Sendable. This small locked wrapper is the only value
+/// shared with the cancellation handler and keeps the unsafe boundary local.
+private final class ProcessCancellationState: @unchecked Sendable {
+    private let lock = NSLock()
+    private let process: Process
+    private var cancellationRequested = false
+
+    init(process: Process) {
+        self.process = process
+    }
+
+    func processDidLaunch() {
+        lock.lock()
+        let shouldTerminate = cancellationRequested
+        lock.unlock()
+        if shouldTerminate, process.isRunning { process.terminate() }
+    }
+
+    func cancel() {
+        lock.lock()
+        cancellationRequested = true
+        let isRunning = process.isRunning
+        lock.unlock()
+        if isRunning { process.terminate() }
     }
 }

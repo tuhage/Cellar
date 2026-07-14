@@ -4,7 +4,6 @@ import CellarCore
 struct FormulaListView: View {
     @Environment(PackageStore.self) private var store
 
-    @State private var selectedFormulaID: Formula.ID?
     @State private var sortOrder: [KeyPathComparator<Formula>] = [
         KeyPathComparator(\.name)
     ]
@@ -13,6 +12,25 @@ struct FormulaListView: View {
 
     private var isSearching: Bool {
         !store.searchQuery.isEmpty
+    }
+
+    private var selectedFormulaID: Binding<Formula.ID?> {
+        Binding(
+            get: { store.selectedFormulaId },
+            set: { store.selectedFormulaId = $0 }
+        )
+    }
+
+    private var selectedFormula: Formula? {
+        guard let id = store.selectedFormulaId else { return nil }
+        return store.formulae.first { $0.id == id }
+    }
+
+    private var isInspectorPresented: Binding<Bool> {
+        Binding(
+            get: { selectedFormula != nil },
+            set: { if !$0 { store.selectedFormulaId = nil } }
+        )
     }
 
     var body: some View {
@@ -48,6 +66,12 @@ struct FormulaListView: View {
         }
         .task {
             await store.loadFormulae()
+        }
+        .inspector(isPresented: isInspectorPresented) {
+            if let selectedFormula {
+                PackageDetailView(package: .formula(selectedFormula))
+                    .inspectorColumnWidth(min: 360, ideal: 440, max: 560)
+            }
         }
         .task(id: store.searchQuery) {
             guard !store.searchQuery.isEmpty else {
@@ -100,6 +124,8 @@ struct FormulaListView: View {
                 Section {
                     ForEach(store.filteredFormulae) { formula in
                         installedFormulaRow(formula)
+                            .contentShape(Rectangle())
+                            .onTapGesture { store.selectedFormulaId = formula.id }
                             .contextMenu { formulaContextMenu(for: formula) }
                     }
                 } header: {
@@ -191,7 +217,7 @@ struct FormulaListView: View {
     // MARK: - Table
 
     private var formulaTable: some View {
-        Table(store.filteredFormulae, selection: $selectedFormulaID, sortOrder: $sortOrder) {
+        Table(store.filteredFormulae, selection: selectedFormulaID, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.name) { formula in
                 Text(formula.name)
                     .fontWeight(.medium)

@@ -140,7 +140,9 @@ final class ServiceStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .serviceStart(name: service.name))
         do {
-            try await service.start(privileged: service.requiresRoot)
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await service.start(privileged: service.requiresRoot)
+            }
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
@@ -157,7 +159,9 @@ final class ServiceStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .serviceStop(name: service.name))
         do {
-            try await service.stop(privileged: service.requiresRoot)
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await service.stop(privileged: service.requiresRoot)
+            }
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
@@ -176,12 +180,13 @@ final class ServiceStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .serviceKill(name: service.name))
         do {
-            try await service.kill()
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await service.kill()
+            }
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = error.localizedDescription
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            handleActionFailure(error, opID: opID)
         }
         isLoading = false
     }
@@ -196,12 +201,13 @@ final class ServiceStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .uninstall(name: service.name, isCask: false))
         do {
-            try await BrewService.shared.uninstall(service.name, force: force)
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await BrewService.shared.uninstall(service.name, force: force)
+            }
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
-            errorMessage = error.localizedDescription
-            if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+            handleActionFailure(error, opID: opID)
         }
         isLoading = false
     }
@@ -214,7 +220,9 @@ final class ServiceStore: LoadableStore {
         errorMessage = nil
         let opID = activityStore?.register(kind: .serviceRestart(name: service.name))
         do {
-            try await service.restart(privileged: service.requiresRoot)
+            try await withCancellableActivity(activityStore, id: opID) {
+                try await service.restart(privileged: service.requiresRoot)
+            }
             try await refreshServices()
             if let opID { activityStore?.setStatus(opID, .succeeded) }
         } catch {
@@ -229,7 +237,7 @@ final class ServiceStore: LoadableStore {
     /// (`BrewError.cancelled`) is treated as a quiet cancellation rather
     /// than an error.
     private func handleActionFailure(_ error: Error, opID: UUID?) {
-        if case BrewError.cancelled = error {
+        if isOperationCancellation(error) {
             if let opID { activityStore?.setStatus(opID, .cancelled) }
             return
         }
