@@ -73,6 +73,28 @@ extension BrewOperation {
             }
         }
 
+        /// Human-readable completion copy used by transient success feedback.
+        var completionTitle: String {
+            switch self {
+            case .install(let name, _): "Installed \(name)"
+            case .upgrade(let name, _): "Upgraded \(name)"
+            case .uninstall(let name, _): "Uninstalled \(name)"
+            case .upgradeAll(let count): "Upgraded \(count) packages"
+            case .serviceStart(let name): "Started \(name)"
+            case .serviceStop(let name): "Stopped \(name)"
+            case .serviceRestart(let name): "Restarted \(name)"
+            case .serviceKill(let name): "Force stopped \(name)"
+            case .tapAdd(let url): "Added tap \(url)"
+            case .tapRemove(let name): "Removed tap \(name)"
+            case .brewfileInstall: "Installed Brewfile packages"
+            case .brewfileCleanup: "Cleaned up Brewfile"
+            case .cleanup: "Homebrew cleanup completed"
+            case .healthCheck: "Homebrew doctor completed"
+            case .projectActivate(let name): "Activated \(name)"
+            case .projectDeactivate(let name): "Deactivated \(name)"
+            }
+        }
+
         /// SF Symbol shown on the leading edge of the activity row.
         var symbolName: String {
             switch self {

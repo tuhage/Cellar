@@ -78,7 +78,7 @@ struct DashboardView: View {
             SectionHeaderView(title: "Overview", systemImage: "chart.bar.fill", color: .secondary)
 
             LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.sectionContent), count: 2),
+                columns: [GridItem(.adaptive(minimum: 250), spacing: Spacing.sectionContent)],
                 spacing: Spacing.sectionContent
             ) {
                 navigableCard(to: .formulae) {
@@ -178,7 +178,20 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .secondary)
 
-            HStack(spacing: Spacing.sectionContent) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Spacing.sectionContent) {
+                    quickActionButtons(summary)
+                }
+
+                VStack(spacing: Spacing.sectionContent) {
+                    quickActionButtons(summary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func quickActionButtons(_ summary: SystemSummary) -> some View {
                 QuickActionButton(
                     title: "Upgrade All",
                     subtitle: summary.updatesAvailable > 0
@@ -212,8 +225,6 @@ struct DashboardView: View {
                 ) {
                     dashboardStore.healthCheck()
                 }
-            }
-        }
     }
 
     // MARK: - Shared Store Coordination

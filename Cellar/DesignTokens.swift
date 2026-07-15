@@ -194,18 +194,19 @@ nonisolated enum WindowSize {
 /// A button style that elevates shadow on hover and scales down on press.
 struct HoverableCardButtonStyle: ButtonStyle {
     @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : isHovered ? 1.01 : 1.0)
+            .scaleEffect(reduceMotion ? 1 : configuration.isPressed ? 0.98 : isHovered ? 1.01 : 1.0)
             .shadow(
                 color: isHovered ? Shadow.elevatedColor : Shadow.cardColor,
                 radius: isHovered ? Shadow.elevatedBlur : Shadow.cardBlur,
                 y: isHovered ? Shadow.elevatedY : Shadow.cardY
             )
             .brightness(isHovered ? 0.02 : 0)
-            .animation(AnimationToken.interactive, value: configuration.isPressed)
-            .animation(AnimationToken.interactive, value: isHovered)
+            .animation(reduceMotion ? nil : AnimationToken.interactive, value: configuration.isPressed)
+            .animation(reduceMotion ? nil : AnimationToken.interactive, value: isHovered)
             .onHover { isHovered = $0 }
     }
 }

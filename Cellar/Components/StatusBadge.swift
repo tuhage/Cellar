@@ -8,6 +8,7 @@ struct StatusBadge: View {
     let text: String
     let color: Color
     var icon: String?
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         Group {
@@ -20,8 +21,11 @@ struct StatusBadge: View {
         .font(.caption)
         .fontWeight(.medium)
         .badgeInset()
-        .background(color.opacity(Opacity.badgeBackground), in: Capsule())
-        .overlay(Capsule().strokeBorder(color.opacity(0.2), lineWidth: 0.5))
+        .background(
+            color.opacity(contrast == .increased ? 0.24 : Opacity.badgeBackground),
+            in: Capsule()
+        )
+        .overlay(Capsule().strokeBorder(color.opacity(contrast == .increased ? 0.7 : 0.2), lineWidth: contrast == .increased ? 1 : 0.5))
         .foregroundStyle(color)
         .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
         .transition(.scale.combined(with: .opacity))

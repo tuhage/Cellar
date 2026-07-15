@@ -11,11 +11,16 @@ struct ContentView: View {
         )
     }
     @State private var isBrewInstalled = BrewProcess.isInstalled
+    @State private var isQuickOpenPresented = false
+    @State private var operationNotice: OperationNotice?
+    @State private var announcedOperationIDs: Set<UUID> = []
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(TapStore.self) private var tapStore
     @Environment(MaintenanceStore.self) private var maintenanceStore
+    @Environment(ActivityStore.self) private var activityStore
 
     var body: some View {
         Group {
@@ -50,8 +55,49 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isQuickOpenPresented = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .help("Quick Open (⌘K)")
+                .accessibilityLabel("Quick Open")
+            }
+
+            ToolbarItem(placement: .primaryAction) {
                 ActivityToolbarButton()
             }
+        }
+        .sheet(isPresented: $isQuickOpenPresented) {
+            QuickOpenView(selection: selection, isPresented: $isQuickOpenPresented)
+        }
+        .overlay(alignment: .topTrailing) {
+            if let operationNotice {
+                OperationNoticeView(
+                    notice: operationNotice,
+                    showDetails: {
+                        NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                        self.operationNotice = nil
+                    },
+                    dismiss: { self.operationNotice = nil }
+                )
+                .padding(Spacing.section)
+                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(reduceMotion ? nil : AnimationToken.smooth, value: operationNotice)
+        .onChange(of: activityStore.operations) { _, operations in
+            guard let completed = operations.first(where: {
+                !$0.isRunning && !announcedOperationIDs.contains($0.id)
+            }) else { return }
+            announcedOperationIDs.insert(completed.id)
+            operationNotice = OperationNotice(operation: completed)
+        }
+        .task(id: operationNotice?.id) {
+            guard operationNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled else { return }
+            operationNotice = nil
         }
         .urlSchemeHandler(selection: selection)
         .onReceive(NotificationCenter.default.publisher(for: .refreshAll)) { _ in
@@ -69,6 +115,14 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .refreshServices)) { _ in
             guard isBrewInstalled else { return }
             Task { await serviceStore.load(forceRefresh: true) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openQuickOpen)) { _ in
+            isQuickOpenPresented = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToSidebarItem)) { notification in
+            guard let rawValue = notification.userInfo?["item"] as? String,
+                  let item = SidebarItem(rawValue: rawValue) else { return }
+            selection.wrappedValue = item
         }
     }
 

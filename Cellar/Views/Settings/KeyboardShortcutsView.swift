@@ -27,6 +27,7 @@ struct KeyboardShortcutsView: View {
                 ])
 
                 ShortcutSection(title: "Navigation", systemImage: "sidebar.left", shortcuts: [
+                    Shortcut(keys: "\u{2318}K", description: "Quick Open"),
                     Shortcut(keys: "\u{2318}1\u{2013}\u{2318}9", description: "Switch Sidebar Section"),
                     Shortcut(keys: "\u{2318}F", description: "Search (when available)"),
                 ])

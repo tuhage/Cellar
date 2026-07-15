@@ -11,6 +11,7 @@ struct QuickActionButton: View {
     let color: Color
     var isDisabled: Bool = false
     let action: () -> Void
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         Button(action: action) {
@@ -27,7 +28,7 @@ struct QuickActionButton: View {
 
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(contrast == .increased ? .secondary : .tertiary)
                 }
 
                 Spacer(minLength: 0)
@@ -45,11 +46,12 @@ struct QuickActionButton: View {
 
 private struct QuickActionButtonStyle: ButtonStyle {
     @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .cardStyle(cornerRadius: CornerRadius.card)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .scaleEffect(reduceMotion ? 1 : configuration.isPressed ? 0.98 : 1.0)
             .brightness(configuration.isPressed ? -0.02 : isHovered ? 0.02 : 0)
             .shadow(
                 color: isHovered ? Shadow.elevatedColor : .clear,
@@ -57,8 +59,8 @@ private struct QuickActionButtonStyle: ButtonStyle {
                 y: isHovered ? Shadow.elevatedY : 0
             )
             .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
-            .animation(AnimationToken.interactive, value: configuration.isPressed)
-            .animation(AnimationToken.interactive, value: isHovered)
+            .animation(reduceMotion ? nil : AnimationToken.interactive, value: configuration.isPressed)
+            .animation(reduceMotion ? nil : AnimationToken.interactive, value: isHovered)
             .onHover { isHovered = $0 }
     }
 }

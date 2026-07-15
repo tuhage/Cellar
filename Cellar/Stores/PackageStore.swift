@@ -21,7 +21,8 @@ final class PackageStore: LoadableStore {
 
     var isLoading = false
     var errorMessage: String?
-    var searchQuery = ""
+    var formulaSearchQuery = ""
+    var caskSearchQuery = ""
     var selectedFormulaId: String?
     var selectedCaskId: String?
 
@@ -47,8 +48,8 @@ final class PackageStore: LoadableStore {
     // MARK: Computed
 
     var filteredFormulae: [Formula] {
-        guard !searchQuery.isEmpty else { return formulae }
-        let query = searchQuery.localizedLowercase
+        guard !formulaSearchQuery.isEmpty else { return formulae }
+        let query = formulaSearchQuery.localizedLowercase
         return formulae.filter { formula in
             formula.name.localizedCaseInsensitiveContains(query)
                 || formula.fullName.localizedCaseInsensitiveContains(query)
@@ -57,8 +58,8 @@ final class PackageStore: LoadableStore {
     }
 
     var filteredCasks: [Cask] {
-        guard !searchQuery.isEmpty else { return casks }
-        let query = searchQuery.localizedLowercase
+        guard !caskSearchQuery.isEmpty else { return casks }
+        let query = caskSearchQuery.localizedLowercase
         return casks.filter { cask in
             cask.token.localizedCaseInsensitiveContains(query)
                 || cask.displayName.localizedCaseInsensitiveContains(query)
@@ -355,7 +356,7 @@ final class PackageStore: LoadableStore {
     // MARK: Remote Search
 
     func searchRemoteFormulae() async {
-        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = formulaSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard query.count >= 2 else {
             searchResultFormulae = []
             return
@@ -370,7 +371,7 @@ final class PackageStore: LoadableStore {
     }
 
     func searchRemoteCasks() async {
-        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = caskSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard query.count >= 2 else {
             searchResultCasks = []
             return

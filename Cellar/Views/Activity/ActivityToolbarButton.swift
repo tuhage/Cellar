@@ -35,6 +35,9 @@ struct ActivityToolbarButton: View {
             ActivityPanel()
                 .environment(store)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openActivityPanel)) { _ in
+            isPanelPresented = true
+        }
     }
 
     // MARK: - Derived state
@@ -76,6 +79,10 @@ struct ActivityToolbarButton: View {
             return "Activity"
         }
     }
+}
+
+extension Notification.Name {
+    static let openActivityPanel = Notification.Name("cellar.openActivityPanel")
 }
 
 // MARK: - Previews

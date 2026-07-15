@@ -8,9 +8,14 @@ struct TapListView: View {
     @State private var isAddingTap = false
     @State private var isConfirmingUntap = false
     @State private var tapToRemove: Tap?
-    @State private var sortOrder: [KeyPathComparator<Tap>] = [
-        KeyPathComparator(\.name)
-    ]
+    @State private var sortOrder: [KeyPathComparator<Tap>]
+
+    init() {
+        let defaults = UserDefaults.standard
+        let order: SortOrder = defaults.object(forKey: "tapSortAscending") == nil
+            || defaults.bool(forKey: "tapSortAscending") ? .forward : .reverse
+        _sortOrder = State(initialValue: [KeyPathComparator(\Tap.name, order: order)])
+    }
 
     var body: some View {
         @Bindable var store = store
@@ -26,8 +31,12 @@ struct TapListView: View {
                 EmptyStateView(
                     title: "No Taps",
                     systemImage: "spigot",
-                    description: "Homebrew taps will appear here."
-                )
+                    description: "Homebrew taps will appear here.",
+                    actionTitle: "Add Tap",
+                    actionSystemImage: "plus"
+                ) {
+                    isAddingTap = true
+                }
             } else {
                 tapTable
             }
@@ -135,6 +144,18 @@ struct TapListView: View {
                     .foregroundStyle(tap.lastCommit.isEmpty ? .quaternary : .secondary)
             }
             .width(min: 80, ideal: 120)
+
+            TableColumn("") { tap in
+                Menu {
+                    tapContextMenu(for: tap)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Actions for \(tap.name)")
+            }
+            .width(28)
         }
         .contextMenu(forSelectionType: Tap.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
@@ -144,6 +165,9 @@ struct TapListView: View {
         } primaryAction: { _ in }
         .onChange(of: sortOrder) { _, newOrder in
             store.taps.sort(using: newOrder)
+            if let comparator = newOrder.first {
+                UserDefaults.standard.set(comparator.order == .forward, forKey: "tapSortAscending")
+            }
         }
     }
 

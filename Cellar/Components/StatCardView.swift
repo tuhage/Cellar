@@ -8,6 +8,7 @@ struct StatCardView: View {
     var color: Color = .accentColor
 
     @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: Spacing.detailElement) {
@@ -21,7 +22,7 @@ struct StatCardView: View {
                 Text(value)
                     .font(.system(.title2, design: .rounded, weight: .bold))
                     .contentTransition(.numericText())
-                    .animation(AnimationToken.snap, value: value)
+                    .animation(reduceMotion ? nil : AnimationToken.snap, value: value)
 
                 Text(title)
                     .font(.subheadline)
@@ -32,13 +33,13 @@ struct StatCardView: View {
         }
         .padding(Spacing.detailElement)
         .cardStyle()
-        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .scaleEffect(isHovered && !reduceMotion ? 1.01 : 1.0)
         .shadow(
             color: isHovered ? Shadow.elevatedColor : .clear,
             radius: isHovered ? Shadow.elevatedBlur : 0,
             y: isHovered ? Shadow.elevatedY : 0
         )
-        .animation(AnimationToken.interactive, value: isHovered)
+        .animation(reduceMotion ? nil : AnimationToken.interactive, value: isHovered)
         .onHover { isHovered = $0 }
     }
 }

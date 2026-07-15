@@ -24,6 +24,26 @@ struct AppCommands: Commands {
             CheckForUpdatesMenuButton()
         }
 
+        CommandMenu("Navigate") {
+            Button("Quick Open\u{2026}") {
+                NotificationCenter.default.post(name: .openQuickOpen, object: nil)
+            }
+            .keyboardShortcut("k", modifiers: .command)
+
+            Divider()
+
+            ForEach(Array(SidebarItem.allCases.prefix(9).enumerated()), id: \.element.id) { index, item in
+                Button(item.title) {
+                    NotificationCenter.default.post(
+                        name: .navigateToSidebarItem,
+                        object: nil,
+                        userInfo: ["item": item.rawValue]
+                    )
+                }
+                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+            }
+        }
+
         CommandMenu("Packages") {
             Button("Refresh All") {
                 NotificationCenter.default.post(name: .refreshAll, object: nil)
@@ -75,4 +95,6 @@ extension Notification.Name {
     static let cleanup = Notification.Name("cellar.cleanup")
     static let refreshServices = Notification.Name("cellar.refreshServices")
     static let checkForUpdates = Notification.Name("cellar.checkForUpdates")
+    static let openQuickOpen = Notification.Name("cellar.openQuickOpen")
+    static let navigateToSidebarItem = Notification.Name("cellar.navigateToSidebarItem")
 }

@@ -30,8 +30,11 @@ struct OutdatedView: View {
                 EmptyStateView(
                     title: "Everything Up to Date",
                     systemImage: "checkmark.circle",
-                    description: "Outdated packages will appear here."
-                )
+                    description: "Outdated packages will appear here.",
+                    actionTitle: "Check Again"
+                ) {
+                    Task { await store.loadAll(forceRefresh: true) }
+                }
             } else {
                 outdatedList
             }

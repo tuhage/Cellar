@@ -26,8 +26,11 @@ struct DependencyGraphView: View {
                 EmptyStateView(
                     title: "No Dependencies",
                     systemImage: "point.3.connected.trianglepath.dotted",
-                    description: "Could not load dependency information."
-                )
+                    description: "Could not load dependency information.",
+                    actionTitle: "Analyze Again"
+                ) {
+                    Task { await store.loadGraph() }
+                }
             } else if let graph = store.graph {
                 graphContent(graph: graph)
             }

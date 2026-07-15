@@ -17,17 +17,17 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .dashboard: "Dashboard"
-        case .formulae: "Formulae"
-        case .casks: "Casks"
-        case .services: "Services"
-        case .outdated: "Outdated"
-        case .brewfile: "Brewfile"
-        case .taps: "Taps"
-        case .dependencies: "Dependencies"
-        case .resources: "Resources"
-        case .projects: "Projects"
-        case .maintenance: "Maintenance"
+        case .dashboard: String(localized: "Dashboard")
+        case .formulae: String(localized: "Formulae")
+        case .casks: String(localized: "Casks")
+        case .services: String(localized: "Services")
+        case .outdated: String(localized: "Outdated")
+        case .brewfile: String(localized: "Brewfile")
+        case .taps: String(localized: "Taps")
+        case .dependencies: String(localized: "Dependencies")
+        case .resources: String(localized: "Resources")
+        case .projects: String(localized: "Projects")
+        case .maintenance: String(localized: "Maintenance")
         }
     }
 
@@ -73,11 +73,11 @@ enum SidebarSection: String, Identifiable, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .general: "General"
-        case .packages: "Packages"
-        case .services: "Services"
-        case .management: "Management"
-        case .tools: "Tools"
+        case .general: String(localized: "General")
+        case .packages: String(localized: "Packages")
+        case .services: String(localized: "Services")
+        case .management: String(localized: "Management")
+        case .tools: String(localized: "Tools")
         }
     }
 }

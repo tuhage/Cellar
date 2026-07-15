@@ -23,7 +23,9 @@ final class DependencyStore: LoadableStore {
     var errorMessage: String?
     var searchQuery = ""
     var selectedNodeName: String?
-    var showOrphansOnly = false
+    var showOrphansOnly: Bool {
+        didSet { UserDefaults.standard.set(showOrphansOnly, forKey: "dependencyShowOrphansOnly") }
+    }
 
     // MARK: Dependencies
 
@@ -31,6 +33,7 @@ final class DependencyStore: LoadableStore {
 
     init(service: BrewService = .shared) {
         self.service = service
+        self.showOrphansOnly = UserDefaults.standard.bool(forKey: "dependencyShowOrphansOnly")
     }
 
     // MARK: Computed

@@ -4,14 +4,23 @@ import CellarCore
 struct CaskListView: View {
     @Environment(PackageStore.self) private var store
 
-    @State private var sortOrder: [KeyPathComparator<Cask>] = [
-        KeyPathComparator(\.token)
-    ]
+    @State private var sortOrder: [KeyPathComparator<Cask>]
+    @State private var isSearchPresented = false
     @State private var caskToUninstall: Cask?
     @State private var caskToInstall: Cask?
 
+    init() {
+        let defaults = UserDefaults.standard
+        let order: SortOrder = defaults.object(forKey: "caskSortAscending") == nil
+            || defaults.bool(forKey: "caskSortAscending") ? .forward : .reverse
+        let comparator = defaults.string(forKey: "caskSortColumn") == "version"
+            ? KeyPathComparator(\Cask.version, order: order)
+            : KeyPathComparator(\Cask.token, order: order)
+        _sortOrder = State(initialValue: [comparator])
+    }
+
     private var isSearching: Bool {
-        !store.searchQuery.isEmpty
+        !store.caskSearchQuery.isEmpty
     }
 
     private var selectedCaskID: Binding<Cask.ID?> {
@@ -49,14 +58,18 @@ struct CaskListView: View {
                 EmptyStateView(
                     title: "No Casks",
                     systemImage: "macwindow",
-                    description: "Installed casks will appear here."
-                )
+                    description: "Installed casks will appear here.",
+                    actionTitle: "Search Homebrew",
+                    actionSystemImage: "magnifyingglass"
+                ) {
+                    isSearchPresented = true
+                }
             } else {
                 caskTable
             }
         }
         .navigationTitle("Casks")
-        .searchable(text: $store.searchQuery, prompt: "Search casks")
+        .searchable(text: $store.caskSearchQuery, isPresented: $isSearchPresented, prompt: "Search casks")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
@@ -73,8 +86,8 @@ struct CaskListView: View {
                     .inspectorColumnWidth(min: 360, ideal: 440, max: 560)
             }
         }
-        .task(id: store.searchQuery) {
-            guard !store.searchQuery.isEmpty else {
+        .task(id: store.caskSearchQuery) {
+            guard !store.caskSearchQuery.isEmpty else {
                 store.searchResultCasks = []
                 return
             }
@@ -158,7 +171,7 @@ struct CaskListView: View {
                 ContentUnavailableView(
                     "No Results",
                     systemImage: "magnifyingglass",
-                    description: Text("No casks match \"\(store.searchQuery)\".")
+                    description: Text("No casks match \"\(store.caskSearchQuery)\".")
                 )
                 .listRowSeparator(.hidden)
             }
@@ -260,6 +273,18 @@ struct CaskListView: View {
                 }
             }
             .width(min: 60, ideal: 120)
+
+            TableColumn("") { cask in
+                Menu {
+                    caskContextMenu(for: cask)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Actions for \(cask.displayName)")
+            }
+            .width(28)
         }
         .contextMenu(forSelectionType: Cask.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
@@ -269,8 +294,18 @@ struct CaskListView: View {
         } primaryAction: { _ in }
         .onChange(of: sortOrder) { _, newOrder in
             store.casks.sort(using: newOrder)
+            persistSortOrder(newOrder)
         }
         .animation(AnimationToken.smooth, value: store.filteredCasks)
+    }
+
+    private func persistSortOrder(_ order: [KeyPathComparator<Cask>]) {
+        guard let comparator = order.first else { return }
+        UserDefaults.standard.set(comparator.order == .forward, forKey: "caskSortAscending")
+        UserDefaults.standard.set(
+            comparator.keyPath == \Cask.version ? "version" : "name",
+            forKey: "caskSortColumn"
+        )
     }
 
     // MARK: - Context Menu

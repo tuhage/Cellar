@@ -4,14 +4,23 @@ import CellarCore
 struct FormulaListView: View {
     @Environment(PackageStore.self) private var store
 
-    @State private var sortOrder: [KeyPathComparator<Formula>] = [
-        KeyPathComparator(\.name)
-    ]
+    @State private var sortOrder: [KeyPathComparator<Formula>]
+    @State private var isSearchPresented = false
     @State private var formulaToUninstall: Formula?
     @State private var formulaToInstall: Formula?
 
+    init() {
+        let defaults = UserDefaults.standard
+        let order: SortOrder = defaults.object(forKey: "formulaSortAscending") == nil
+            || defaults.bool(forKey: "formulaSortAscending") ? .forward : .reverse
+        let comparator = defaults.string(forKey: "formulaSortColumn") == "version"
+            ? KeyPathComparator(\Formula.version, order: order)
+            : KeyPathComparator(\Formula.name, order: order)
+        _sortOrder = State(initialValue: [comparator])
+    }
+
     private var isSearching: Bool {
-        !store.searchQuery.isEmpty
+        !store.formulaSearchQuery.isEmpty
     }
 
     private var selectedFormulaID: Binding<Formula.ID?> {
@@ -49,14 +58,18 @@ struct FormulaListView: View {
                 EmptyStateView(
                     title: "No Formulae",
                     systemImage: "shippingbox",
-                    description: "Installed formulae will appear here."
-                )
+                    description: "Installed formulae will appear here.",
+                    actionTitle: "Search Homebrew",
+                    actionSystemImage: "magnifyingglass"
+                ) {
+                    isSearchPresented = true
+                }
             } else {
                 formulaTable
             }
         }
         .navigationTitle("Formulae")
-        .searchable(text: $store.searchQuery, prompt: "Search formulae")
+        .searchable(text: $store.formulaSearchQuery, isPresented: $isSearchPresented, prompt: "Search formulae")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
@@ -73,8 +86,8 @@ struct FormulaListView: View {
                     .inspectorColumnWidth(min: 360, ideal: 440, max: 560)
             }
         }
-        .task(id: store.searchQuery) {
-            guard !store.searchQuery.isEmpty else {
+        .task(id: store.formulaSearchQuery) {
+            guard !store.formulaSearchQuery.isEmpty else {
                 store.searchResultFormulae = []
                 return
             }
@@ -158,7 +171,7 @@ struct FormulaListView: View {
                 ContentUnavailableView(
                     "No Results",
                     systemImage: "magnifyingglass",
-                    description: Text("No formulae match \"\(store.searchQuery)\".")
+                    description: Text("No formulae match \"\(store.formulaSearchQuery)\".")
                 )
                 .listRowSeparator(.hidden)
             }
@@ -248,6 +261,18 @@ struct FormulaListView: View {
                 }
             }
             .width(min: 80, ideal: 200)
+
+            TableColumn("") { formula in
+                Menu {
+                    formulaContextMenu(for: formula)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Actions for \(formula.name)")
+            }
+            .width(28)
         }
         .contextMenu(forSelectionType: Formula.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
@@ -259,8 +284,18 @@ struct FormulaListView: View {
         }
         .onChange(of: sortOrder) { _, newOrder in
             store.formulae.sort(using: newOrder)
+            persistSortOrder(newOrder)
         }
         .animation(AnimationToken.smooth, value: store.filteredFormulae)
+    }
+
+    private func persistSortOrder(_ order: [KeyPathComparator<Formula>]) {
+        guard let comparator = order.first else { return }
+        UserDefaults.standard.set(comparator.order == .forward, forKey: "formulaSortAscending")
+        UserDefaults.standard.set(
+            comparator.keyPath == \Formula.version ? "version" : "name",
+            forKey: "formulaSortColumn"
+        )
     }
 
     // MARK: - Context Menu

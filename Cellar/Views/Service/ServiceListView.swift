@@ -4,11 +4,16 @@ import CellarCore
 struct ServiceListView: View {
     @Environment(ServiceStore.self) private var store
 
-    @State private var sortOrder: [KeyPathComparator<BrewServiceItem>] = [
-        KeyPathComparator(\.name)
-    ]
+    @State private var sortOrder: [KeyPathComparator<BrewServiceItem>]
     @State private var serviceToKill: BrewServiceItem?
     @State private var serviceToUninstall: BrewServiceItem?
+
+    init() {
+        let defaults = UserDefaults.standard
+        let order: SortOrder = defaults.object(forKey: "serviceSortAscending") == nil
+            || defaults.bool(forKey: "serviceSortAscending") ? .forward : .reverse
+        _sortOrder = State(initialValue: [KeyPathComparator(\BrewServiceItem.name, order: order)])
+    }
 
     private var selectedServiceID: Binding<BrewServiceItem.ID?> {
         Binding(
@@ -41,8 +46,11 @@ struct ServiceListView: View {
                 EmptyStateView(
                     title: "No Services",
                     systemImage: "gearshape.2",
-                    description: "Homebrew services will appear here."
-                )
+                    description: "Homebrew services will appear here.",
+                    actionTitle: "Check Again"
+                ) {
+                    Task { await store.load(forceRefresh: true) }
+                }
             } else {
                 serviceTable
             }
@@ -123,7 +131,13 @@ struct ServiceListView: View {
     }
 
     private var serviceTable: some View {
-        Table(store.visibleServices, selection: selectedServiceID, sortOrder: $sortOrder) {
+        VStack(spacing: 0) {
+            if hasActiveFilters {
+                filterSummary
+                Divider()
+            }
+
+            Table(store.visibleServices, selection: selectedServiceID, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.name) { service in
                 Text(service.name)
                     .fontWeight(.medium)
@@ -172,6 +186,7 @@ struct ServiceListView: View {
                 .frame(width: 20)
             }
             .width(28)
+            }
         }
         .contextMenu(forSelectionType: BrewServiceItem.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
@@ -181,6 +196,12 @@ struct ServiceListView: View {
         } primaryAction: { _ in }
         .onChange(of: sortOrder) { _, newOrder in
             store.services.sort(using: newOrder)
+            if let comparator = newOrder.first {
+                UserDefaults.standard.set(
+                    comparator.order == .forward,
+                    forKey: "serviceSortAscending"
+                )
+            }
         }
         .animation(AnimationToken.smooth, value: store.visibleServices)
         .confirmationDialog(
@@ -216,6 +237,26 @@ struct ServiceListView: View {
         } message: { service in
             Text("Uninstall \(service.name)? This stops the service and removes the formula from Homebrew.")
         }
+    }
+
+    private var filterSummary: some View {
+        HStack(spacing: Spacing.item) {
+            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                .foregroundStyle(.tint)
+            Text("Showing \(store.visibleServices.count) of \(store.services.count) services")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Clear Filters") {
+                store.showsUnusedServices = true
+                store.showsHiddenServices = true
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, Spacing.cardPadding)
+        .padding(.vertical, Spacing.item)
+        .background(.tint.opacity(0.06))
     }
 
     // MARK: - Context Menu
@@ -280,6 +321,7 @@ private struct ServiceStatusBadge: View {
     let status: ServiceStatus
 
     @State private var isPulsing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: Spacing.related) {
@@ -293,7 +335,10 @@ private struct ServiceStatusBadge: View {
                             .frame(width: IconSize.dotGlow, height: IconSize.dotGlow)
                             .scaleEffect(isPulsing ? 1.3 : 1.0)
                             .opacity(isPulsing ? 0.0 : 0.4)
-                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: isPulsing)
+                            .animation(
+                                reduceMotion ? nil : .easeInOut(duration: 1.5).repeatForever(autoreverses: false),
+                                value: isPulsing
+                            )
                     }
                 }
 
@@ -304,7 +349,7 @@ private struct ServiceStatusBadge: View {
         .accessibilityLabel("Status: \(status.label)")
         .help("Status: \(status.label)")
         .onAppear {
-            if status == .started { isPulsing = true }
+            if status == .started && !reduceMotion { isPulsing = true }
         }
     }
 }

@@ -5,16 +5,25 @@ struct EmptyStateView: View {
     let title: String
     let systemImage: String
     var description: String?
+    var actionTitle: String?
+    var actionSystemImage: String = "arrow.clockwise"
+    var action: (() -> Void)?
 
     var body: some View {
-        Group {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+        } description: {
             if let description {
-                ContentUnavailableView(title, systemImage: systemImage, description: Text(description))
-            } else {
-                ContentUnavailableView(title, systemImage: systemImage)
+                Text(description)
+            }
+        } actions: {
+            if let actionTitle, let action {
+                Button(action: action) {
+                    Label(actionTitle, systemImage: actionSystemImage)
+                }
+                .buttonStyle(.borderedProminent)
             }
         }
-        .symbolEffect(.pulse)
         .transition(.opacity)
     }
 }
