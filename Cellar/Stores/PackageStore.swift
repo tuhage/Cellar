@@ -105,7 +105,9 @@ final class PackageStore: LoadableStore {
             formulae = try await Formula.all
             persistence.saveToCache(formulae, to: Self.formulaeCacheFile)
         } catch {
-            errorMessage = error.localizedDescription
+            if !isOperationCancellation(error) {
+                errorMessage = "Formulae couldn’t be loaded. Please try again."
+            }
         }
         isLoading = false
     }
@@ -124,7 +126,9 @@ final class PackageStore: LoadableStore {
             casks = try await Cask.all
             persistence.saveToCache(casks, to: Self.casksCacheFile)
         } catch {
-            errorMessage = error.localizedDescription
+            if !isOperationCancellation(error) {
+                errorMessage = "Casks couldn’t be loaded. Please try again."
+            }
         }
         isLoading = false
     }
@@ -155,7 +159,9 @@ final class PackageStore: LoadableStore {
 
             await SpotlightService.shared.indexAll(formulae: formulae, casks: casks)
         } catch {
-            errorMessage = error.localizedDescription
+            if !isOperationCancellation(error) {
+                errorMessage = "Homebrew packages couldn’t be loaded. Please try again."
+            }
         }
         isLoading = false
     }

@@ -127,7 +127,9 @@ final class ServiceStore: LoadableStore {
         do {
             try await refreshServices()
         } catch {
-            errorMessage = error.localizedDescription
+            if !isOperationCancellation(error) {
+                errorMessage = "Services couldn’t be loaded. Please try again."
+            }
         }
         isLoading = false
     }

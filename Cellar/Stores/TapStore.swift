@@ -56,7 +56,9 @@ final class TapStore: LoadableStore {
         do {
             try await refreshTaps()
         } catch {
-            errorMessage = error.localizedDescription
+            if !isOperationCancellation(error) {
+                errorMessage = "Taps couldn’t be loaded. Please try again."
+            }
         }
         isLoading = false
     }

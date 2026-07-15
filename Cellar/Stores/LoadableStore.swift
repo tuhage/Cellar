@@ -31,7 +31,12 @@ extension LoadableStore {
         do {
             return try await block()
         } catch {
-            errorMessage = error.localizedDescription
+            // SwiftUI routinely cancels view-bound tasks when a view goes
+            // away. That is expected lifecycle behaviour, not a user-facing
+            // failure.
+            if !isOperationCancellation(error) {
+                errorMessage = error.localizedDescription
+            }
             return nil
         }
     }
