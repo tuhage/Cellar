@@ -86,11 +86,27 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
             if data.isEmpty { return [] }
             var items = try JSONDecoder().decode([BrewServiceItem].self, from: data)
 
-            // brew services list --json sometimes omits the pid field for running
-            // services. Fall back to launchctl to resolve it.
-            for index in items.indices where items[index].isRunning && items[index].pid == nil {
-                if let resolved = await resolvePIDViaLaunchctl(for: items[index].name) {
-                    items[index] = items[index].withPID(resolved)
+            for index in items.indices {
+                let item = items[index]
+
+                // Non-privileged `brew services list` only inspects the current
+                // user's LaunchAgents. Root services live in the system domain,
+                // so Homebrew can report "none" even while the daemon is running.
+                if item.requiresRoot,
+                   let runtime = await resolveSystemRuntimeViaLaunchctl(for: item.name),
+                   runtime.isRunning {
+                    items[index] = item.withRuntimeState(
+                        status: .started,
+                        pid: runtime.pid ?? item.pid
+                    )
+                    continue
+                }
+
+                // Homebrew sometimes omits the pid for running user services.
+                if item.isRunning,
+                   item.pid == nil,
+                   let resolved = await resolvePIDViaLaunchctl(for: item.name) {
+                    items[index] = item.withRuntimeState(status: item.status, pid: resolved)
                 }
             }
 
@@ -117,8 +133,8 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
 
 extension BrewServiceItem {
 
-    /// Returns a copy with the given PID.
-    func withPID(_ pid: Int) -> BrewServiceItem {
+    /// Returns a copy with launchctl's runtime state applied.
+    func withRuntimeState(status: ServiceStatus, pid: Int?) -> BrewServiceItem {
         BrewServiceItem(
             name: name,
             status: status,
@@ -128,6 +144,73 @@ extension BrewServiceItem {
             pid: pid,
             registered: registered
         )
+    }
+
+    struct LaunchctlRuntime: Equatable, Sendable {
+        let isRunning: Bool
+        let pid: Int?
+    }
+
+    /// Parses the relevant fields from `launchctl print` output.
+    static func parseLaunchctlRuntime(_ output: String) -> LaunchctlRuntime {
+        var state: String?
+        var pid: Int?
+
+        for line in output.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.hasPrefix("state =") {
+                state = trimmed
+                    .dropFirst("state =".count)
+                    .trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("pid =") {
+                let value = trimmed
+                    .dropFirst("pid =".count)
+                    .trimmingCharacters(in: .whitespaces)
+                pid = Int(value)
+            }
+        }
+
+        return LaunchctlRuntime(isRunning: state == "running" || pid != nil, pid: pid)
+    }
+
+    /// Root Homebrew services are registered in launchd's system domain, which
+    /// can be inspected without elevating the Cellar process.
+    private static func resolveSystemRuntimeViaLaunchctl(
+        for serviceName: String
+    ) async -> LaunchctlRuntime? {
+        let label = "homebrew.mxcl.\(serviceName)"
+
+        return await withCheckedContinuation { continuation in
+            let process = Process()
+            let pipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            process.arguments = ["print", "system/\(label)"]
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+
+            process.terminationHandler = { _ in
+                guard process.terminationStatus == 0 else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                guard let output = String(data: data, encoding: .utf8) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                continuation.resume(returning: parseLaunchctlRuntime(output))
+            }
+
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(returning: nil)
+            }
+        }
     }
 
     /// Queries `launchctl list` for the service's PID using the

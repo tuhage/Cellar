@@ -35,6 +35,37 @@ struct BrewServiceTests {
         #expect(items[1].status == .stopped)
     }
 
+    @Test("brewServiceItem_parseLaunchctlRuntime_detectsRunningSystemService")
+    func parseLaunchctlRuntimeDetectsRunningSystemService() {
+        let output = """
+        system/homebrew.mxcl.tailscale = {
+            state = running
+            pid = 641
+            last exit code = (never exited)
+        }
+        """
+
+        let runtime = BrewServiceItem.parseLaunchctlRuntime(output)
+
+        #expect(runtime.isRunning)
+        #expect(runtime.pid == 641)
+    }
+
+    @Test("brewServiceItem_parseLaunchctlRuntime_detectsStoppedSystemService")
+    func parseLaunchctlRuntimeDetectsStoppedSystemService() {
+        let output = """
+        system/homebrew.mxcl.example = {
+            state = not running
+            last exit code = 0
+        }
+        """
+
+        let runtime = BrewServiceItem.parseLaunchctlRuntime(output)
+
+        #expect(!runtime.isRunning)
+        #expect(runtime.pid == nil)
+    }
+
     @Test("brewService_searchFormulae_returnsNameArray")
     func brewService_searchFormulae_returnsNameArray() async throws {
         let mock = MockBrewProcess(stubbedOutput: ProcessOutput(

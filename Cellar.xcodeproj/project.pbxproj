@@ -416,7 +416,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CellarWidget/CellarWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -429,7 +429,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.7;
+				MARKETING_VERSION = 1.5.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -443,7 +443,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CellarWidget/CellarWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -456,7 +456,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.7;
+				MARKETING_VERSION = 1.5.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -498,7 +498,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CellarFinderSync/CellarFinderSync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -511,7 +511,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.7;
+				MARKETING_VERSION = 1.5.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.FinderSync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -525,7 +525,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CellarFinderSync/CellarFinderSync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -538,7 +538,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.7;
+				MARKETING_VERSION = 1.5.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.FinderSync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -675,7 +675,7 @@
 				CODE_SIGN_ENTITLEMENTS = Cellar/Cellar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -687,7 +687,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.7;
+				MARKETING_VERSION = 1.5.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -708,7 +708,7 @@
 				CODE_SIGN_ENTITLEMENTS = Cellar/Cellar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -720,7 +720,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.7;
+				MARKETING_VERSION = 1.5.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

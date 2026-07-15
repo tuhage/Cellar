@@ -7,11 +7,11 @@ enum StatusCommand {
 
         async let formulaeData = service.listFormulaeData()
         async let casksData = service.listCasksData()
-        async let servicesData = service.listServicesData()
+        async let loadedServices: [BrewServiceItem] = BrewServiceItem.all
 
         let formulae = try await JSONDecoder().decode(BrewJSONResponse.self, from: formulaeData).formulae
         let casks = try await JSONDecoder().decode(BrewJSONResponse.self, from: casksData).casks ?? []
-        let services = try await JSONDecoder().decode([BrewServiceItem].self, from: servicesData)
+        let services = try await loadedServices
 
         let summary = SystemSummary.current(formulae: formulae, casks: casks, services: services, taps: [])
 
