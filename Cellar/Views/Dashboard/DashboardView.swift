@@ -53,6 +53,39 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 statsSection(summary)
+                dashboardColumns(summary)
+            }
+            .padding(Spacing.section)
+        }
+    }
+
+    @ViewBuilder
+    private func dashboardColumns(_ summary: SystemSummary) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: Spacing.section) {
+                VStack(alignment: .leading, spacing: Spacing.section) {
+                    if !summary.services.isEmpty {
+                        servicesSection(summary)
+                    }
+                    if !summary.recentlyInstalled.isEmpty {
+                        recentlyInstalledSection(summary)
+                    }
+                    if !summary.taps.isEmpty {
+                        tapsSection(summary)
+                    }
+                }
+                .frame(minWidth: 420, maxWidth: .infinity, alignment: .topLeading)
+
+                VStack(alignment: .leading, spacing: Spacing.section) {
+                    quickActionsSection(summary)
+                    if summary.updatesAvailable > 0 {
+                        outdatedSection(summary)
+                    }
+                }
+                .frame(minWidth: 360, idealWidth: 420, maxWidth: 480, alignment: .topLeading)
+            }
+
+            VStack(alignment: .leading, spacing: Spacing.section) {
                 if !summary.services.isEmpty {
                     servicesSection(summary)
                 }
@@ -67,7 +100,6 @@ struct DashboardView: View {
                     outdatedSection(summary)
                 }
             }
-            .padding(Spacing.section)
         }
     }
 
@@ -78,7 +110,7 @@ struct DashboardView: View {
             SectionHeaderView(title: "Overview", systemImage: "chart.bar.fill", color: .secondary)
 
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 250), spacing: Spacing.sectionContent)],
+                columns: [GridItem(.adaptive(minimum: 210), spacing: Spacing.sectionContent)],
                 spacing: Spacing.sectionContent
             ) {
                 navigableCard(to: .formulae) {
@@ -201,7 +233,8 @@ struct DashboardView: View {
                     color: .orange,
                     isDisabled: summary.updatesAvailable == 0
                         || dashboardStore.isPerformingAction
-                        || packageStore.isUpgradingAll
+                        || packageStore.isUpgradingAll,
+                    isProminent: true
                 ) {
                     packageStore.upgradeAll()
                 }
@@ -210,7 +243,7 @@ struct DashboardView: View {
                     title: "Cleanup",
                     subtitle: "Free disk space",
                     systemImage: "trash.circle.fill",
-                    color: .red,
+                    color: .blue,
                     isDisabled: dashboardStore.isPerformingAction
                 ) {
                     dashboardStore.cleanup()
@@ -220,7 +253,7 @@ struct DashboardView: View {
                     title: "Health Check",
                     subtitle: "Run brew doctor",
                     systemImage: "heart.circle.fill",
-                    color: .pink,
+                    color: .green,
                     isDisabled: dashboardStore.isPerformingAction
                 ) {
                     dashboardStore.healthCheck()
@@ -352,10 +385,10 @@ struct DashboardView: View {
                 if tap.official {
                     Text("Official")
                         .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.white)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.blue)
                         .smallBadgeInset()
-                        .background(.blue.gradient, in: Capsule())
+                        .background(.blue.opacity(Opacity.badgeBackground), in: Capsule())
                 }
 
                 Spacer()
@@ -404,7 +437,7 @@ struct DashboardView: View {
                                 systemImage: "terminal",
                                 iconColor: .blue,
                                 currentVersion: formula.version,
-                                targetVersion: "latest"
+                                targetVersion: formula.latestVersion ?? "latest"
                             )
                         }
                     }

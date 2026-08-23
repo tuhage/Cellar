@@ -1,10 +1,9 @@
 import SwiftUI
 
 /// Toolbar button that exposes the activity panel via a popover. Shows a
-/// bolt symbol with a badge counting all tracked operations (running +
-/// completed + failed). The icon stays filled and the badge visible as long
-/// as there are any operations in the store, so the user knows there are
-/// completed or failed items to review.
+/// activity symbol with a badge for running or failed operations. Completed
+/// operations stay available in the panel without permanently cluttering the
+/// toolbar.
 struct ActivityToolbarButton: View {
     @Environment(ActivityStore.self) private var store
     @State private var isPanelPresented = false
@@ -14,11 +13,11 @@ struct ActivityToolbarButton: View {
             isPanelPresented.toggle()
         } label: {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: hasOps ? "bolt.circle.fill" : "bolt.circle")
+                Image(systemName: hasAttention ? "clock.arrow.circlepath" : "clock")
                     .font(.title3)
                     .foregroundStyle(iconTint)
-                if hasOps {
-                    Text("\(store.operations.count)")
+                if badgeCount > 0 {
+                    Text("\(badgeCount)")
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
@@ -43,6 +42,16 @@ struct ActivityToolbarButton: View {
     // MARK: - Derived state
 
     private var hasOps: Bool { !store.operations.isEmpty }
+
+    private var failedCount: Int {
+        store.operations.filter {
+            if case .failed = $0.status { return true }
+            return false
+        }.count
+    }
+
+    private var badgeCount: Int { store.runningCount + failedCount }
+    private var hasAttention: Bool { badgeCount > 0 }
 
     private var hasFailures: Bool {
         store.operations.contains {
@@ -73,8 +82,10 @@ struct ActivityToolbarButton: View {
         let running = store.runningCount
         if running > 0 {
             return "\(running) running"
+        } else if hasFailures {
+            return "\(failedCount) failed — click to review"
         } else if hasOps {
-            return "\(store.operations.count) finished — click to view"
+            return "Activity history"
         } else {
             return "Activity"
         }

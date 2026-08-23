@@ -30,6 +30,7 @@
 - **CLI Tool** — `cellar` command-line tool for quick terminal operations
 - **Finder Integration** — Badges directories containing Brewfiles, right-click service controls
 - **Spotlight** — All installed packages indexed for system-wide search
+- **Automatic Updates** — Signed GitHub Releases are checked, downloaded, and installed securely in-app
 
 ## Screenshots
 
@@ -58,6 +59,8 @@
 
 Download the latest `.dmg` from the [Releases](https://github.com/tuhage/Cellar/releases) page. Open the `.dmg` and drag **Cellar** to your **Applications** folder.
 
+After the first installation, Cellar checks the signed GitHub Releases feed daily. Automatic download and installation can be changed under **Settings → About → Updates**.
+
 ### Requirements
 
 - macOS 15 or later
@@ -70,6 +73,28 @@ git clone https://github.com/tuhage/Cellar.git
 cd Cellar
 xcodebuild -project Cellar.xcodeproj -scheme Cellar -configuration Release build -allowProvisioningUpdates
 ```
+
+### Publishing an Update
+
+Sparkle verifies every update with the public Ed25519 key embedded in Cellar and the app's Developer ID signature. The matching private key stays in the maintainer's macOS Login Keychain and must never be committed.
+
+Increment both the user-facing version and the monotonically increasing build number, then run:
+
+```bash
+./scripts/release.sh 1.6.0 15
+```
+
+The script produces the notarized DMG and a signed `build/appcast/appcast.xml`. Upload both assets to the same GitHub Release:
+
+```bash
+gh release create v1.6.0 \
+  build/Cellar-1.6.0.dmg \
+  build/appcast/appcast.xml \
+  --title "Cellar 1.6.0" \
+  --generate-notes
+```
+
+Cellar reads the feed from `releases/latest/download/appcast.xml`; releases without that asset cannot be installed in-app. Back up the Sparkle private key to secure offline storage before publishing the first update.
 
 ## CLI Tool
 

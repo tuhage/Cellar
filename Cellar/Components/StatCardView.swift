@@ -14,9 +14,9 @@ struct StatCardView: View {
         HStack(spacing: Spacing.detailElement) {
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(color)
                 .frame(width: IconSize.mediumIcon, height: IconSize.mediumIcon)
-                .background(color.gradient, in: RoundedRectangle(cornerRadius: CornerRadius.medium, style: .continuous))
+                .background(color.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.medium, style: .continuous))
 
             VStack(alignment: .leading, spacing: Spacing.textPair) {
                 Text(value)

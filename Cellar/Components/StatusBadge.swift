@@ -18,16 +18,14 @@ struct StatusBadge: View {
                 Text(text)
             }
         }
-        .font(.caption)
-        .fontWeight(.medium)
-        .badgeInset()
+        .font(.caption2.weight(.semibold))
+        .smallBadgeInset()
         .background(
             color.opacity(contrast == .increased ? 0.24 : Opacity.badgeBackground),
             in: Capsule()
         )
-        .overlay(Capsule().strokeBorder(color.opacity(contrast == .increased ? 0.7 : 0.2), lineWidth: contrast == .increased ? 1 : 0.5))
+        .overlay(Capsule().strokeBorder(color.opacity(contrast == .increased ? 0.7 : 0.18), lineWidth: contrast == .increased ? 1 : 0.5))
         .foregroundStyle(color)
-        .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
         .transition(.scale.combined(with: .opacity))
         .help(text)
     }

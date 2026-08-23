@@ -5,25 +5,60 @@ import CellarCore
 
 /// The content displayed inside the menu bar extra dropdown.
 ///
-/// Reads from the shared `PackageStore` and `ServiceStore` to show
-/// running services, available updates, and quick actions. All heavy
-/// lifting happens through the existing stores — this view is
-/// intentionally lightweight.
+/// Reads from the shared stores to show running services, their combined
+/// resource usage, available updates, and quick actions.
 struct MenuBarView: View {
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(MaintenanceStore.self) private var maintenanceStore
+    @Environment(ResourceStore.self) private var resourceStore
+
+    @State private var isLoadingResources = false
 
     var body: some View {
         headerSection
+            .task {
+                await refreshResourceUsage()
+            }
         Divider()
         servicesSection
+        Divider()
+        resourcesSection
         Divider()
         updatesSection
         Divider()
         actionsSection
         Divider()
         appSection
+    }
+
+    // MARK: - Resources
+
+    @ViewBuilder
+    private var resourcesSection: some View {
+        Text("Service Resources")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+        if isLoadingResources && resourceStore.usages.isEmpty {
+            Label("Measuring Usage…", systemImage: "gauge.with.dots.needle.33percent")
+                .disabled(true)
+        } else if resourceStore.usages.isEmpty {
+            Label("Resource Usage Unavailable", systemImage: "gauge.with.dots.needle.33percent")
+                .disabled(true)
+        } else {
+            Label(
+                "\(formattedCPU(resourceStore.totalCPU)) CPU",
+                systemImage: "cpu"
+            )
+            .disabled(true)
+
+            Label(
+                "\(formattedMemory(resourceStore.totalMemoryMB)) RAM",
+                systemImage: "memorychip"
+            )
+            .disabled(true)
+        }
     }
 
     // MARK: - Header
@@ -96,6 +131,7 @@ struct MenuBarView: View {
                 Task {
                     await packageStore.loadAll()
                     await serviceStore.load()
+                    await refreshResourceUsage()
                 }
             }
         }
@@ -127,6 +163,23 @@ struct MenuBarView: View {
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
+
+    private func refreshResourceUsage() async {
+        isLoadingResources = true
+        await resourceStore.loadResourceUsage(for: serviceStore.services)
+        isLoadingResources = false
+    }
+
+    private func formattedCPU(_ percent: Double) -> String {
+        String(format: "%.1f%%", percent)
+    }
+
+    private func formattedMemory(_ megabytes: Double) -> String {
+        if megabytes >= 1_024 {
+            return String(format: "%.1f GB", megabytes / 1_024)
+        }
+        return String(format: megabytes < 10 ? "%.1f MB" : "%.0f MB", megabytes)
+    }
 }
 
 // MARK: - Preview
@@ -136,4 +189,5 @@ struct MenuBarView: View {
         .environment(PackageStore())
         .environment(ServiceStore())
         .environment(MaintenanceStore())
+        .environment(ResourceStore())
 }

@@ -54,17 +54,17 @@ struct ContentView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .secondaryAction) {
                 Button {
                     isQuickOpenPresented = true
                 } label: {
-                    Image(systemName: "magnifyingglass")
+                    Image(systemName: "command.square")
                 }
                 .help("Quick Open (⌘K)")
                 .accessibilityLabel("Quick Open")
             }
 
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .secondaryAction) {
                 ActivityToolbarButton()
             }
         }

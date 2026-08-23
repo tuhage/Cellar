@@ -36,7 +36,6 @@ struct CellarApp: App {
                     handleSpotlightActivity(activity)
                 }
                 .task { notificationObserver.register(serviceStore: serviceStore) }
-                .task { await updateStore.checkIfStale() }
                 .task {
                     wireStores()
                     maintenanceStore.loadSettings()
@@ -44,9 +43,6 @@ struct CellarApp: App {
                     UNUserNotificationCenter.current().delegate = notificationDelegate
                     await ActivityNotificationService.shared.requestPermission()
                     await runMaintenanceScheduler()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .checkForUpdates)) { _ in
-                    Task { await updateStore.check() }
                 }
                 .onChange(of: activityStore.operations) {
                     for op in activityStore.operations {
@@ -57,7 +53,7 @@ struct CellarApp: App {
                 }
         }
         .defaultSize(width: 1320, height: 820)
-        .commands { AppCommands() }
+        .commands { AppCommands(updateStore: updateStore) }
 
         Window("Keyboard Shortcuts", id: "keyboard-shortcuts") {
             KeyboardShortcutsView()
@@ -75,6 +71,7 @@ struct CellarApp: App {
                 .environment(packageStore)
                 .environment(serviceStore)
                 .environment(maintenanceStore)
+                .environment(resourceStore)
         }
         .menuBarExtraStyle(.menu)
     }

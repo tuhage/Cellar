@@ -35,7 +35,7 @@ struct DependencyGraphView: View {
                 graphContent(graph: graph)
             }
         }
-        .navigationTitle("Dependencies")
+        .navigationTitle("Dependency Browser")
         .searchable(text: $store.searchQuery, prompt: "Filter packages")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -98,32 +98,49 @@ struct DependencyGraphView: View {
     // MARK: - Stats Row
 
     private func statsRow(graph: DependencyGraph) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.sectionContent) {
-            StatCardView(
-                title: "Packages",
-                value: "\(graph.totalPackages)",
-                systemImage: "shippingbox",
-                color: .blue
-            )
-            StatCardView(
-                title: "Orphans",
-                value: "\(graph.orphans.count)",
-                systemImage: "exclamationmark.triangle",
-                color: .orange
-            )
-            StatCardView(
-                title: "Leaves",
-                value: "\(graph.leaves.count)",
-                systemImage: "leaf",
-                color: .green
-            )
-            StatCardView(
-                title: "Edges",
-                value: "\(graph.totalEdges)",
-                systemImage: "arrow.triangle.branch",
-                color: .purple
-            )
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 0) {
+                dependencyMetric("Packages", value: graph.totalPackages, icon: "shippingbox", color: .blue)
+                metricDivider
+                dependencyMetric("Orphans", value: graph.orphans.count, icon: "exclamationmark.triangle", color: .orange)
+                metricDivider
+                dependencyMetric("Leaves", value: graph.leaves.count, icon: "leaf", color: .green)
+                metricDivider
+                dependencyMetric("Connections", value: graph.totalEdges, icon: "arrow.triangle.branch", color: .purple)
+            }
+            .padding(.vertical, Spacing.item)
+            .cardStyle(cornerRadius: CornerRadius.card)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.item) {
+                dependencyMetric("Packages", value: graph.totalPackages, icon: "shippingbox", color: .blue)
+                dependencyMetric("Orphans", value: graph.orphans.count, icon: "exclamationmark.triangle", color: .orange)
+                dependencyMetric("Leaves", value: graph.leaves.count, icon: "leaf", color: .green)
+                dependencyMetric("Connections", value: graph.totalEdges, icon: "arrow.triangle.branch", color: .purple)
+            }
+            .padding(Spacing.item)
+            .cardStyle(cornerRadius: CornerRadius.card)
         }
+    }
+
+    private func dependencyMetric(_ title: String, value: Int, icon: String, color: Color) -> some View {
+        HStack(spacing: Spacing.item) {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(value)")
+                    .font(.headline.monospacedDigit())
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.row)
+    }
+
+    private var metricDivider: some View {
+        Divider().frame(height: 28)
     }
 
     // MARK: - Detail Panel

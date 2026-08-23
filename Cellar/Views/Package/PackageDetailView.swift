@@ -65,6 +65,7 @@ struct PackageDetailView: View {
     @Environment(PackageStore.self) private var store
     @State private var isPerformingAction = false
     @State private var actionError: String?
+    @State private var isConfirmingUninstall = false
 
     private var packageIcon: String {
         switch package {
@@ -84,27 +85,22 @@ struct PackageDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 headerSection
-                Divider().opacity(0.5)
+                actionsSection
                 infoSection
                     .padding(Spacing.cardPadding)
                     .cardStyle()
                 if !badges.isEmpty {
-                    Divider().opacity(0.5)
                     badgeSection
                         .transition(.opacity)
                 }
                 if case .formula(let formula) = package, !formula.dependencies.isEmpty {
-                    Divider().opacity(0.5)
                     dependenciesSection(formula.dependencies)
                         .transition(.opacity)
                 }
                 if case .formula(let formula) = package, !formula.runtimeDependencies.isEmpty {
-                    Divider().opacity(0.5)
                     runtimeDependenciesSection(formula.runtimeDependencies)
                         .transition(.opacity)
                 }
-                Divider().opacity(0.5)
-                actionsSection
             }
             .padding(Spacing.section)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -117,6 +113,22 @@ struct PackageDetailView: View {
             Button("OK") { actionError = nil }
         } message: {
             Text(actionError ?? "")
+        }
+        .confirmationDialog(
+            "Uninstall \(package.name)?",
+            isPresented: $isConfirmingUninstall,
+            titleVisibility: .visible
+        ) {
+            Button("Uninstall", role: .destructive) {
+                performAction {
+                    switch package {
+                    case .formula(let formula): await store.uninstall(formula)
+                    case .cask(let cask): await store.uninstall(cask)
+                    }
+                }
+            }
+        } message: {
+            Text("This removes \(package.name) and its associated Homebrew files.")
         }
     }
 
@@ -171,6 +183,18 @@ struct PackageDetailView: View {
                 Text(package.version)
                     .textSelection(.enabled)
                     .fontDesign(.monospaced)
+            }
+
+            if case .formula(let formula) = package,
+               formula.outdated,
+               let latestVersion = formula.latestVersion {
+                GridRow {
+                    Text("Latest")
+                        .foregroundStyle(.secondary)
+                    Text(latestVersion)
+                        .fontDesign(.monospaced)
+                        .foregroundStyle(.orange)
+                }
             }
 
             if let homepage = package.homepage, let url = URL(string: homepage) {
@@ -324,7 +348,6 @@ struct PackageDetailView: View {
                         Label("Upgrade", systemImage: "arrow.up.circle")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.orange)
                 }
 
                 if case .formula(let formula) = package {
@@ -350,16 +373,12 @@ struct PackageDetailView: View {
                 }
 
                 Button(role: .destructive) {
-                    performAction {
-                        switch package {
-                            case .formula(let f): await store.uninstall(f)
-                            case .cask(let c): await store.uninstall(c)
-                            }
-                    }
+                    isConfirmingUninstall = true
                 } label: {
                     Label("Uninstall", systemImage: "trash")
                 }
                 .buttonStyle(.bordered)
+                .tint(.red)
             }
             .disabled(isPerformingAction)
 

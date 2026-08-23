@@ -10,6 +10,7 @@ struct QuickActionButton: View {
     let systemImage: String
     let color: Color
     var isDisabled: Bool = false
+    var isProminent: Bool = false
     let action: () -> Void
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -18,9 +19,9 @@ struct QuickActionButton: View {
             HStack(spacing: Spacing.row) {
                 Image(systemName: systemImage)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(color)
                     .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
-                    .background(color.gradient, in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
+                    .background(color.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
@@ -35,6 +36,10 @@ struct QuickActionButton: View {
             }
             .padding(Spacing.row)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                color.opacity(isProminent ? 0.065 : 0),
+                in: RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
+            )
         }
         .buttonStyle(QuickActionButtonStyle())
         .disabled(isDisabled)
@@ -74,6 +79,7 @@ private struct QuickActionButtonStyle: ButtonStyle {
             subtitle: "3 available",
             systemImage: "arrow.up.circle.fill",
             color: .orange,
+            isProminent: true,
             action: {}
         )
 

@@ -86,7 +86,7 @@ struct ServiceListView: View {
                     }
                 } label: {
                     Image(
-                        systemName: hasActiveFilters
+                        systemName: hasEffectiveFilters
                             ? "line.3.horizontal.decrease.circle.fill"
                             : "line.3.horizontal.decrease.circle"
                     )
@@ -130,9 +130,13 @@ struct ServiceListView: View {
         !store.showsUnusedServices || (store.hiddenCount > 0 && !store.showsHiddenServices)
     }
 
+    private var hasEffectiveFilters: Bool {
+        hasActiveFilters && store.visibleServices.count != store.services.count
+    }
+
     private var serviceTable: some View {
         VStack(spacing: 0) {
-            if hasActiveFilters {
+            if hasEffectiveFilters {
                 filterSummary
                 Divider()
             }
@@ -141,6 +145,7 @@ struct ServiceListView: View {
             TableColumn("Name", value: \.name) { service in
                 Text(service.name)
                     .fontWeight(.medium)
+                    .padding(.vertical, Spacing.textPair)
             }
             .width(min: 120, ideal: 200)
 
@@ -175,18 +180,8 @@ struct ServiceListView: View {
             }
             .width(min: 60, ideal: 100)
 
-            TableColumn("") { service in
-                Menu {
-                    serviceContextMenu(for: service)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .menuStyle(.borderlessButton)
-                .frame(width: 20)
             }
-            .width(28)
-            }
+            .tableStyle(.inset(alternatesRowBackgrounds: false))
         }
         .contextMenu(forSelectionType: BrewServiceItem.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
@@ -320,27 +315,11 @@ struct ServiceListView: View {
 private struct ServiceStatusBadge: View {
     let status: ServiceStatus
 
-    @State private var isPulsing = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         HStack(spacing: Spacing.related) {
             Circle()
                 .fill(status.color)
                 .frame(width: IconSize.statusDot, height: IconSize.statusDot)
-                .overlay {
-                    if status == .started {
-                        Circle()
-                            .fill(status.color.opacity(0.4))
-                            .frame(width: IconSize.dotGlow, height: IconSize.dotGlow)
-                            .scaleEffect(isPulsing ? 1.3 : 1.0)
-                            .opacity(isPulsing ? 0.0 : 0.4)
-                            .animation(
-                                reduceMotion ? nil : .easeInOut(duration: 1.5).repeatForever(autoreverses: false),
-                                value: isPulsing
-                            )
-                    }
-                }
 
             Text(status.label)
                 .font(.callout)
@@ -348,9 +327,6 @@ private struct ServiceStatusBadge: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Status: \(status.label)")
         .help("Status: \(status.label)")
-        .onAppear {
-            if status == .started && !reduceMotion { isPulsing = true }
-        }
     }
 }
 

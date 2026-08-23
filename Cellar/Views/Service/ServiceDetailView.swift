@@ -14,14 +14,10 @@ struct ServiceDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 headerSection
-                Divider().opacity(0.5)
+                actionsSection
                 infoSection
                     .padding(Spacing.cardPadding)
                     .cardStyle()
-                Divider().opacity(0.5)
-                actionsSection
-                Divider().opacity(0.5)
-                logsPlaceholderSection
             }
             .padding(Spacing.section)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -199,36 +195,6 @@ struct ServiceDetailView: View {
         }
     }
 
-    // MARK: - Logs Placeholder
-
-    private var logsPlaceholderSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            Text("Logs")
-                .font(.headline)
-
-            VStack(spacing: Spacing.sectionContent) {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .font(.largeTitle)
-                    .foregroundStyle(.tertiary)
-
-                Text("No Logs Available")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-
-                Text("Service log viewing will be available in a future update.")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-            }
-            .frame(maxWidth: .infinity, minHeight: 150)
-            .cardStyle(cornerRadius: CornerRadius.card)
-            .overlay(
-                RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                    .foregroundStyle(.tertiary)
-            )
-        }
-    }
-
     // MARK: - Helpers
 
     private func performAction(_ action: @escaping () async -> Void) {
@@ -264,7 +230,6 @@ private struct ServiceDetailStatusBadge: View {
         .padding(.horizontal, Spacing.sectionContent)
         .padding(.vertical, Spacing.compact)
         .background(status.color.opacity(Opacity.badgeBackground), in: Capsule())
-        .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
     }
 }
 

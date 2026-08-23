@@ -13,14 +13,12 @@ struct SectionHeaderView<Trailing: View>: View {
     var body: some View {
         HStack(spacing: Spacing.item) {
             Image(systemName: systemImage)
-                .font(.caption)
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(color)
-                .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
-                .background(color.opacity(Opacity.iconBackground), in: Circle())
+                .frame(width: IconSize.iconColumn)
 
             Text(title)
-                .font(.headline)
-                .fontWeight(.semibold)
+                .font(.headline.weight(.semibold))
 
             Spacer()
 

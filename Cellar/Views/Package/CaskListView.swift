@@ -8,6 +8,7 @@ struct CaskListView: View {
     @State private var isSearchPresented = false
     @State private var caskToUninstall: Cask?
     @State private var caskToInstall: Cask?
+    @State private var scope: CaskScope = .all
 
     init() {
         let defaults = UserDefaults.standard
@@ -33,6 +34,14 @@ struct CaskListView: View {
     private var selectedCask: Cask? {
         guard let id = store.selectedCaskId else { return nil }
         return store.casks.first { $0.id == id }
+    }
+
+    private var scopedCasks: [Cask] {
+        switch scope {
+        case .all: store.filteredCasks
+        case .outdated: store.filteredCasks.filter(\.outdated)
+        case .autoUpdating: store.filteredCasks.filter(\.autoUpdates)
+        }
     }
 
     private var isInspectorPresented: Binding<Bool> {
@@ -228,7 +237,29 @@ struct CaskListView: View {
     // MARK: - Table
 
     private var caskTable: some View {
-        Table(store.filteredCasks, selection: selectedCaskID, sortOrder: $sortOrder) {
+        VStack(spacing: 0) {
+            HStack {
+                Picker("Cask filter", selection: $scope) {
+                    ForEach(CaskScope.allCases) { scope in
+                        Text(scope.title).tag(scope)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 360)
+
+                Spacer()
+
+                Text("\(scopedCasks.count) installed")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, Spacing.cardPadding)
+            .padding(.vertical, Spacing.item)
+
+            Divider()
+
+        Table(scopedCasks, selection: selectedCaskID, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.token) { cask in
                 VStack(alignment: .leading, spacing: Spacing.textPair) {
                     Text(cask.displayName)
@@ -239,6 +270,7 @@ struct CaskListView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .padding(.vertical, Spacing.textPair)
             }
             .width(min: 120, ideal: 200)
 
@@ -251,13 +283,11 @@ struct CaskListView: View {
 
             TableColumn("Auto Updates") { cask in
                 if cask.autoUpdates {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .help("Updates automatically")
+                    StatusBadge(text: "On", color: .green, icon: "checkmark")
                 } else {
-                    Image(systemName: "minus.circle")
-                        .foregroundStyle(.secondary)
-                        .help("Managed by Homebrew")
+                    Text("Off")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
             }
             .width(min: 60, ideal: 100)
@@ -274,18 +304,8 @@ struct CaskListView: View {
             }
             .width(min: 60, ideal: 120)
 
-            TableColumn("") { cask in
-                Menu {
-                    caskContextMenu(for: cask)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .menuStyle(.borderlessButton)
-                .help("Actions for \(cask.displayName)")
-            }
-            .width(28)
         }
+        .tableStyle(.inset(alternatesRowBackgrounds: false))
         .contextMenu(forSelectionType: Cask.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
                let cask = store.filteredCasks.first(where: { $0.id == id }) {
@@ -297,6 +317,7 @@ struct CaskListView: View {
             persistSortOrder(newOrder)
         }
         .animation(AnimationToken.smooth, value: store.filteredCasks)
+        }
     }
 
     private func persistSortOrder(_ order: [KeyPathComparator<Cask>]) {
@@ -326,6 +347,19 @@ struct CaskListView: View {
             caskToUninstall = cask
         } label: {
             Label("Uninstall", systemImage: "trash")
+        }
+    }
+}
+
+private enum CaskScope: String, CaseIterable, Identifiable {
+    case all, outdated, autoUpdating
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .outdated: "Outdated"
+        case .autoUpdating: "Auto-updating"
         }
     }
 }

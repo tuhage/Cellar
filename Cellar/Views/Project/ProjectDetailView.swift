@@ -126,13 +126,9 @@ struct ProjectDetailView: View {
                         HStack {
                             Label(serviceName, systemImage: "gearshape.2")
                             Spacer()
-                            Button {
+                            ProjectRemovalButton(help: "Remove \(serviceName) from project") {
                                 store.removeService(serviceName, from: project)
-                            } label: {
-                                Image(systemName: "minus.circle")
-                                    .foregroundStyle(.red)
                             }
-                            .buttonStyle(.borderless)
                         }
                     }
                 }
@@ -166,13 +162,9 @@ struct ProjectDetailView: View {
 
                             Spacer()
 
-                            Button {
+                            ProjectRemovalButton(help: "Remove \(packageName) from project") {
                                 store.removePackage(packageName, from: project)
-                            } label: {
-                                Image(systemName: "minus.circle")
-                                    .foregroundStyle(.red)
                             }
-                            .buttonStyle(.borderless)
                         }
                     }
                 }
@@ -213,6 +205,25 @@ struct ProjectDetailView: View {
                 store.save()
             }
         ))
+    }
+}
+
+private struct ProjectRemovalButton: View {
+    let help: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "minus")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isHovered ? Color.red : Color.secondary.opacity(0.55))
+                .frame(width: 22, height: 22)
+                .background(isHovered ? Color.red.opacity(0.10) : .clear, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(help)
     }
 }
 

@@ -15,6 +15,7 @@ struct FormulaParsingTests {
         #expect(formula.fullName == "openssl@3")
         #expect(formula.version == "3.6.0")
         #expect(formula.installedVersion == "3.6.0")
+        #expect(formula.latestVersion == "3.6.0")
     }
 
     @Test("formula_decode_parsesInstalledFields")

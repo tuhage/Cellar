@@ -13,6 +13,7 @@ struct OnboardingView: View {
     var body: some View {
         VStack(spacing: Spacing.section) {
             header
+            setupSteps
             commandBox
             actions
         }
@@ -39,6 +40,44 @@ struct OnboardingView: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+            }
+        }
+    }
+
+    // MARK: - Command Box
+
+    private var setupSteps: some View {
+        HStack(alignment: .top, spacing: Spacing.sectionContent) {
+            setupStep(number: 1, title: "Install", subtitle: "Open Terminal")
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.top, Spacing.item)
+            setupStep(number: 2, title: "Complete", subtitle: "Follow Homebrew")
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.top, Spacing.item)
+            setupStep(number: 3, title: "Recheck", subtitle: "Return to Cellar")
+        }
+        .padding(Spacing.sectionContent)
+        .cardStyle(cornerRadius: CornerRadius.card)
+    }
+
+    private func setupStep(number: Int, title: String, subtitle: String) -> some View {
+        HStack(spacing: Spacing.item) {
+            Text("\(number)")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tint)
+                .frame(width: 24, height: 24)
+                .background(.tint.opacity(Opacity.iconBackground), in: Circle())
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.callout.weight(.medium))
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }

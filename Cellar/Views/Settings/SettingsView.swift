@@ -14,7 +14,7 @@ struct SettingsView: View {
             AboutTab()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 500)
+        .frame(width: 540, height: 520)
     }
 }
 
@@ -51,7 +51,6 @@ private struct GeneralTab: View {
             }
         }
         .formStyle(.grouped)
-        .scrollDisabled(true)
     }
 }
 
@@ -78,7 +77,6 @@ private struct ExtensionsTab: View {
             }
         }
         .formStyle(.grouped)
-        .scrollDisabled(true)
     }
 }
 
@@ -139,73 +137,37 @@ private struct UpdateSection: View {
     @Environment(UpdateStore.self) private var store
 
     var body: some View {
-        Section("Updates") {
+        @Bindable var store = store
+
+        Section {
             LabeledContent("Current Version") {
-                Text(store.currentVersion)
+                Text("\(store.currentVersion) (\(store.currentBuild))")
                     .foregroundStyle(.secondary)
             }
 
-            if store.isLoading {
-                HStack {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Checking\u{2026}")
+            Toggle("Check for Updates Automatically", isOn: $store.automaticallyChecksForUpdates)
+
+            Toggle("Download and Install Automatically", isOn: $store.automaticallyDownloadsUpdates)
+                .disabled(!store.automaticallyChecksForUpdates)
+
+            if let lastChecked = store.lastChecked {
+                LabeledContent("Last Checked") {
+                    Text(lastChecked, format: .relative(presentation: .named))
                         .foregroundStyle(.secondary)
                 }
-            } else if let release = store.latestRelease, store.hasUpdate {
-                updateAvailableRow(release: release)
-            } else if store.latestRelease != nil {
-                Label("You\u{2019}re on the latest version", systemImage: "checkmark.circle")
-                    .foregroundStyle(.secondary)
             }
 
-            if let errorMessage = store.errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
+            Button {
+                store.checkForUpdates()
+            } label: {
+                Label("Check for Updates\u{2026}", systemImage: "arrow.triangle.2.circlepath")
             }
-
-            Button(store.isLoading ? "Checking\u{2026}" : "Check for Updates") {
-                Task { await store.check() }
-            }
-            .disabled(store.isLoading)
+        } header: {
+            Text("Updates")
+        } footer: {
+            Text("Updates are downloaded from signed GitHub Releases and verified before installation. Automatic updates are installed when Cellar is idle or the app quits.")
         }
-    }
-
-    @ViewBuilder
-    private func updateAvailableRow(release: ReleaseInfo) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.item) {
-            HStack {
-                Image(systemName: "arrow.up.circle.fill")
-                    .foregroundStyle(.tint)
-                Text("Version \(release.version) is available")
-                    .font(.headline)
-                Spacer()
-                Text(release.publishedAt, format: .dateTime.day().month().year())
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
-
-            if !release.body.isEmpty {
-                let preview = release.body.count > 400
-                    ? String(release.body.prefix(400)) + "\u{2026}"
-                    : release.body
-                Text(.init(preview))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(6)
-            }
-
-            HStack {
-                Link("View on GitHub", destination: release.htmlUrl)
-                Spacer()
-                Button("Skip This Version") {
-                    store.skipCurrentRelease()
-                }
-                .controlSize(.small)
-            }
-        }
-        .padding(.vertical, Spacing.item)
+        .onAppear { store.refreshPreferences() }
     }
 }
 
@@ -386,8 +348,11 @@ private struct FinderMonitoredPathsRow: View {
                         Button {
                             remove(path)
                         } label: {
-                            Image(systemName: "minus.circle.fill")
+                            Image(systemName: "minus")
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.red)
+                                .frame(width: 20, height: 20)
+                                .background(.red.opacity(0.10), in: Circle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Remove \(abbreviate(path))")
@@ -437,5 +402,5 @@ private struct FinderMonitoredPathsRow: View {
 
 #Preview {
     SettingsView()
-        .environment(UpdateStore())
+        .environment(UpdateStore(startingUpdater: false))
 }

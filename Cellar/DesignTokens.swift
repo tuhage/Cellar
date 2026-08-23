@@ -101,21 +101,20 @@ extension View {
     /// Card background with subtle shadow and thin border
     func cardStyle(cornerRadius: CGFloat = CornerRadius.large) -> some View {
         self
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
+                    .strokeBorder(.primary.opacity(0.09), lineWidth: 0.5)
             )
-            .shadow(color: Shadow.cardColor, radius: Shadow.cardBlur, y: Shadow.cardY)
     }
 
     /// Elevated card background with stronger shadow — used for hover states
     func elevatedCardStyle(cornerRadius: CGFloat = CornerRadius.large) -> some View {
         self
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
+                    .strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
             )
             .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
     }
@@ -200,11 +199,11 @@ struct HoverableCardButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(reduceMotion ? 1 : configuration.isPressed ? 0.98 : isHovered ? 1.01 : 1.0)
             .shadow(
-                color: isHovered ? Shadow.elevatedColor : Shadow.cardColor,
-                radius: isHovered ? Shadow.elevatedBlur : Shadow.cardBlur,
-                y: isHovered ? Shadow.elevatedY : Shadow.cardY
+                color: isHovered ? Shadow.elevatedColor : .clear,
+                radius: isHovered ? Shadow.elevatedBlur : 0,
+                y: isHovered ? Shadow.elevatedY : 0
             )
-            .brightness(isHovered ? 0.02 : 0)
+            .brightness(isHovered ? 0.015 : 0)
             .animation(reduceMotion ? nil : AnimationToken.interactive, value: configuration.isPressed)
             .animation(reduceMotion ? nil : AnimationToken.interactive, value: isHovered)
             .onHover { isHovered = $0 }

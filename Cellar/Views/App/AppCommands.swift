@@ -9,6 +9,7 @@ import CellarCore
 /// `Commands` structs cannot directly access `@Environment` stores.
 struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    let updateStore: UpdateStore
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) { }
@@ -21,7 +22,9 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .appInfo) {
-            CheckForUpdatesMenuButton()
+            Button("Check for Updates\u{2026}") {
+                updateStore.checkForUpdates()
+            }
         }
 
         CommandMenu("Navigate") {
@@ -72,21 +75,6 @@ struct AppCommands: Commands {
     }
 }
 
-// MARK: - CheckForUpdatesMenuButton
-
-/// A `View` wrapper so we can access `@Environment(\.openSettings)` from
-/// within the `Commands` DSL, which does not support environment directly.
-private struct CheckForUpdatesMenuButton: View {
-    @Environment(\.openSettings) private var openSettings
-
-    var body: some View {
-        Button("Check for Updates\u{2026}") {
-            openSettings()
-            NotificationCenter.default.post(name: .checkForUpdates, object: nil)
-        }
-    }
-}
-
 // MARK: - Notification Names
 
 extension Notification.Name {
@@ -94,7 +82,6 @@ extension Notification.Name {
     static let upgradeAll = Notification.Name("cellar.upgradeAll")
     static let cleanup = Notification.Name("cellar.cleanup")
     static let refreshServices = Notification.Name("cellar.refreshServices")
-    static let checkForUpdates = Notification.Name("cellar.checkForUpdates")
     static let openQuickOpen = Notification.Name("cellar.openQuickOpen")
     static let navigateToSidebarItem = Notification.Name("cellar.navigateToSidebarItem")
 }

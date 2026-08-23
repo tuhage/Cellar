@@ -13,6 +13,7 @@
 		CC300003EMBEDFS000000001 /* CellarFinderSync.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CCF00004FSPRODUCT0000001 /* CellarFinderSync.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CCC10001CLICOPYFILE00001 /* cellar in Copy CLI Tool */ = {isa = PBXBuildFile; fileRef = CC600001CLIPRODUCT00001 /* cellar */; };
 		CCF00001FSBUILDFILE00001 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CCF00002FSPKGDEP00000001 /* CellarCore */; };
+		CCSPARKLEBUILDFILE00001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CCSPARKLEPRODUCT000001 /* Sparkle */; };
 		E59E70032F2D213A00937D73 /* CellarCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC000002CELLARCORE000002 /* CellarCore */; };
 /* End PBXBuildFile section */
 
@@ -159,6 +160,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CCSPARKLEBUILDFILE00001 /* Sparkle in Frameworks */,
 				E59E70032F2D213A00937D73 /* CellarCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -282,6 +284,7 @@
 			name = Cellar;
 			packageProductDependencies = (
 				CC000002CELLARCORE000002 /* CellarCore */,
+				CCSPARKLEPRODUCT000001 /* Sparkle */,
 			);
 			productName = Cellar;
 			productReference = E59E6E332F2CDDDC00937D73 /* Cellar.app */;
@@ -323,6 +326,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				CC000001CELLARCORE000001 /* XCLocalSwiftPackageReference "CellarCore" */,
+				CCSPARKLEPACKAGE000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E59E6E342F2CDDDC00937D73 /* Products */;
@@ -416,7 +420,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CellarWidget/CellarWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -429,7 +433,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.9;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -443,7 +447,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CellarWidget/CellarWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -456,7 +460,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.9;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -498,7 +502,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CellarFinderSync/CellarFinderSync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -511,7 +515,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.9;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.FinderSync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -525,7 +529,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = CellarFinderSync/CellarFinderSync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -538,7 +542,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.9;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar.FinderSync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -675,7 +679,7 @@
 				CODE_SIGN_ENTITLEMENTS = Cellar/Cellar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -687,7 +691,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.9;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -708,7 +712,7 @@
 				CODE_SIGN_ENTITLEMENTS = Cellar/Cellar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 23H73A78A7;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -720,7 +724,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.9;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tuhage.Cellar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -790,6 +794,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		CCSPARKLEPACKAGE000001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		CC000002CELLARCORE000002 /* CellarCore */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -806,6 +821,11 @@
 		CCF00002FSPKGDEP00000001 /* CellarCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CellarCore;
+		};
+		CCSPARKLEPRODUCT000001 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCSPARKLEPACKAGE000001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -47,15 +47,6 @@ struct OutdatedView: View {
                     await store.loadAll(forceRefresh: true)
                 }
             }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isConfirmingUpgradeAll = true
-                } label: {
-                    Label("Upgrade All", systemImage: "arrow.up.circle.fill")
-                }
-                .disabled(store.isUpgradingAll || (store.outdatedFormulae.isEmpty && store.outdatedCasks.isEmpty))
-            }
         }
         .task {
             await store.loadAll()
@@ -65,7 +56,7 @@ struct OutdatedView: View {
             isPresented: $isConfirmingUpgradeAll,
             titleVisibility: .visible
         ) {
-            Button("Upgrade All", role: .destructive) {
+            Button("Upgrade All") {
                 upgradeAll()
             }
         } message: {
@@ -77,6 +68,10 @@ struct OutdatedView: View {
     // MARK: - List
 
     private var outdatedList: some View {
+        VStack(spacing: 0) {
+            updateSummary
+            Divider()
+
         List {
             if !filteredFormulae.isEmpty {
                 Section {
@@ -85,7 +80,7 @@ struct OutdatedView: View {
                             name: formula.name,
                             description: formula.desc,
                             currentVersion: formula.version,
-                            targetVersion: "latest"
+                            targetVersion: formula.latestVersion ?? "latest"
                         ) {
                             Task { await store.upgrade(formula) }
                         }
@@ -119,6 +114,39 @@ struct OutdatedView: View {
             }
         }
         .animation(AnimationToken.smooth, value: store.isUpgradingAll)
+        }
+    }
+
+    private var updateSummary: some View {
+        HStack(spacing: Spacing.sectionContent) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.orange)
+                .frame(width: IconSize.mediumIcon, height: IconSize.mediumIcon)
+                .background(.orange.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.medium))
+
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
+                Text("\(store.totalOutdated) updates available")
+                    .font(.headline)
+                Text("Upgrade individually or update everything in one operation.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                isConfirmingUpgradeAll = true
+            } label: {
+                Label("Upgrade All", systemImage: "arrow.up.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+            .disabled(store.isUpgradingAll)
+        }
+        .padding(.horizontal, Spacing.cardPadding)
+        .padding(.vertical, Spacing.row)
+        .background(.orange.opacity(0.045))
     }
 
     // MARK: - Upgrade All Banner
@@ -160,6 +188,7 @@ private struct OutdatedPackageRow: View {
     let upgradeAction: () -> Void
 
     @Environment(ActivityStore.self) private var activityStore
+    @State private var isHovered = false
 
     private var isUpgrading: Bool {
         activityStore.isActive(target: name)
@@ -201,9 +230,10 @@ private struct OutdatedPackageRow: View {
                 if isUpgrading {
                     ProgressView()
                         .controlSize(.small)
-                } else {
+                } else if isHovered {
                     Label("Upgrade", systemImage: "arrow.up.circle")
-                        .labelStyle(.iconOnly)
+                } else {
+                    Image(systemName: "arrow.up.circle")
                 }
             }
             .buttonStyle(.bordered)
@@ -211,7 +241,9 @@ private struct OutdatedPackageRow: View {
             .controlSize(.small)
             .disabled(isUpgrading)
         }
-        .padding(.vertical, Spacing.textPair)
+        .padding(.vertical, Spacing.compact)
+        .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
     }
 }
 

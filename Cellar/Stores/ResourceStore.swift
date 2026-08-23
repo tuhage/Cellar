@@ -17,6 +17,7 @@ final class ResourceStore: LoadableStore {
 
     var usages: [ResourceUsage] = []
     var diskUsage: DiskUsage?
+    var usageHistory: [String: [ResourceUsage]] = [:]
 
     // MARK: State
 
@@ -38,6 +39,14 @@ final class ResourceStore: LoadableStore {
         usages.sorted { $0.memoryMB > $1.memoryMB }
     }
 
+    var lastUpdated: Date? {
+        usages.map(\.timestamp).max()
+    }
+
+    func history(for serviceName: String) -> [ResourceUsage] {
+        usageHistory[serviceName] ?? []
+    }
+
     // MARK: Actions
 
     func loadResourceUsage(for services: [BrewServiceItem]) async {
@@ -45,6 +54,7 @@ final class ResourceStore: LoadableStore {
 
         guard !runningServices.isEmpty else {
             usages = []
+            usageHistory = [:]
             return
         }
 
@@ -82,6 +92,13 @@ final class ResourceStore: LoadableStore {
         }
 
         usages = results
+        let activeNames = Set(results.map(\.serviceName))
+        usageHistory = usageHistory.filter { activeNames.contains($0.key) }
+        for usage in results {
+            var samples = usageHistory[usage.serviceName, default: []]
+            samples.append(usage)
+            usageHistory[usage.serviceName] = Array(samples.suffix(12))
+        }
     }
 
     func loadDiskUsage() async {

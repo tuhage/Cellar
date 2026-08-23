@@ -29,7 +29,7 @@ struct ProjectListView: View {
     var body: some View {
         mainContent
             .navigationTitle("Projects")
-            .searchable(text: $searchText, placement: .toolbar, prompt: "Search projects")
+            .projectSearchable(text: $searchText, enabled: !store.projects.isEmpty)
             .toolbar { toolbarContent }
             .sheet(isPresented: $isAddingProject) { addProjectSheet }
             .sheet(isPresented: $isAddingService) { addServiceSheet }
@@ -50,12 +50,17 @@ struct ProjectListView: View {
 
     // MARK: - Main Content
 
+    @ViewBuilder
     private var mainContent: some View {
-        HSplitView {
-            projectList
-                .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
-            detailPanel
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        if store.projects.isEmpty {
+            onboardingView
+        } else {
+            HSplitView {
+                projectList
+                    .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+                detailPanel
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
     }
 
@@ -254,35 +259,35 @@ struct ProjectListView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-                newServiceName = ""
-                isAddingService = true
-            } label: {
-                Label("Add Service", systemImage: "gearshape.2")
-            }
-            .disabled(store.selectedProject == nil)
-            .help("Add a brew service to this project")
-
-            Button {
-                newPackageName = ""
-                isAddingPackage = true
-            } label: {
-                Label("Add Package", systemImage: "plus.square")
-            }
-            .disabled(store.selectedProject == nil)
-            .help("Add a required formula to this project")
-
-            Button {
-                guard let project = store.selectedProject else { return }
-                Task {
-                    missingPackages = await store.checkMissingPackages(project)
+        if store.selectedProject != nil {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    newServiceName = ""
+                    isAddingService = true
+                } label: {
+                    Label("Add Service", systemImage: "gearshape.2")
                 }
-            } label: {
-                Label("Check Packages", systemImage: "checkmark.circle")
+                .help("Add a brew service to this project")
+
+                Button {
+                    newPackageName = ""
+                    isAddingPackage = true
+                } label: {
+                    Label("Add Package", systemImage: "plus.square")
+                }
+                .help("Add a required formula to this project")
+
+                Button {
+                    guard let project = store.selectedProject else { return }
+                    Task {
+                        missingPackages = await store.checkMissingPackages(project)
+                    }
+                } label: {
+                    Label("Check Packages", systemImage: "checkmark.circle")
+                }
+                .disabled(store.isLoading)
+                .help("Check which required packages are not installed")
             }
-            .disabled(store.selectedProject == nil || store.isLoading)
-            .help("Check which required packages are not installed")
         }
     }
 
@@ -408,6 +413,17 @@ struct ProjectListView: View {
         }
         .padding()
         .frame(width: WindowSize.addItemSheet)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func projectSearchable(text: Binding<String>, enabled: Bool) -> some View {
+        if enabled {
+            searchable(text: text, placement: .toolbar, prompt: "Search projects")
+        } else {
+            self
+        }
     }
 }
 

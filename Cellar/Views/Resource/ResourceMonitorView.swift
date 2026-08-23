@@ -6,6 +6,7 @@ import CellarCore
 struct ResourceMonitorView: View {
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(ResourceStore.self) private var store
+    @Environment(MaintenanceStore.self) private var maintenanceStore
 
     @State private var searchText = ""
 
@@ -28,7 +29,7 @@ struct ResourceMonitorView: View {
             }
         }
         .navigationTitle("Resources")
-        .searchable(text: $searchText, placement: .toolbar, prompt: "Search services")
+        .resourceSearchable(text: $searchText, enabled: store.usages.count > 8)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
@@ -102,6 +103,15 @@ struct ResourceMonitorView: View {
                 }
 
                 Spacer()
+
+                Button {
+                    Task { await maintenanceStore.runCleanup() }
+                } label: {
+                    Label("Clean Up", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(maintenanceStore.isLoading)
             }
 
             if let diskUsage = store.diskUsage {
@@ -179,17 +189,19 @@ struct ResourceMonitorView: View {
                 systemImage: "gauge.with.dots.needle.33percent",
                 color: .green
             ) {
-                if !store.usages.isEmpty {
-                    Text("\(store.usages.count) running")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                if let lastUpdated = store.lastUpdated {
+                    Text("Updated \(lastUpdated, style: .relative) · \(store.usages.count) running")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
             }
 
             if store.sortedUsages.isEmpty {
                 serviceEmptyState
             } else if filteredUsages.isEmpty {
-                serviceEmptyState
+                ContentUnavailableView.search(text: searchText)
+                    .frame(maxWidth: .infinity, minHeight: 140)
+                    .cardStyle()
             } else {
                 resourceSummary
                 resourceTable
@@ -243,7 +255,11 @@ struct ResourceMonitorView: View {
 
                 TableColumn("CPU %") { usage in
                     HStack(spacing: Spacing.related) {
-                        cpuBar(percent: usage.cpuPercent)
+                        ResourceSparkline(
+                            values: store.history(for: usage.serviceName).map(\.cpuPercent),
+                            color: cpuColor(for: usage.cpuPercent)
+                        )
+                        .frame(width: 54, height: 18)
 
                         Text(formatPercent(usage.cpuPercent))
                             .font(.body.monospaced())
@@ -259,7 +275,7 @@ struct ResourceMonitorView: View {
                 }
                 .width(min: 80, ideal: 120)
             }
-            .tableStyle(.inset(alternatesRowBackgrounds: true))
+            .tableStyle(.inset(alternatesRowBackgrounds: false))
             .frame(minHeight: CGFloat(filteredUsages.count) * 32 + 32)
         }
         .cardStyle()
@@ -362,6 +378,41 @@ struct ResourceMonitorView: View {
     }
 }
 
+private struct ResourceSparkline: View {
+    let values: [Double]
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            let maximum = max(values.max() ?? 1, 1)
+            Path { path in
+                guard !values.isEmpty else { return }
+                for (index, value) in values.enumerated() {
+                    let x = values.count == 1
+                        ? geometry.size.width
+                        : geometry.size.width * CGFloat(index) / CGFloat(values.count - 1)
+                    let y = geometry.size.height * (1 - CGFloat(value / maximum))
+                    if index == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                    else { path.addLine(to: CGPoint(x: x, y: y)) }
+                }
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func resourceSearchable(text: Binding<String>, enabled: Bool) -> some View {
+        if enabled {
+            searchable(text: text, placement: .toolbar, prompt: "Search services")
+        } else {
+            self
+        }
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -370,5 +421,6 @@ struct ResourceMonitorView: View {
     }
     .environment(ServiceStore())
     .environment(ResourceStore())
+    .environment(MaintenanceStore())
     .frame(width: 700, height: 600)
 }

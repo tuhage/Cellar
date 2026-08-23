@@ -46,7 +46,10 @@ struct BrewfileView: View {
             }
         }
         .navigationTitle("Brewfile")
-        .searchable(text: $searchText, placement: .toolbar, prompt: "Search packages")
+        .brewfileSearchable(
+            text: $searchText,
+            enabled: store.brewfileExistsOnDisk && !store.parsedContent.isEmpty
+        )
         .toolbar { toolbarContent }
         .sheet(isPresented: $isAddingProfile) { addProfileSheet }
         .sheet(isPresented: $isEditingRaw) { rawEditorSheet }
@@ -108,12 +111,16 @@ struct BrewfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 profileHeader
-                statsSection
-                quickActionsSection
-                if let result = store.checkResult {
-                    checkResultBanner(result)
+                if store.parsedContent.isEmpty {
+                    emptyBrewfileHero
+                } else {
+                    statsSection
+                    quickActionsSection
+                    if let result = store.checkResult {
+                        checkResultBanner(result)
+                    }
+                    packageListSections
                 }
-                packageListSections
             }
             .padding(Spacing.section)
         }
@@ -198,9 +205,8 @@ struct BrewfileView: View {
                 }
             }
         } label: {
-            Image(systemName: "chevron.down.circle.fill")
-                .symbolRenderingMode(.hierarchical)
-                .font(.title3)
+            Label("Profiles", systemImage: "chevron.up.chevron.down")
+                .font(.callout.weight(.medium))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -262,7 +268,8 @@ struct BrewfileView: View {
                     subtitle: "Export current packages to Brewfile",
                     systemImage: "arrow.triangle.2.circlepath",
                     color: .blue,
-                    isDisabled: isDisabled
+                    isDisabled: isDisabled,
+                    isProminent: true
                 ) {
                     guard let profile = store.selectedProfile else { return }
                     Task { await store.exportBrewfile(to: profile) }
@@ -425,6 +432,48 @@ struct BrewfileView: View {
                 )
             )
         }
+    }
+
+    private var emptyBrewfileHero: some View {
+        VStack(spacing: Spacing.cardPadding) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(.blue)
+                .frame(width: 64, height: 64)
+                .background(.blue.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.extraLarge))
+
+            VStack(spacing: Spacing.compact) {
+                Text("Start with your current setup")
+                    .font(.title2.weight(.semibold))
+                Text("Sync exports the packages, casks, and taps installed on this Mac into the selected Brewfile.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: WindowSize.mediumSheet)
+            }
+
+            HStack(spacing: Spacing.item) {
+                Button {
+                    guard let profile = store.selectedProfile else { return }
+                    Task { await store.exportBrewfile(to: profile) }
+                } label: {
+                    Label("Sync Current System", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+
+                Button {
+                    isEditingRaw = true
+                } label: {
+                    Label("Edit Manually", systemImage: "pencil")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 300)
+        .padding(Spacing.section)
+        .cardStyle(cornerRadius: CornerRadius.extraLarge)
     }
 
     // MARK: - No Brewfile on Disk
@@ -625,6 +674,17 @@ struct BrewfileView: View {
             } else {
                 newProfilePath = url.path
             }
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func brewfileSearchable(text: Binding<String>, enabled: Bool) -> some View {
+        if enabled {
+            searchable(text: text, placement: .toolbar, prompt: "Search packages")
+        } else {
+            self
         }
     }
 }

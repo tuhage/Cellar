@@ -1,68 +1,63 @@
 import Foundation
 import Observation
-import CellarCore
+import Sparkle
 
 // MARK: - UpdateStore
 
+/// Owns Cellar's Sparkle updater and exposes its user-facing preferences to SwiftUI.
+/// Sparkle reads the signed GitHub Releases appcast configured in Info.plist.
 @Observable
 @MainActor
-final class UpdateStore: LoadableStore {
-    var isLoading: Bool = false
-    var errorMessage: String?
+final class UpdateStore {
+    private let controller: SPUStandardUpdaterController
 
-    var latestRelease: ReleaseInfo?
-    var lastChecked: Date?
-
-    private let service: UpdateService
-    private let defaults: UserDefaults
-
-    private static let lastCheckKey = "com.tuhage.Cellar.update.lastCheck"
-    private static let dismissedVersionKey = "com.tuhage.Cellar.update.dismissedVersion"
-
-    init(service: UpdateService = UpdateService(), defaults: UserDefaults = .standard) {
-        self.service = service
-        self.defaults = defaults
-        if let timestamp = defaults.object(forKey: Self.lastCheckKey) as? Date {
-            self.lastChecked = timestamp
+    var automaticallyChecksForUpdates: Bool {
+        didSet {
+            controller.updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates
+            if !automaticallyChecksForUpdates, automaticallyDownloadsUpdates {
+                automaticallyDownloadsUpdates = false
+            }
         }
     }
 
-    /// Force a fresh check (ignores cache).
-    func check() async {
-        await withLoading {
-            let release = try await service.fetchLatestRelease()
-            self.latestRelease = release
-            let now = Date()
-            self.lastChecked = now
-            self.defaults.set(now, forKey: Self.lastCheckKey)
+    var automaticallyDownloadsUpdates: Bool {
+        didSet {
+            controller.updater.automaticallyDownloadsUpdates = automaticallyDownloadsUpdates
         }
     }
 
-    /// Checks only if 24+ hours have elapsed since the last successful check.
-    func checkIfStale() async {
-        if let lastChecked, Date().timeIntervalSince(lastChecked) < 24 * 60 * 60 {
-            return
-        }
-        await check()
+    private(set) var lastChecked: Date?
+
+    init(startingUpdater: Bool = true) {
+        let controller = SPUStandardUpdaterController(
+            startingUpdater: startingUpdater,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+        self.controller = controller
+        self.automaticallyChecksForUpdates = controller.updater.automaticallyChecksForUpdates
+        self.automaticallyDownloadsUpdates = controller.updater.automaticallyDownloadsUpdates
+        self.lastChecked = controller.updater.lastUpdateCheckDate
     }
 
-    /// User chose to skip this version. Stored persistently.
-    func skipCurrentRelease() {
-        guard let version = latestRelease?.version else { return }
-        defaults.set(version, forKey: Self.dismissedVersionKey)
+    /// Presents Sparkle's standard update UI. The downloaded archive is verified
+    /// with Cellar's Ed25519 key and Developer ID signature before installation.
+    func checkForUpdates() {
+        controller.checkForUpdates(nil)
+        refreshPreferences()
     }
 
-    /// `true` when a release strictly newer than the current build is available
-    /// AND the user has not skipped it.
-    var hasUpdate: Bool {
-        guard let release = latestRelease else { return false }
-        let current = UpdateService.currentVersion
-        guard UpdateService.isUpdateAvailable(current: current, latest: release.version) else {
-            return false
-        }
-        let dismissed = defaults.string(forKey: Self.dismissedVersionKey)
-        return dismissed != release.version
+    func refreshPreferences() {
+        automaticallyChecksForUpdates = controller.updater.automaticallyChecksForUpdates
+        automaticallyDownloadsUpdates = controller.updater.automaticallyDownloadsUpdates
+        lastChecked = controller.updater.lastUpdateCheckDate
     }
 
-    var currentVersion: String { UpdateService.currentVersion }
+    var currentVersion: String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.0"
+    }
+
+    var currentBuild: String {
+        (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "0"
+    }
 }

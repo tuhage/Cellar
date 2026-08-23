@@ -8,6 +8,7 @@ struct FormulaListView: View {
     @State private var isSearchPresented = false
     @State private var formulaToUninstall: Formula?
     @State private var formulaToInstall: Formula?
+    @State private var scope: FormulaScope = .all
 
     init() {
         let defaults = UserDefaults.standard
@@ -33,6 +34,15 @@ struct FormulaListView: View {
     private var selectedFormula: Formula? {
         guard let id = store.selectedFormulaId else { return nil }
         return store.formulae.first { $0.id == id }
+    }
+
+    private var scopedFormulae: [Formula] {
+        switch scope {
+        case .all: store.filteredFormulae
+        case .outdated: store.filteredFormulae.filter(\.outdated)
+        case .pinned: store.filteredFormulae.filter(\.pinned)
+        case .kegOnly: store.filteredFormulae.filter(\.isKegOnly)
+        }
     }
 
     private var isInspectorPresented: Binding<Bool> {
@@ -230,63 +240,74 @@ struct FormulaListView: View {
     // MARK: - Table
 
     private var formulaTable: some View {
-        Table(store.filteredFormulae, selection: selectedFormulaID, sortOrder: $sortOrder) {
-            TableColumn("Name", value: \.name) { formula in
-                Text(formula.name)
-                    .fontWeight(.medium)
-            }
-            .width(min: 120, ideal: 200)
+        VStack(spacing: 0) {
+            HStack {
+                Picker("Package filter", selection: $scope) {
+                    ForEach(FormulaScope.allCases) { scope in
+                        Text(scope.title).tag(scope)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 420)
 
-            TableColumn("Version", value: \.version) { formula in
-                Text(formula.version)
+                Spacer()
+
+                Text("\(scopedFormulae.count) installed")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .font(.body.monospaced())
             }
-            .width(min: 80, ideal: 120)
+            .padding(.horizontal, Spacing.cardPadding)
+            .padding(.vertical, Spacing.item)
 
-            TableColumn("Status") { formula in
-                HStack(spacing: Spacing.related) {
-                    if formula.outdated {
-                        StatusBadge(text: "Outdated", color: .orange)
-                    }
-                    if formula.pinned {
-                        StatusBadge(text: "Pinned", color: .blue)
-                    }
-                    if formula.isKegOnly {
-                        StatusBadge(text: "Keg-only", color: .purple)
-                    }
-                    if formula.deprecated {
-                        StatusBadge(text: "Deprecated", color: .red)
-                    }
+            Divider()
+
+            Table(scopedFormulae, selection: selectedFormulaID, sortOrder: $sortOrder) {
+                TableColumn("Name", value: \.name) { formula in
+                    Text(formula.name)
+                        .fontWeight(.medium)
+                        .padding(.vertical, Spacing.textPair)
                 }
-            }
-            .width(min: 80, ideal: 200)
+                .width(min: 120, ideal: 200)
 
-            TableColumn("") { formula in
-                Menu {
-                    formulaContextMenu(for: formula)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                TableColumn("Version", value: \.version) { formula in
+                    Text(formula.version)
                         .foregroundStyle(.secondary)
+                        .font(.body.monospaced())
                 }
-                .menuStyle(.borderlessButton)
-                .help("Actions for \(formula.name)")
+                .width(min: 80, ideal: 120)
+
+                TableColumn("Status") { formula in
+                    HStack(spacing: Spacing.related) {
+                        if formula.outdated {
+                            StatusBadge(text: "Outdated", color: .orange)
+                        }
+                        if formula.pinned {
+                            StatusBadge(text: "Pinned", color: .blue)
+                        }
+                        if formula.isKegOnly {
+                            StatusBadge(text: "Keg-only", color: .purple)
+                        }
+                        if formula.deprecated {
+                            StatusBadge(text: "Deprecated", color: .red)
+                        }
+                    }
+                }
+                .width(min: 80, ideal: 200)
             }
-            .width(28)
-        }
-        .contextMenu(forSelectionType: Formula.ID.self) { selectedIDs in
-            if let id = selectedIDs.first,
-               let formula = store.filteredFormulae.first(where: { $0.id == id }) {
-                formulaContextMenu(for: formula)
+            .tableStyle(.inset(alternatesRowBackgrounds: false))
+            .contextMenu(forSelectionType: Formula.ID.self) { selectedIDs in
+                if let id = selectedIDs.first,
+                   let formula = store.filteredFormulae.first(where: { $0.id == id }) {
+                    formulaContextMenu(for: formula)
+                }
+            } primaryAction: { _ in }
+            .onChange(of: sortOrder) { _, newOrder in
+                store.formulae.sort(using: newOrder)
+                persistSortOrder(newOrder)
             }
-        } primaryAction: { selectedIDs in
-            // Double-click selects the row — no additional action needed
         }
-        .onChange(of: sortOrder) { _, newOrder in
-            store.formulae.sort(using: newOrder)
-            persistSortOrder(newOrder)
-        }
-        .animation(AnimationToken.smooth, value: store.filteredFormulae)
+        .animation(AnimationToken.smooth, value: scopedFormulae)
     }
 
     private func persistSortOrder(_ order: [KeyPathComparator<Formula>]) {
@@ -330,6 +351,20 @@ struct FormulaListView: View {
             formulaToUninstall = formula
         } label: {
             Label("Uninstall", systemImage: "trash")
+        }
+    }
+}
+
+private enum FormulaScope: String, CaseIterable, Identifiable {
+    case all, outdated, pinned, kegOnly
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .outdated: "Outdated"
+        case .pinned: "Pinned"
+        case .kegOnly: "Keg-only"
         }
     }
 }

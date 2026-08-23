@@ -12,6 +12,9 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
     public let license: String?
     public let homepage: String?
     public let version: String
+    /// The current stable version reported by Homebrew. For installed formulae,
+    /// `version` remains the installed version while this stores the upgrade target.
+    public let latestVersion: String?
     public let deprecated: Bool
     public let disabled: Bool
     public let outdated: Bool
@@ -52,7 +55,8 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         isInstalled: Bool,
         installTime: Date?,
         runtimeDependencies: [RuntimeDependency],
-        isKegOnly: Bool
+        isKegOnly: Bool,
+        latestVersion: String? = nil
     ) {
         self.name = name
         self.fullName = fullName
@@ -73,6 +77,7 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         self.installTime = installTime
         self.runtimeDependencies = runtimeDependencies
         self.isKegOnly = isKegOnly
+        self.latestVersion = latestVersion
     }
 
     // MARK: Actions
@@ -214,6 +219,7 @@ extension Formula {
         if let entry = try container.decodeIfPresent([InstalledEntry].self, forKey: .installed)?.first {
             self.installedVersion = entry.version
             self.version = entry.version
+            self.latestVersion = stableVersion
             self.installedOnRequest = entry.installedOnRequest
             self.installedAsDependency = entry.installedAsDependency
             self.isInstalled = true
@@ -222,6 +228,7 @@ extension Formula {
         } else {
             self.installedVersion = nil
             self.version = stableVersion ?? "unknown"
+            self.latestVersion = stableVersion
             self.installedOnRequest = false
             self.installedAsDependency = false
             self.isInstalled = false
@@ -248,7 +255,7 @@ extension Formula {
 
         // Encode versions
         var versionsContainer = container.nestedContainer(keyedBy: VersionsKeys.self, forKey: .versions)
-        try versionsContainer.encode(version, forKey: .stable)
+        try versionsContainer.encode(latestVersion ?? version, forKey: .stable)
 
         // Encode installed array
         if isInstalled {

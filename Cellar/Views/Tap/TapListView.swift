@@ -68,6 +68,18 @@ struct TapListView: View {
                 }
             }
 
+            if let selectedTapID,
+               let selectedTap = store.taps.first(where: { $0.id == selectedTapID }) {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        tapContextMenu(for: selectedTap)
+                    } label: {
+                        Label("Tap Actions", systemImage: "ellipsis")
+                    }
+                    .help("Actions for \(selectedTap.name)")
+                }
+            }
+
             ToolbarItem(placement: .status) {
                 if !store.taps.isEmpty {
                     Text("\(store.taps.count) taps")
@@ -104,6 +116,7 @@ struct TapListView: View {
                 HStack(spacing: Spacing.related) {
                     Text(tap.name)
                         .fontWeight(.medium)
+                        .padding(.vertical, Spacing.textPair)
                     if tap.official {
                         Text("Official")
                             .font(.caption2)
@@ -145,18 +158,8 @@ struct TapListView: View {
             }
             .width(min: 80, ideal: 120)
 
-            TableColumn("") { tap in
-                Menu {
-                    tapContextMenu(for: tap)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .menuStyle(.borderlessButton)
-                .help("Actions for \(tap.name)")
-            }
-            .width(28)
         }
+        .tableStyle(.inset(alternatesRowBackgrounds: false))
         .contextMenu(forSelectionType: Tap.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
                let tap = store.taps.first(where: { $0.id == id }) {

@@ -36,6 +36,11 @@ struct MaintenanceView: View {
                         LabeledContent("Last Cleanup", value: lastCleanup.formatted(date: .abbreviated, time: .shortened))
                     }
 
+                    if store.schedule.autoCleanup,
+                       let nextCleanup = nextRun(after: store.schedule.lastCleanup, frequency: store.schedule.cleanupFrequency) {
+                        LabeledContent("Next Cleanup", value: nextCleanup.formatted(date: .abbreviated, time: .shortened))
+                    }
+
                     Toggle("Auto Health Check", isOn: $store.schedule.autoHealthCheck)
                         .onChange(of: store.schedule.autoHealthCheck) { self.store.saveSettings() }
 
@@ -51,8 +56,12 @@ struct MaintenanceView: View {
                     if let lastHealthCheck = store.schedule.lastHealthCheck {
                         LabeledContent("Last Health Check", value: lastHealthCheck.formatted(date: .abbreviated, time: .shortened))
                     }
+                    if store.schedule.autoHealthCheck,
+                       let nextHealthCheck = nextRun(after: store.schedule.lastHealthCheck, frequency: store.schedule.healthCheckFrequency) {
+                        LabeledContent("Next Health Check", value: nextHealthCheck.formatted(date: .abbreviated, time: .shortened))
+                    }
                 } header: {
-                    Text("Schedule")
+                    Label("Automation", systemImage: "calendar.badge.clock")
                 }
 
                 actionsSection
@@ -65,17 +74,7 @@ struct MaintenanceView: View {
             }
         }
         .navigationTitle("Maintenance")
-        .searchable(text: $searchText, placement: .toolbar, prompt: "Search reports")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await store.runAll() }
-                } label: {
-                    Label("Run All", systemImage: "play.fill")
-                }
-                .disabled(store.isLoading)
-            }
-        }
+        .maintenanceSearchable(text: $searchText, enabled: !store.reports.isEmpty)
     }
 
     // MARK: - Actions Section
@@ -87,16 +86,27 @@ struct MaintenanceView: View {
                     Task { await store.runCleanup() }
                 } label: {
                     Label("Run Cleanup", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.bordered)
                 .disabled(store.isLoading)
-
-                Spacer()
 
                 Button {
                     Task { await store.runHealthCheck() }
                 } label: {
                     Label("Run Health Check", systemImage: "heart.text.square")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.bordered)
+                .disabled(store.isLoading)
+
+                Button {
+                    Task { await store.runAll() }
+                } label: {
+                    Label("Run All", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
                 .disabled(store.isLoading)
             }
 
@@ -106,7 +116,7 @@ struct MaintenanceView: View {
                     .font(.callout)
             }
         } header: {
-            Text("Run Now")
+            Label("Run Now", systemImage: "play.circle")
         }
     }
 
@@ -157,6 +167,14 @@ struct MaintenanceView: View {
         }
     }
 
+    private func nextRun(after lastRun: Date?, frequency: MaintenanceFrequency) -> Date? {
+        Calendar.current.date(
+            byAdding: frequency.calendarComponent,
+            value: 1,
+            to: lastRun ?? .now
+        )
+    }
+
     // MARK: - Running Overlay
 
     private var runningOverlay: some View {
@@ -198,9 +216,9 @@ private struct MaintenanceReportRow: View {
                 let iconColor: Color = report.type == .cleanup ? .orange : .green
                 Image(systemName: report.type.icon)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(iconColor)
                     .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
-                    .background(iconColor.gradient, in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
+                    .background(iconColor.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .firstTextBaseline) {
@@ -247,6 +265,17 @@ private struct MaintenanceReportRow: View {
             }
         }
         .padding(.vertical, Spacing.compact)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func maintenanceSearchable(text: Binding<String>, enabled: Bool) -> some View {
+        if enabled {
+            searchable(text: text, placement: .toolbar, prompt: "Search reports")
+        } else {
+            self
+        }
     }
 }
 

@@ -25,7 +25,9 @@ CLAUDE.md
 CellarCore/.build/
 DerivedData/
 Package.resolved
+!Cellar.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 TODO.md
 build/
 docs/
-scripts/
+scripts/*
+!scripts/release.sh
