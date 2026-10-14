@@ -5,68 +5,121 @@
 <h1 align="center">Cellar</h1>
 
 <p align="center">
-  A native macOS app for managing Homebrew packages, casks, and services.
+  <strong>Homebrew, as a Mac app.</strong><br />
+  Upgrade, install and clean up packages, run services and keep your setup healthy — without memorizing a single <code>brew</code> flag.
 </p>
 
 <p align="center">
+  <a href="https://github.com/tuhage/Cellar/releases/latest"><img src="https://img.shields.io/github/v/release/tuhage/Cellar?label=Download&color=blue" alt="Download the latest release" /></a>
   <img src="https://img.shields.io/badge/macOS-15%2B-blue" alt="macOS 15+" />
   <img src="https://img.shields.io/badge/Swift-6-orange" alt="Swift 6" />
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License" />
 </p>
 
+<p align="center">
+  <img src=".github/assets/dashboard.png" width="820" alt="Cellar's dashboard: what needs attention, services, recent installs and quick actions" />
+</p>
+
 ---
+
+## Why Cellar
+
+- **See before you change.** Upgrade All, Clean Up and removing unused dependencies show exactly what brew will do — every package, pulled-in dependency and download size — before anything runs.
+- **Follow every operation.** Live progress tells you which package is upgrading, how many are left and what brew is doing right now. Cancel any time, retry just what failed, and find every run's full log in `~/Library/Logs/Cellar`.
+- **Failures that tell you what to do.** Outdated Command Line Tools, a full disk, no internet or a cask app installed outside Homebrew are recognized and explained, with a button that fixes them.
+- **Native and private.** Built with SwiftUI and Apple frameworks only. No account and no telemetry: Cellar talks to `brew` on your Mac and checks GitHub for its own updates.
 
 ## Features
 
-- **Dashboard** — Overview of installed packages, services, and system health at a glance
-- **Package Management** — Browse, install, upgrade, and uninstall formulae and casks
-- **Services** — Start, stop, and monitor Homebrew services with real-time status
-- **Dependency Graph** — Visualize package dependencies interactively
-- **Resource Monitor** — Track Homebrew disk usage and system resources
-- **Maintenance** — Run cleanup, doctor checks, and manage taps
-- **Brewfile Support** — View and manage Brewfiles from your projects
-- **Search** — Find new packages with integrated search
-- **Widget** — Desktop widget with small, medium, and large sizes
-- **CLI Tool** — `cellar` command-line tool for quick terminal operations
-- **Finder Integration** — Badges directories containing Brewfiles, right-click service controls
-- **Spotlight** — All installed packages indexed for system-wide search
-- **Automatic Updates** — Signed GitHub Releases are checked, downloaded, and installed securely in-app
+### Packages
+- Browse installed **formulae and casks**, search Homebrew and install new packages.
+- **Updates** lists everything outdated; upgrade one, a selection, or everything at once.
+- Select several packages to upgrade or uninstall them together, and pin the ones you want to keep as they are.
+- An inspector shows versions, caveats, dependencies and what uses a package, so you know whether it's safe to remove.
+
+### Services
+- Start, stop, restart or run a service just once — with CPU and memory use, ports, uptime and logs for each.
+- After an upgrade, Cellar offers to restart services still running the old version.
+- Services that need root ask for your password once, even for several at a time.
+
+### Environment
+- **Brewfiles** — keep a Brewfile per project, see what's missing, install it in one click, or export your current setup. Right-click a folder in Finder and choose *Open in Cellar*.
+- **Taps** — see what each tap provides and remove ones you no longer use, safely.
+- **Dependencies** — an interactive graph that answers *why is this installed?* and finds dependencies nothing needs anymore.
+
+### Maintenance
+- Clean Up and Health Check (`brew doctor`) with a preview and readable findings.
+- See how much space Homebrew takes and what can be freed.
+- Schedule automatic cleanups, health checks and a daily check for package updates.
+
+### Everywhere on your Mac
+- **Activity** — every operation in one place, in a popover or its own window (⇧⌘A). Notifications tell you when long upgrades finish, and progress shows on the Dock icon.
+- **Quick Open** (⌘K) — jump to any package, service or page, or run a command.
+- **Menu bar** — services and available updates at a glance.
+- **Widgets** — small, medium and large widgets for services and updates.
+- **Spotlight** — installed packages show up in system search.
+- **Command-line tool** — `cellar status`, `cellar start postgresql`, and more.
 
 ## Screenshots
 
-<p align="center">
-  <img src=".github/assets/dashboard.png" width="720" alt="Dashboard" />
-</p>
-<p align="center">
-  <img src=".github/assets/formulae.png" width="720" alt="Formulae" />
-</p>
-<p align="center">
-  <img src=".github/assets/services.png" width="720" alt="Services" />
-</p>
-<p align="center">
-  <img src=".github/assets/taps.png" width="720" alt="Taps" />
-</p>
-<p align="center">
-  <img src=".github/assets/dependencies.png" width="720" alt="Dependencies" />
-</p>
-<p align="center">
-  <img src=".github/assets/resources.png" width="720" alt="Resources" />
-</p>
+| | |
+|:-:|:-:|
+| <img src=".github/assets/updates.png" alt="Upgrade All in progress: the package upgrading now, how many are left, and each package's status" /> | <img src=".github/assets/activity.png" alt="Activity explaining a failed upgrade and offering the fix" /> |
+| **Updates** — follow every package as it upgrades | **Activity** — failures come with a fix |
+| <img src=".github/assets/formulae.png" alt="Formulae table with the package inspector" /> | <img src=".github/assets/services.png" alt="Services with CPU, memory, uptime and the service inspector" /> |
+| **Formulae** — details, caveats and what uses a package | **Services** — control and monitor in one place |
+| <img src=".github/assets/dependencies.png" alt="Dependencies explaining why cairo is installed and what needs it" /> | <img src=".github/assets/maintenance.png" alt="Maintenance tasks and Homebrew disk usage" /> |
+| **Dependencies** — why is this installed? | **Maintenance** — clean up, check health, see disk usage |
 
 ## Installation
 
-### Download
+1. Download the latest `.dmg` from [Releases](https://github.com/tuhage/Cellar/releases/latest).
+2. Open it and drag **Cellar** to **Applications**.
 
-Download the latest `.dmg` from the [Releases](https://github.com/tuhage/Cellar/releases) page. Open the `.dmg` and drag **Cellar** to your **Applications** folder.
+Cellar is signed with a Developer ID and notarized by Apple. It checks for its own updates daily and installs them in-app; signed updates are verified before they're installed. You can change this under **Settings › About**.
 
-After the first installation, Cellar checks the signed GitHub Releases feed daily. Automatic download and installation can be changed under **Settings → About → Updates**.
+**Requirements:** macOS 15 or later and [Homebrew](https://brew.sh). If Homebrew isn't installed, Cellar walks you through installing it.
 
-### Requirements
+## Command-Line Tool
 
-- macOS 15 or later
-- [Homebrew](https://brew.sh) installed
+Install it from **Settings › Extensions**, then:
 
-### Build from Source
+```bash
+cellar status                 # Packages, services and updates at a glance
+cellar list                   # Installed packages
+cellar search <query>         # Search Homebrew
+cellar start <service>        # Also: stop, restart
+cellar health                 # Run brew doctor
+cellar cleanup                # Remove old versions and downloads
+```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| ⌘K | Quick Open |
+| ⇧⌘A | Show Activity |
+| ⌘R | Reload |
+| ⌥⌘R | Check for Package Updates |
+| ⇧⌘U | Upgrade All |
+| ⌘U | Upgrade Selected Package |
+| ⇧⌘K | Clean Up Homebrew |
+| ⇧⌘S | Start or Stop Selected Service |
+
+All shortcuts are listed under **Help › Keyboard Shortcuts**.
+
+## Links
+
+Open Cellar at a specific place with `cellar://` links:
+
+```
+cellar://formula/<name>
+cellar://cask/<token>
+cellar://services                       # any page: dashboard, outdated, maintenance…
+cellar://brewfile?path=/path/to/project
+```
+
+## Building from Source
 
 ```bash
 git clone https://github.com/tuhage/Cellar.git
@@ -74,50 +127,7 @@ cd Cellar
 xcodebuild -project Cellar.xcodeproj -scheme Cellar -configuration Release build -allowProvisioningUpdates
 ```
 
-### Publishing an Update
-
-Sparkle verifies every update with the public Ed25519 key embedded in Cellar and the app's Developer ID signature. The matching private key stays in the maintainer's macOS Login Keychain and must never be committed.
-
-Increment both the user-facing version and the monotonically increasing build number, then run:
-
-```bash
-./scripts/release.sh 1.6.0 15
-```
-
-The script produces the notarized DMG and a signed `build/appcast/appcast.xml`. Upload both assets to the same GitHub Release:
-
-```bash
-gh release create v1.6.0 \
-  build/Cellar-1.6.0.dmg \
-  build/appcast/appcast.xml \
-  --title "Cellar 1.6.0" \
-  --generate-notes
-```
-
-Cellar reads the feed from `releases/latest/download/appcast.xml`; releases without that asset cannot be installed in-app. Back up the Sparkle private key to secure offline storage before publishing the first update.
-
-## CLI Tool
-
-Cellar includes a command-line tool for quick terminal access:
-
-```bash
-cellar status              # Package and service summary
-cellar start <service>     # Start a service
-cellar stop <service>      # Stop a service
-cellar health              # Run brew doctor
-cellar cleanup             # Clean up old downloads and cache
-```
-
-## URL Scheme
-
-Open specific sections directly via `cellar://` links:
-
-```
-cellar://formula/<name>
-cellar://cask/<token>
-cellar://dashboard
-cellar://services
-```
+Shared models and services live in the `CellarCore` Swift package; run its tests with `cd CellarCore && swift test`.
 
 ## License
 
