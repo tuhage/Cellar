@@ -81,9 +81,12 @@ struct ContentView: View {
         .sheet(isPresented: $maintenance.isCleanupPreviewPresented) {
             CleanupPreviewSheet()
         }
-        .sheet(isPresented: $isQuickOpenPresented) {
-            QuickOpenView(selection: selection, isPresented: $isQuickOpenPresented)
+        .overlay {
+            if isQuickOpenPresented {
+                quickOpen
+            }
         }
+        .animation(reduceMotion ? nil : AnimationToken.snap, value: isQuickOpenPresented)
         .overlay(alignment: .topTrailing) {
             if let notice = noticeStore.current {
                 OperationNoticeView(notice: notice)
@@ -94,6 +97,22 @@ struct ContentView: View {
         .animation(reduceMotion ? nil : AnimationToken.smooth, value: noticeStore.current)
         .urlSchemeHandler(selection: selection)
         .focusedSceneValue(\.windowCommands, windowCommands)
+    }
+
+    /// A Spotlight-style panel over the window; clicking outside closes it.
+    private var quickOpen: some View {
+        ZStack(alignment: .top) {
+            Color.black.opacity(Opacity.pressedOverlay)
+                .ignoresSafeArea()
+                .onTapGesture { isQuickOpenPresented = false }
+                .accessibilityHidden(true)
+
+            QuickOpenView(selection: selection, isPresented: $isQuickOpenPresented)
+                .frame(width: 580, height: 460)
+                .floatingSurface(cornerRadius: CornerRadius.extraLarge)
+                .padding(.top, Spacing.section * 3)
+        }
+        .transition(.opacity)
     }
 
     private var windowCommands: WindowCommands {

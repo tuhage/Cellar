@@ -41,6 +41,26 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
         }
     }
 
+    /// Other words people use for the page, so Quick Open finds it.
+    var keywords: [String] {
+        switch self {
+        case .dashboard: ["overview", "home", "summary"]
+        case .formulae: ["packages", "installed", "cli", "tools"]
+        case .casks: ["apps", "applications"]
+        case .outdated: ["outdated", "upgrade", "update"]
+        case .services: ["daemons", "launchd", "resources", "cpu", "memory"]
+        case .brewfile: ["bundle", "projects", "backup", "restore"]
+        case .taps: ["repositories", "sources"]
+        case .dependencies: ["deps", "leaves", "orphans", "unused"]
+        case .maintenance: ["cleanup", "clean up", "doctor", "health", "disk", "autoremove"]
+        }
+    }
+
+    func matches(_ query: String) -> Bool {
+        title.localizedCaseInsensitiveContains(query)
+            || keywords.contains { $0.localizedCaseInsensitiveContains(query) }
+    }
+
     var section: SidebarSection {
         switch self {
         case .dashboard: .overview

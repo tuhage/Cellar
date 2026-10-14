@@ -1,13 +1,17 @@
 import SwiftUI
 import CellarCore
 
-/// A keyboard-first launcher for navigating Cellar and opening installed items.
+/// A keyboard-first launcher: go to pages, open installed items, and run
+/// commands such as Upgrade All or restarting a service.
 struct QuickOpenView: View {
     @Binding var selection: SidebarItem?
     @Binding var isPresented: Bool
 
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
+    @Environment(MaintenanceStore.self) private var maintenanceStore
+    @Environment(ActivityStore.self) private var activityStore
+    @Environment(\.openSettings) private var openSettings
 
     @State private var query = ""
     @State private var selectedIndex = 0
@@ -16,6 +20,9 @@ struct QuickOpenView: View {
     @State private var isSearchingHomebrew = false
     @AppStorage("quickOpenRecentItems") private var recentItemIDs = ""
     @FocusState private var isSearchFocused: Bool
+    /// Where the pointer was when the keyboard last moved the selection;
+    /// hover only takes over once the pointer actually moves.
+    @State private var pointerAtKeyboardNavigation: CGPoint?
 
     private var results: [QuickOpenItem] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -32,8 +39,10 @@ struct QuickOpenView: View {
             return deduplicated(recent + pinned + destinations)
         }
 
+        let commands = commands(matching: trimmedQuery).map(QuickOpenItem.command)
+
         let destinations = SidebarItem.allCases
-            .filter { $0.title.localizedCaseInsensitiveContains(trimmedQuery) }
+            .filter { $0.matches(trimmedQuery) }
             .map(QuickOpenItem.destination)
 
         let formulae = packageStore.formulae
@@ -73,7 +82,70 @@ struct QuickOpenView: View {
             .prefix(6)
             .map(QuickOpenItem.availableCask)
 
-        return destinations + formulae + casks + services + remoteFormulae + remoteCasks
+        return commands + destinations + formulae + casks + services + remoteFormulae + remoteCasks
+    }
+
+    // MARK: - Commands
+
+    private func commands(matching query: String) -> [QuickOpenCommand] {
+        let general = [
+            QuickOpenCommand(
+                title: "Upgrade All\u{2026}",
+                keywords: ["upgrade", "update all"],
+                systemImage: "arrow.up.circle",
+                isEnabled: packageStore.totalOutdated > 0 && !packageStore.isUpgradingAll
+            ) { packageStore.isUpgradePreviewPresented = true },
+            QuickOpenCommand(
+                title: "Check for Package Updates",
+                keywords: ["brew update", "check", "refresh"],
+                systemImage: "arrow.triangle.2.circlepath",
+                isEnabled: !activityStore.isActive(.homebrew)
+            ) { Task { await packageStore.checkForUpdates() } },
+            QuickOpenCommand(
+                title: "Clean Up\u{2026}",
+                keywords: ["cleanup", "disk space", "free"],
+                systemImage: "trash.circle",
+                isEnabled: !maintenanceStore.isRunning
+            ) { maintenanceStore.isCleanupPreviewPresented = true },
+            QuickOpenCommand(
+                title: "Run Health Check",
+                keywords: ["doctor", "health"],
+                systemImage: "stethoscope",
+                isEnabled: !maintenanceStore.isRunning
+            ) { Task { await maintenanceStore.runHealthCheck() } },
+            QuickOpenCommand(title: "Show Activity", keywords: ["log", "progress"], systemImage: "clock") {
+                NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+            },
+            QuickOpenCommand(title: "Settings\u{2026}", keywords: ["preferences"], systemImage: "gear") {
+                openSettings()
+            },
+        ]
+        return (general + serviceCommands(matching: query))
+            .filter { $0.isEnabled && $0.matches(query) }
+    }
+
+    /// Start, stop or restart a service whose name matches the query.
+    private func serviceCommands(matching query: String) -> [QuickOpenCommand] {
+        serviceStore.services
+            .filter { query.localizedCaseInsensitiveContains($0.name) || $0.name.localizedCaseInsensitiveContains(query) }
+            .prefix(3)
+            .flatMap { service -> [QuickOpenCommand] in
+                let isBusy = activityStore.isActive(.package(service.name))
+                let toggle = service.isRunning
+                    ? QuickOpenCommand(title: "Stop \(service.name)", systemImage: "stop.circle", isEnabled: !isBusy) {
+                        Task { await serviceStore.stop(service) }
+                    }
+                    : QuickOpenCommand(title: "Start \(service.name)", systemImage: "play.circle", isEnabled: !isBusy) {
+                        Task { await serviceStore.start(service) }
+                    }
+                guard service.isRunning else { return [toggle] }
+                return [
+                    toggle,
+                    QuickOpenCommand(title: "Restart \(service.name)", systemImage: "arrow.clockwise.circle", isEnabled: !isBusy) {
+                        Task { await serviceStore.restart(service) }
+                    },
+                ]
+            }
     }
 
     var body: some View {
@@ -84,8 +156,6 @@ struct QuickOpenView: View {
             Divider()
             keyboardHints
         }
-        .frame(width: 580, height: 520)
-        .background(.background)
         .onAppear { isSearchFocused = true }
         .onChange(of: query) { selectedIndex = 0 }
         .task(id: query) { await searchHomebrew() }
@@ -98,6 +168,7 @@ struct QuickOpenView: View {
             moveSelection(by: -1)
             return .handled
         }
+        .accessibilityAddTraits(.isModal)
     }
 
     private var searchField: some View {
@@ -106,7 +177,7 @@ struct QuickOpenView: View {
                 .font(.title3)
                 .foregroundStyle(.secondary)
 
-            TextField("Search destinations, packages, and services", text: $query)
+            TextField("Search pages, packages, services and commands", text: $query)
                 .textFieldStyle(.plain)
                 .font(.title3)
                 .focused($isSearchFocused)
@@ -198,9 +269,10 @@ struct QuickOpenView: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered in
-            if isHovered { selectedIndex = index }
+            guard isHovered, pointerHasMoved else { return }
+            selectedIndex = index
         }
-        .accessibilityHint("Open \(result.category.lowercased())")
+        .accessibilityHint(result.isCommand ? "Runs the command" : "Opens the \(result.category.lowercased())")
     }
 
     private var keyboardHints: some View {
@@ -240,7 +312,14 @@ struct QuickOpenView: View {
 
     private func moveSelection(by offset: Int) {
         guard !results.isEmpty else { return }
+        pointerAtKeyboardNavigation = NSEvent.mouseLocation
         selectedIndex = min(max(selectedIndex + offset, 0), results.count - 1)
+    }
+
+    /// Scrolling moves rows under a still pointer; that must not count as hover.
+    private var pointerHasMoved: Bool {
+        guard let pointerAtKeyboardNavigation else { return true }
+        return NSEvent.mouseLocation != pointerAtKeyboardNavigation
     }
 
     private func openSelectedResult() {
@@ -267,6 +346,10 @@ struct QuickOpenView: View {
         case .availableCask(let cask):
             packageStore.caskSearchQuery = cask.token
             selection = .casks
+        case .command(let command):
+            isPresented = false
+            command.perform()
+            return
         }
         remember(result)
         isPresented = false
@@ -344,9 +427,15 @@ private struct QuickOpenItem: Identifiable {
         case service(BrewServiceItem)
         case availableFormula(Formula)
         case availableCask(Cask)
+        case command(QuickOpenCommand)
     }
 
     let kind: Kind
+
+    var isCommand: Bool {
+        if case .command = kind { return true }
+        return false
+    }
 
     static func destination(_ item: SidebarItem) -> Self { .init(kind: .destination(item)) }
     static func formula(_ formula: Formula) -> Self { .init(kind: .formula(formula)) }
@@ -354,6 +443,7 @@ private struct QuickOpenItem: Identifiable {
     static func service(_ service: BrewServiceItem) -> Self { .init(kind: .service(service)) }
     static func availableFormula(_ formula: Formula) -> Self { .init(kind: .availableFormula(formula)) }
     static func availableCask(_ cask: Cask) -> Self { .init(kind: .availableCask(cask)) }
+    static func command(_ command: QuickOpenCommand) -> Self { .init(kind: .command(command)) }
 
     var id: String {
         switch kind {
@@ -363,6 +453,7 @@ private struct QuickOpenItem: Identifiable {
         case .service(let service): "service:\(service.id)"
         case .availableFormula(let formula): "available-formula:\(formula.id)"
         case .availableCask(let cask): "available-cask:\(cask.id)"
+        case .command(let command): "command:\(command.title)"
         }
     }
 
@@ -374,6 +465,7 @@ private struct QuickOpenItem: Identifiable {
         case .service(let service): service.name
         case .availableFormula(let formula): formula.name
         case .availableCask(let cask): cask.token
+        case .command(let command): command.title
         }
     }
 
@@ -385,6 +477,7 @@ private struct QuickOpenItem: Identifiable {
         case .service(let service): service.status.label
         case .availableFormula: "Available from Homebrew"
         case .availableCask: "Available from Homebrew"
+        case .command: "Command"
         }
     }
 
@@ -396,6 +489,7 @@ private struct QuickOpenItem: Identifiable {
         case .service: String(localized: "Service")
         case .availableFormula: String(localized: "Available Formula")
         case .availableCask: String(localized: "Available Cask")
+        case .command: String(localized: "Command")
         }
     }
 
@@ -407,6 +501,7 @@ private struct QuickOpenItem: Identifiable {
         case .service: "gearshape.2"
         case .availableFormula: "arrow.down.circle"
         case .availableCask: "arrow.down.circle"
+        case .command(let command): command.systemImage
         }
     }
 
@@ -418,7 +513,22 @@ private struct QuickOpenItem: Identifiable {
         case .service(let service): service.status.color
         case .availableFormula: .blue
         case .availableCask: .purple
+        case .command: .orange
         }
+    }
+}
+
+/// An action Quick Open can run directly.
+private struct QuickOpenCommand {
+    let title: String
+    var keywords: [String] = []
+    let systemImage: String
+    var isEnabled = true
+    let perform: () -> Void
+
+    func matches(_ query: String) -> Bool {
+        title.localizedCaseInsensitiveContains(query)
+            || keywords.contains { $0.localizedCaseInsensitiveContains(query) || query.localizedCaseInsensitiveContains($0) }
     }
 }
 

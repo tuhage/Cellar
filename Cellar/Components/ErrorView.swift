@@ -1,37 +1,32 @@
 import SwiftUI
 import CellarCore
 
+/// Full-page error for a page with nothing to show: what failed, what to
+/// try, and a way to retry or copy the details.
 struct ErrorView: View {
     let message: String
     var suggestion: String?
     var retryAction: (() -> Void)?
 
-    private var resolvedSuggestion: String? {
-        suggestion ?? Self.suggestion(for: message)
-    }
-
     var body: some View {
         ContentUnavailableView {
-            Label("Something Went Wrong", systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.red.opacity(0.8))
+            Label(message, systemImage: "exclamationmark.triangle")
         } description: {
-            VStack(spacing: 8) {
-                Text(message)
-                if let resolvedSuggestion {
-                    Text(resolvedSuggestion)
-                        .foregroundStyle(.secondary)
-                        .font(.callout)
-                }
+            if let suggestion = suggestion ?? Self.suggestion(for: message) {
+                Text(AttributedString(markdownOrPlain: suggestion))
             }
         } actions: {
             if let retryAction {
-                Button("Retry", action: retryAction)
+                Button("Try Again", action: retryAction)
                     .buttonStyle(.borderedProminent)
-                    .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
             }
+            Button("Copy Details") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(message, forType: .string)
+            }
+            .buttonStyle(.borderless)
         }
         .transition(.opacity)
-        .animation(AnimationToken.smooth, value: message)
     }
 
     // MARK: - Suggestion Detection
@@ -39,36 +34,31 @@ struct ErrorView: View {
     static func suggestion(for message: String) -> String? {
         let lowercased = message.lowercased()
 
-        if lowercased.contains("not found") || lowercased.contains("no such file") {
-            if lowercased.contains("brew") || lowercased.contains("homebrew") {
-                return "Homebrew may not be installed. Visit https://brew.sh to install it."
-            }
+        if lowercased.contains("homebrew not found") {
+            return "Homebrew may not be installed. [Install it from brew.sh](https://brew.sh)."
         }
-
         if lowercased.contains("permission denied") {
-            return "Try running the operation with administrator privileges."
+            return "Homebrew needs your user to own its folders. Run `brew doctor` in Terminal to see which ones."
         }
-
         if lowercased.contains("timed out") || lowercased.contains("timeout") {
-            return "The operation timed out. Check your internet connection and try again."
+            return "The operation took too long. Check your internet connection and try again."
         }
-
         if lowercased.contains("could not resolve host") || lowercased.contains("network") {
             return "Check your internet connection and try again."
         }
-
         return nil
     }
 }
 
-#Preview {
-    ErrorView(message: "Could not connect to Homebrew.")
+private extension AttributedString {
+    /// Renders inline Markdown (links, code) and falls back to plain text.
+    init(markdownOrPlain string: String) {
+        self = (try? AttributedString(markdown: string)) ?? AttributedString(string)
+    }
 }
 
 #Preview("With Retry") {
-    ErrorView(message: "Failed to load formulae.") {
-        print("Retrying...")
-    }
+    ErrorView(message: "Homebrew packages couldn’t be loaded.") {}
 }
 
 #Preview("Brew Not Found") {
@@ -77,15 +67,4 @@ struct ErrorView: View {
 
 #Preview("Permission Denied") {
     ErrorView(message: "Brew command failed (exit 1): permission denied")
-}
-
-#Preview("Timeout") {
-    ErrorView(message: "Brew command timed out.")
-}
-
-#Preview("Custom Suggestion") {
-    ErrorView(
-        message: "Something unexpected happened.",
-        suggestion: "Try restarting the application."
-    )
 }

@@ -1,11 +1,13 @@
 import SwiftUI
-import CellarCore
 
+/// Full-page loading state. After a while it explains why brew may be slow
+/// and offers Activity, so a stuck load never looks like a frozen app.
 struct LoadingView: View {
-    var message: String = "Loading…"
+    var message: String = "Loading\u{2026}"
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isPulsing = false
+    @State private var isSlow = false
+
+    private static let slowThreshold: Duration = .seconds(10)
 
     var body: some View {
         VStack(spacing: Spacing.sectionContent) {
@@ -13,22 +15,31 @@ struct LoadingView: View {
                 .controlSize(.large)
             Text(message)
                 .foregroundStyle(.secondary)
-                .opacity(isPulsing && !reduceMotion ? 0.6 : 1.0)
-                .animation(
-                    reduceMotion ? nil : .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
-                    value: isPulsing
-                )
+
+            if isSlow {
+                VStack(spacing: Spacing.item) {
+                    Text("Still working. brew can be slow the first time, or while another brew command runs.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Show Activity") {
+                        NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                    }
+                }
+                .frame(maxWidth: 360)
+                .transition(.opacity)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(AnimationToken.gentle, value: isSlow)
         .transition(.opacity)
-        .onAppear { isPulsing = !reduceMotion }
+        .task {
+            try? await Task.sleep(for: Self.slowThreshold)
+            isSlow = !Task.isCancelled
+        }
     }
 }
 
 #Preview {
-    LoadingView()
-}
-
-#Preview("Custom Message") {
-    LoadingView(message: "Fetching formulae…")
+    LoadingView(message: "Loading Formulae\u{2026}")
 }
