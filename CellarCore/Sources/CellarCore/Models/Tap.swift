@@ -32,6 +32,12 @@ public struct Tap: Identifiable, Codable, Hashable, Sendable {
 
     public var totalPackages: Int { formulaCount + caskCount }
 
+    /// How long ago the last commit was, parsed from git's relative date
+    /// ("2 weeks ago"). Unknown dates count as infinitely old so they sort last.
+    public var lastCommitAge: TimeInterval {
+        Self.age(fromRelativeDate: lastCommit) ?? .infinity
+    }
+
     public var githubURL: URL? {
         guard remote.contains("github.com") else { return nil }
         let cleaned = remote
@@ -82,8 +88,9 @@ public struct Tap: Identifiable, Codable, Hashable, Sendable {
 
     // MARK: Actions
 
-    public func remove() async throws {
-        try await BrewService.shared.removeTap(name)
+    /// `force` untaps even while installed packages come from the tap.
+    public func remove(force: Bool = false) async throws {
+        try await BrewService.shared.removeTap(name, force: force)
     }
 
     // MARK: Factory Methods
@@ -118,6 +125,49 @@ public struct Tap: Identifiable, Codable, Hashable, Sendable {
             lastCommit: "2 hours ago",
             branch: "main"
         )
+    }
+}
+
+// MARK: - Packages
+
+extension Tap {
+
+    /// The tap a package comes from, given its fully qualified name
+    /// (`user/repo/name`). Core formulae and casks have unqualified names.
+    public static func tapName(ofPackage qualifiedName: String, isCask: Bool) -> String {
+        let parts = qualifiedName.split(separator: "/")
+        guard parts.count == 3 else { return isCask ? "homebrew/cask" : "homebrew/core" }
+        return "\(parts[0])/\(parts[1])".lowercased()
+    }
+
+    /// The package name without its `user/repo/` prefix.
+    public static func packageName(fromQualified qualifiedName: String) -> String {
+        qualifiedName.split(separator: "/").last.map(String.init) ?? qualifiedName
+    }
+}
+
+// MARK: - Relative Dates
+
+extension Tap {
+
+    private static let unitSeconds: [String: TimeInterval] = [
+        "second": 1, "minute": 60, "hour": 3_600, "day": 86_400,
+        "week": 604_800, "month": 2_592_000, "year": 31_536_000,
+    ]
+
+    /// Sums every "N unit" pair, so "1 year, 2 months ago" works too.
+    static func age(fromRelativeDate text: String) -> TimeInterval? {
+        let words = text.lowercased()
+            .split(whereSeparator: { $0 == " " || $0 == "," })
+            .map(String.init)
+        var total: TimeInterval?
+        for (count, unit) in zip(words, words.dropFirst()) {
+            guard let value = Double(count) else { continue }
+            let singular = unit.hasSuffix("s") ? String(unit.dropLast()) : unit
+            guard let seconds = unitSeconds[singular] else { continue }
+            total = (total ?? 0) + value * seconds
+        }
+        return total
     }
 }
 
