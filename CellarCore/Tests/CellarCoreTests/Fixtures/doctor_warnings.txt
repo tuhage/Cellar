@@ -1,0 +1,32 @@
+Please note that these warnings are just used to help the Homebrew maintainers
+with debugging if you file an issue. If everything you use Homebrew for is
+working fine: please don't worry or file an issue; just ignore this. Thanks!
+
+Warning: Your Command Line Tools are too outdated.
+
+Update them from Software Update in System Settings.
+
+If that doesn't show you any updates, run:
+  sudo rm -rf /Library/Developer/CommandLineTools
+  sudo xcode-select --install
+
+Alternatively, manually download them from:
+  https://developer.apple.com/download/all/.
+You should download the Command Line Tools for Xcode 27.0.
+
+Warning: /usr/bin occurs before /opt/homebrew/bin in your PATH.
+This means that system-provided programs will be used instead of those
+provided by Homebrew.
+
+The following tools exist at both paths:
+  bundle
+  ruby
+
+Consider setting your PATH for example like so:
+  printf '%s\n' export\ PATH\=/opt/homebrew/bin:\$PATH >> ~/.zshrc
+
+Warning: Homebrew's "sbin" was not found in your PATH but you have installed
+formulae that put executables in /opt/homebrew/sbin.
+
+Consider setting your PATH for example like so:
+  printf '%s\n' export\ PATH\=/opt/homebrew/sbin:\$PATH >> ~/.zshrc

@@ -5,6 +5,14 @@ struct MaintenanceView: View {
     @Environment(MaintenanceStore.self) private var store
 
     @State private var searchText = ""
+    @State private var isAutoremovePreviewPresented = false
+    @State private var isClearReportsConfirmationPresented = false
+
+    /// Any Homebrew-wide operation (Upgrade All, `brew update`, maintenance)
+    /// blocks the maintenance tasks.
+    private var isBusy: Bool {
+        store.activityStore.isActive(.homebrew)
+    }
 
     private var filteredReports: [MaintenanceReport] {
         guard !searchText.isEmpty else { return store.reports }
@@ -15,140 +23,171 @@ struct MaintenanceView: View {
     }
 
     var body: some View {
-        @Bindable var store = store
-
-        ZStack {
-            Form {
-                Section {
-                    Toggle("Auto Cleanup", isOn: $store.schedule.autoCleanup)
-                        .onChange(of: store.schedule.autoCleanup) { self.store.saveSettings() }
-
-                    if store.schedule.autoCleanup {
-                        Picker("Cleanup Frequency", selection: $store.schedule.cleanupFrequency) {
-                            ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
-                                Text(frequency.title).tag(frequency)
-                            }
-                        }
-                        .onChange(of: store.schedule.cleanupFrequency) { self.store.saveSettings() }
-                    }
-
-                    if let lastCleanup = store.schedule.lastCleanup {
-                        LabeledContent("Last Cleanup", value: lastCleanup.formatted(date: .abbreviated, time: .shortened))
-                    }
-
-                    if store.schedule.autoCleanup,
-                       let nextCleanup = nextRun(after: store.schedule.lastCleanup, frequency: store.schedule.cleanupFrequency) {
-                        LabeledContent("Next Cleanup", value: nextCleanup.formatted(date: .abbreviated, time: .shortened))
-                    }
-
-                    Toggle("Auto Health Check", isOn: $store.schedule.autoHealthCheck)
-                        .onChange(of: store.schedule.autoHealthCheck) { self.store.saveSettings() }
-
-                    if store.schedule.autoHealthCheck {
-                        Picker("Health Check Frequency", selection: $store.schedule.healthCheckFrequency) {
-                            ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
-                                Text(frequency.title).tag(frequency)
-                            }
-                        }
-                        .onChange(of: store.schedule.healthCheckFrequency) { self.store.saveSettings() }
-                    }
-
-                    if let lastHealthCheck = store.schedule.lastHealthCheck {
-                        LabeledContent("Last Health Check", value: lastHealthCheck.formatted(date: .abbreviated, time: .shortened))
-                    }
-                    if store.schedule.autoHealthCheck,
-                       let nextHealthCheck = nextRun(after: store.schedule.lastHealthCheck, frequency: store.schedule.healthCheckFrequency) {
-                        LabeledContent("Next Health Check", value: nextHealthCheck.formatted(date: .abbreviated, time: .shortened))
-                    }
-                } header: {
-                    Label("Automation", systemImage: "calendar.badge.clock")
-                }
-
-                actionsSection
-                reportsSection
-            }
-            .formStyle(.grouped)
+        Form {
+            tasksSection
+            healthSection
+            DiskUsageSection(store: store.diskUsage)
+            scheduleSection
+            reportsSection
         }
+        .formStyle(.grouped)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if let task = store.runningTask {
-                RunningOperationBar(operation: task)
+            VStack(spacing: Spacing.none) {
+                if let task = store.runningTask {
+                    RunningOperationBar(operation: task)
+                }
+                if let errorMessage = store.errorMessage {
+                    NoticeBanner(tint: .red, systemImage: "exclamationmark.triangle.fill", title: errorMessage) {
+                        Button("Dismiss") { store.errorMessage = nil }
+                    }
+                }
             }
         }
+        .loadErrorBanner(for: store.diskUsage) { await reloadDiskUsage() }
         .navigationTitle("Maintenance")
+        .dataFreshness(store.diskUsage.lastUpdated)
         .maintenanceSearchable(text: $searchText, enabled: !store.reports.isEmpty)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                RefreshToolbarButton(isLoading: store.diskUsage.isLoading) {
+                    await reloadDiskUsage()
+                }
+            }
+        }
+        .focusedSceneValue(\.pageRefresh, AsyncAction { await reloadDiskUsage() })
+        .task { await store.diskUsage.load() }
+        .sheet(isPresented: $isAutoremovePreviewPresented) {
+            AutoremovePreviewSheet()
+        }
+        .confirmationDialog(
+            "Clear all maintenance reports?",
+            isPresented: $isClearReportsConfirmationPresented
+        ) {
+            Button("Clear Reports", role: .destructive) {
+                store.clearReports()
+            }
+        } message: {
+            Text("This removes \(store.reports.count) \(store.reports.count == 1 ? "report" : "reports"). Your schedule isn’t affected.")
+        }
     }
 
-    // MARK: - Actions Section
+    private func reloadDiskUsage() async {
+        await store.diskUsage.load(force: true)
+    }
 
-    private var actionsSection: some View {
+    // MARK: - Tasks
+
+    private var tasksSection: some View {
         Section {
-            HStack {
-                Button {
-                    Task { await store.runCleanup() }
-                } label: {
-                    Label("Run Cleanup", systemImage: "trash")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(store.isRunning)
-
-                Button {
-                    Task { await store.runHealthCheck() }
-                } label: {
-                    Label("Run Health Check", systemImage: "heart.text.square")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(store.isRunning)
-
-                Button {
-                    Task { await store.runAll() }
-                } label: {
-                    Label("Run All", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(store.isRunning)
+            TaskRow(
+                title: "Clean Up",
+                description: "Remove old versions, outdated downloads and logs. You’ll see what will be removed first.",
+                systemImage: "trash",
+                buttonTitle: "Clean Up\u{2026}",
+                isDisabled: isBusy
+            ) {
+                store.isCleanupPreviewPresented = true
             }
 
-            if let errorMessage = store.errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .font(.callout)
+            TaskRow(
+                title: "Remove Unused Dependencies",
+                description: "Uninstall formulae that were installed only as dependencies and are no longer needed.",
+                systemImage: "shippingbox",
+                buttonTitle: "Remove\u{2026}",
+                isDisabled: isBusy
+            ) {
+                isAutoremovePreviewPresented = true
+            }
+
+            TaskRow(
+                title: "Check Health",
+                description: "Run brew doctor to find problems with your Homebrew setup.",
+                systemImage: "stethoscope",
+                buttonTitle: "Check Health",
+                isDisabled: isBusy
+            ) {
+                Task { await store.runHealthCheck() }
+            }
+
+            TaskRow(
+                title: "Run All",
+                description: "Clean up, then check health. Stops if the cleanup fails or is cancelled.",
+                systemImage: "play",
+                buttonTitle: "Run All\u{2026}",
+                isDisabled: isBusy
+            ) {
+                store.previewRunAll()
             }
         } header: {
-            Label("Run Now", systemImage: "play.circle")
+            Text("Tasks")
         }
     }
 
-    // MARK: - Reports Section
+    // MARK: - Health
+
+    private var healthSection: some View {
+        Section {
+            if let report = store.latestHealthCheck {
+                DoctorFindingList(report: DoctorReport(output: report.details ?? ""))
+            } else {
+                Text("Check health to see whether brew doctor finds any problems.")
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack {
+                Text("Health")
+                Spacer()
+                if let date = store.latestHealthCheck?.date {
+                    Text("Checked \(date.formatted(.relative(presentation: .named)))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    // MARK: - Schedule
+
+    private var scheduleSection: some View {
+        Section {
+            ScheduleRow(
+                title: "Automatic Cleanup",
+                frequency: store.schedule.cleanupFrequency,
+                status: store.schedule.cleanupStatus(),
+                lastRun: store.schedule.lastCleanup
+            )
+            ScheduleRow(
+                title: "Automatic Health Check",
+                frequency: store.schedule.healthCheckFrequency,
+                status: store.schedule.healthCheckStatus(),
+                lastRun: store.schedule.lastHealthCheck
+            )
+            SettingsLink {
+                Text("Change in Settings\u{2026}")
+            }
+        } header: {
+            Text("Schedule")
+        } footer: {
+            Text("Scheduled tasks run only while Cellar is open; it checks for due tasks once an hour. Scheduled cleanups run without asking and remove old versions, outdated downloads, logs and unused dependencies.")
+        }
+    }
+
+    // MARK: - Reports
 
     private var reportsSection: some View {
         Section {
             if store.reports.isEmpty {
-                HStack(spacing: Spacing.sectionContent) {
-                    Image(systemName: "doc.text")
-                        .font(.title3)
-                        .foregroundStyle(.tertiary)
-
-                    VStack(alignment: .leading, spacing: Spacing.textPair) {
-                        Text("No Reports Yet")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        Text("Run a cleanup or health check to generate a report.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, Spacing.item)
+                EmptyStateView(
+                    title: "No Reports Yet",
+                    systemImage: "doc.text",
+                    description: "Cleanups, removed dependencies and health checks are recorded here."
+                )
             } else if filteredReports.isEmpty {
-                Text("No reports matching \"\(searchText)\"")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, Spacing.item)
+                EmptyStateView(
+                    title: "No Results",
+                    systemImage: "magnifyingglass",
+                    description: "No reports match “\(searchText)”."
+                )
             } else {
                 ForEach(filteredReports) { report in
                     MaintenanceReportRow(report: report)
@@ -159,86 +198,66 @@ struct MaintenanceView: View {
                 Text("Reports")
                 Spacer()
                 if !store.reports.isEmpty {
-                    Button("Clear Reports", role: .destructive) {
-                        store.clearReports()
+                    Button("Clear Reports\u{2026}") {
+                        isClearReportsConfirmationPresented = true
                     }
-                    .font(.caption)
+                    .controlSize(.small)
                 }
             }
         }
-    }
-
-    private func nextRun(after lastRun: Date?, frequency: MaintenanceFrequency) -> Date? {
-        Calendar.current.date(
-            byAdding: frequency.calendarComponent,
-            value: 1,
-            to: lastRun ?? .now
-        )
     }
 }
 
-// MARK: - MaintenanceReportRow
+// MARK: - Task Row
 
-private struct MaintenanceReportRow: View {
-    let report: MaintenanceReport
-
-    @State private var isExpanded = false
+private struct TaskRow: View {
+    let title: String
+    let description: String
+    let systemImage: String
+    let buttonTitle: String
+    let isDisabled: Bool
+    let action: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.item) {
-            HStack(alignment: .top, spacing: Spacing.row) {
-                let iconColor: Color = report.type == .cleanup ? .orange : .green
-                Image(systemName: report.type.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(iconColor)
-                    .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
-                    .background(iconColor.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(report.type.title)
-                            .fontWeight(.medium)
-
-                        Spacer()
-
-                        Text(report.date, style: .relative)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-
-                    Text(report.summary)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(isExpanded ? nil : 2)
-                }
-
-                if report.details != nil {
-                    Image(systemName: "chevron.right")
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                guard report.details != nil else { return }
-                withAnimation(AnimationToken.snap) {
-                    isExpanded.toggle()
-                }
-            }
-
-            if isExpanded, let details = report.details {
-                Text(details)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .padding(Spacing.item)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .cardStyle(cornerRadius: CornerRadius.small)
-                    .padding(.leading, 38)
-                    .textSelection(.enabled)
+        LabeledContent {
+            Button(buttonTitle, action: action)
+                .disabled(isDisabled)
+        } label: {
+            Label {
+                Text(title)
+                Text(description)
+            } icon: {
+                Image(systemName: systemImage)
             }
         }
-        .padding(.vertical, Spacing.compact)
+    }
+}
+
+// MARK: - Schedule Row
+
+private struct ScheduleRow: View {
+    let title: String
+    let frequency: MaintenanceFrequency
+    let status: MaintenanceSchedule.Status
+    let lastRun: Date?
+
+    var body: some View {
+        LabeledContent {
+            Text(statusText)
+                .foregroundStyle(status == .overdue ? .orange : .secondary)
+        } label: {
+            Text(title)
+            Text(lastRun.map { "Last run \($0.formatted(.relative(presentation: .named)))" } ?? "Never run")
+        }
+    }
+
+    private var statusText: String {
+        switch status {
+        case .off: "Off"
+        case .dueNow: "\(frequency.title) · Due now"
+        case .overdue: "\(frequency.title) · Overdue"
+        case .scheduled(let date): "\(frequency.title) · Next \(date.formatted(date: .abbreviated, time: .omitted))"
+        }
     }
 }
 
@@ -260,5 +279,5 @@ private extension View {
         MaintenanceView()
     }
     .environment(AppStores())
-    .frame(width: 600, height: 700)
+    .frame(width: 640, height: 900)
 }

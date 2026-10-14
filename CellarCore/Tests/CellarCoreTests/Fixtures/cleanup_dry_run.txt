@@ -1,0 +1,16 @@
+Warning: Skipping gradle: most recent version 9.8.1 not installed
+Would remove: /opt/homebrew/Cellar/ca-certificates/2026-05-14 (4 files, 199.2KB)
+Would remove: /opt/homebrew/Cellar/node/26.5.0 (2,071 files, 88.6MB)
+Would remove: /opt/homebrew/Cellar/openjdk/26.0.1 (549 files, 398MB)
+Would remove: /opt/homebrew/Caskroom/firefox/140.0 (12 files, 1.2MB)
+==> Would autoremove 2 unneeded formulae:
+libnghttp3
+libngtcp2
+Would remove: /Users/me/Library/Caches/Homebrew/portable-ruby-4.0.7.arm64_big_sur.bottle.tar.gz (12.7MB)
+Would remove: /Users/me/Library/Caches/Homebrew/Cask/android-commandlinetools--15859902.zip (0B)
+Would prune 3 files from: /Users/me/Library/Caches/Homebrew/api-source
+Would remove: /Users/me/Library/Logs/Homebrew/node (3 files, 12KB)
+Would remove: /opt/homebrew/var/homebrew/tmp/.cellar/openssl@3 (7,641 files, 37.8MB)
+Would remove (empty directory): /opt/homebrew/lib/gio/modules
+Would remove: /opt/homebrew/Library/Homebrew/vendor/portable-ruby/4.0.5_1 (1,707 files, 34.6MB)
+==> This operation would free approximately 573.3MB of disk space.

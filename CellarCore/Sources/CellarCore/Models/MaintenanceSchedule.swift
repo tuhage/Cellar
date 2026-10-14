@@ -70,23 +70,51 @@ public struct MaintenanceSchedule: Codable, Sendable {
 
     // MARK: Schedule Logic
 
-    /// Returns `true` when the given task is overdue based on its frequency and last-run date.
-    public func isOverdue(lastRun: Date?, frequency: MaintenanceFrequency) -> Bool {
-        guard let lastRun else { return true }
-        let nextDue = Calendar.current.date(
-            byAdding: frequency.calendarComponent,
-            value: 1,
-            to: lastRun
-        ) ?? .distantPast
-        return Date.now >= nextDue
+    /// Where a scheduled task stands. Overdue tasks run at the next hourly
+    /// check while Cellar is open.
+    public enum Status: Hashable, Sendable {
+        case off
+        /// Never run, so the next check runs it.
+        case dueNow
+        /// The due date has passed.
+        case overdue
+        case scheduled(Date)
+
+        public var isDue: Bool {
+            self == .dueNow || self == .overdue
+        }
+    }
+
+    /// When a task last run at `lastRun` is due again; `nil` if it never ran.
+    public static func nextRun(after lastRun: Date?, frequency: MaintenanceFrequency) -> Date? {
+        lastRun.flatMap { Calendar.current.date(byAdding: frequency.calendarComponent, value: 1, to: $0) }
+    }
+
+    public static func status(
+        isEnabled: Bool,
+        lastRun: Date?,
+        frequency: MaintenanceFrequency,
+        now: Date = .now
+    ) -> Status {
+        guard isEnabled else { return .off }
+        guard let next = nextRun(after: lastRun, frequency: frequency) else { return .dueNow }
+        return next <= now ? .overdue : .scheduled(next)
+    }
+
+    public func cleanupStatus(now: Date = .now) -> Status {
+        Self.status(isEnabled: autoCleanup, lastRun: lastCleanup, frequency: cleanupFrequency, now: now)
+    }
+
+    public func healthCheckStatus(now: Date = .now) -> Status {
+        Self.status(isEnabled: autoHealthCheck, lastRun: lastHealthCheck, frequency: healthCheckFrequency, now: now)
     }
 
     public var isCleanupOverdue: Bool {
-        autoCleanup && isOverdue(lastRun: lastCleanup, frequency: cleanupFrequency)
+        cleanupStatus().isDue
     }
 
     public var isHealthCheckOverdue: Bool {
-        autoHealthCheck && isOverdue(lastRun: lastHealthCheck, frequency: healthCheckFrequency)
+        healthCheckStatus().isDue
     }
 }
 
@@ -147,8 +175,12 @@ public struct MaintenanceReport: Identifiable, Codable, Sendable {
         MaintenanceReport(
             date: Calendar.current.date(byAdding: .hour, value: -2, to: .now) ?? .now,
             type: .cleanup,
-            summary: "Removed 3 old versions and 150 MB of cache files.",
-            details: "Removing /opt/homebrew/Cellar/node/20.0.0...\nRemoving /opt/homebrew/Cellar/python@3.11/3.11.5..."
+            summary: "Freed 152 MB · 2 items",
+            details: """
+            Removing: /opt/homebrew/Cellar/node/20.0.0... (2,071 files, 88.6MB)
+            Removing: /opt/homebrew/Cellar/python@3.11/3.11.5... (3,300 files, 63.4MB)
+            ==> This operation has freed approximately 152MB of disk space.
+            """
         )
     }
 }
@@ -157,11 +189,13 @@ public struct MaintenanceReport: Identifiable, Codable, Sendable {
 
 public enum MaintenanceReportType: String, Codable, Sendable {
     case cleanup
+    case autoremove
     case healthCheck
 
     public var title: String {
         switch self {
         case .cleanup: "Cleanup"
+        case .autoremove: "Unused Dependencies"
         case .healthCheck: "Health Check"
         }
     }
@@ -169,6 +203,7 @@ public enum MaintenanceReportType: String, Codable, Sendable {
     public var icon: String {
         switch self {
         case .cleanup: "trash.circle.fill"
+        case .autoremove: "shippingbox.circle.fill"
         case .healthCheck: "heart.circle.fill"
         }
     }

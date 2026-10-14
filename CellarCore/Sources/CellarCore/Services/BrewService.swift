@@ -80,21 +80,6 @@ public nonisolated final class BrewService: Sendable {
         process.stream(["update"], includingStandardError: true)
     }
 
-    // MARK: - Cleanup
-
-    public func cleanupDryRun() async throws -> String {
-        let output = try await runChecked(["cleanup", "-n"])
-        return output.stdout
-    }
-
-    public func cleanup() -> AsyncThrowingStream<String, Error> {
-        process.stream(["cleanup"])
-    }
-
-    public func cleanupAggressive() -> AsyncThrowingStream<String, Error> {
-        process.stream(["cleanup", "--prune=all", "-s"])
-    }
-
     // MARK: - Services
 
     public func listServicesData() async throws -> Data {
@@ -138,12 +123,6 @@ public nonisolated final class BrewService: Sendable {
     }
 
     // MARK: - Health
-
-    public func doctor() async throws -> String {
-        let output = try await process.run(["doctor"])
-        // brew doctor exits non-zero when issues found -- that's expected
-        return output.stdout + output.stderr
-    }
 
     public func missing() async throws -> String {
         let output = try await process.run(["missing"])
@@ -199,8 +178,9 @@ public nonisolated final class BrewService: Sendable {
 
     // MARK: - Private
 
+    /// Internal so per-domain extensions can run commands that must succeed.
     @discardableResult
-    private func runChecked(_ arguments: [String], privileged: Bool = false) async throws -> ProcessOutput {
+    func runChecked(_ arguments: [String], privileged: Bool = false) async throws -> ProcessOutput {
         let output = privileged
             ? try await process.runPrivileged(arguments)
             : try await process.run(arguments)
