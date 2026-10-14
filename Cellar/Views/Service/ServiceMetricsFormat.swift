@@ -23,7 +23,13 @@ extension Date {
     /// Time since this date: "3 hr", or with more units "3 hr, 12 min".
     func formattedUptime(units: Int = 1) -> String {
         Duration.seconds(max(0, Date().timeIntervalSince(self))).formatted(
-            .units(allowed: [.days, .hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: units)
+            // Rounded down, so 5 hr 40 min reads "5 hr", not "6 hr".
+            .units(
+                allowed: [.days, .hours, .minutes, .seconds],
+                width: .abbreviated,
+                maximumUnitCount: units,
+                fractionalPart: .hide(rounded: .down)
+            )
         )
     }
 }

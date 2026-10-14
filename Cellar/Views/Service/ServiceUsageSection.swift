@@ -23,6 +23,7 @@ struct ServiceUsageSection: View {
                     current: usage.cpuText,
                     samples: history,
                     value: \.cpuPercent,
+                    minimumScale: 1,
                     format: ResourceUsage.formattedCPU
                 )
                 MetricHistoryChart(
@@ -30,6 +31,7 @@ struct ServiceUsageSection: View {
                     current: usage.memoryText,
                     samples: history,
                     value: { Double($0.memoryBytes) },
+                    minimumScale: 1_048_576,
                     format: { ResourceUsage.formattedMemory(Int64($0)) }
                 )
                 Text(footnote(for: usage))
@@ -57,6 +59,9 @@ private struct MetricHistoryChart: View {
     let current: String
     let samples: [ResourceUsage]
     let value: (ResourceUsage) -> Double
+    /// The smallest top of the y-axis, so an idle service doesn't get an
+    /// axis from 0.0% to 0.0%.
+    let minimumScale: Double
     let format: (Double) -> String
 
     @State private var hoveredDate: Date?
@@ -102,6 +107,7 @@ private struct MetricHistoryChart: View {
             }
         }
         .chartXScale(domain: Date.now.addingTimeInterval(-ServiceMetricsStore.historyWindow)...Date.now)
+        .chartYScale(domain: 0...max(samples.map(value).max() ?? 0, minimumScale))
         .chartXAxis(.hidden)
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 2)) { axisValue in
