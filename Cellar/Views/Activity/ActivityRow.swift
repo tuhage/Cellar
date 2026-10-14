@@ -1,108 +1,180 @@
 import SwiftUI
 
-/// Single row in the activity panel — one `BrewOperation`.
+/// One operation in the Activity panel: what it did, when, how it ended,
+/// and what can be done next (cancel, retry, open the log).
 struct ActivityRow: View {
     let operation: BrewOperation
-    let onCancel: (() -> Void)?
-    let onForceRetry: (() -> Void)?
-    var onRetry: (() -> Void)?
 
-    @State private var isLogExpanded = false
+    @Environment(ActivityStore.self) private var store
+    @State private var isOutputExpanded = false
     @State private var isStepsExpanded = false
+    @State private var isConfirmingCancel = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.compact) {
-            HStack(alignment: .top, spacing: Spacing.item) {
-                Image(systemName: operation.kind.symbolName)
-                    .font(.title3)
-                    .foregroundStyle(.tint)
-                    .frame(width: IconSize.headerIcon)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(operation.kind.displayTitle)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    if !operation.isRunning {
-                        Text(statusLabel)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(operation.isRunning ? 1 : nil)
-                            .truncationMode(.tail)
-                    }
-                }
-                Spacer()
-                statusIndicator
-            }
+        VStack(alignment: .leading, spacing: Spacing.item) {
+            header
 
             if operation.isRunning {
                 OperationProgressView(operation: operation)
-            }
-
-            if case .failed = operation.status, let onForceRetry {
-                HStack {
-                    Spacer()
-                    Button(action: onForceRetry) {
-                        Label("Retry (force)", systemImage: "arrow.clockwise.circle.fill")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .tint(.orange)
-                }
-                .padding(.top, Spacing.compact)
+            } else if case .failed(let reason) = operation.status {
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(3)
+                    .textSelection(.enabled)
             }
 
             if !operation.steps.isEmpty {
-                DisclosureGroup(isExpanded: $isStepsExpanded) {
-                    ScrollView {
-                        BatchStepList(steps: operation.steps)
-                            .padding(.vertical, Spacing.compact)
-                    }
-                    .frame(maxHeight: 180)
-                } label: {
-                    Text(stepsDisclosureTitle)
-                        .font(.caption)
-                        .foregroundStyle(operation.failedSteps.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
-                }
+                stepsDisclosure
             }
-
-            if onRetry != nil || operation.logFileURL != nil {
-                actionButtons
-            }
-
             if !operation.log.isEmpty {
-                DisclosureGroup(isExpanded: $isLogExpanded) {
-                    ScrollView {
-                        Text(operation.log.joined(separator: "\n"))
-                            .font(.system(size: 11, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                    }
-                    .frame(maxHeight: 140)
-                    .padding(.vertical, Spacing.compact)
-                } label: {
-                    Text("Output")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                outputDisclosure
+            }
+            if !operation.isRunning {
+                actions
             }
         }
         .padding(.vertical, Spacing.item)
+        .contextMenu { contextMenu }
+        .confirmationDialog(
+            "Cancel \(operation.kind.displayTitle)?",
+            isPresented: $isConfirmingCancel
+        ) {
+            Button("Stop After Current Package", role: .destructive) {
+                store.cancel(operation.id)
+            }
+        } message: {
+            Text("Packages already upgraded stay upgraded.")
+        }
     }
 
-    private var actionButtons: some View {
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: Spacing.item) {
+            Image(systemName: operation.kind.symbolName)
+                .font(.title3)
+                .foregroundStyle(iconColor)
+                .frame(width: IconSize.smallIcon)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: Spacing.textPair) {
+                Text(operation.title)
+                    .font(.subheadline.weight(.medium))
+                timing
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: Spacing.item)
+
+            if operation.isRunning {
+                Button(role: .cancel) {
+                    if operation.steps.isEmpty {
+                        store.cancel(operation.id)
+                    } else {
+                        isConfirmingCancel = true
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!store.canCancel(operation.id))
+                .help("Cancel")
+                .accessibilityLabel("Cancel \(operation.kind.displayTitle)")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(statusDescription)
+    }
+
+    @ViewBuilder
+    private var timing: some View {
+        if let completedAt = operation.completedAt {
+            Text("\(statusDescription) \(completedAt, style: .relative) ago · took \(duration(until: completedAt))")
+        } else {
+            Text("Started \(operation.startedAt, style: .relative) ago")
+        }
+    }
+
+    private var statusDescription: String {
+        switch operation.status {
+        case .running: operation.isCancelling ? "Cancelling" : "Running"
+        case .succeeded: "Finished"
+        case .failed: "Failed"
+        case .cancelled: "Cancelled"
+        }
+    }
+
+    private var iconColor: Color {
+        switch operation.status {
+        case .running: .accentColor
+        case .succeeded: .green
+        case .failed: .red
+        case .cancelled: .secondary
+        }
+    }
+
+    private func duration(until end: Date) -> String {
+        Duration.seconds(max(0, end.timeIntervalSince(operation.startedAt)))
+            .formatted(.time(pattern: .minuteSecond))
+    }
+
+    // MARK: - Disclosures
+
+    private var stepsDisclosure: some View {
+        DisclosureGroup(isExpanded: $isStepsExpanded) {
+            ScrollView {
+                BatchStepList(steps: operation.steps)
+                    .padding(.vertical, Spacing.compact)
+            }
+            .frame(maxHeight: 180)
+        } label: {
+            Text(stepsTitle)
+                .font(.caption)
+                .foregroundStyle(operation.failedSteps.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
+        }
+    }
+
+    private var stepsTitle: String {
+        let failed = operation.failedSteps.count
+        let upgraded = operation.succeededStepCount
+        return failed > 0
+            ? "Packages · \(upgraded) upgraded, \(failed) failed"
+            : "Packages · \(upgraded) of \(operation.steps.count) upgraded"
+    }
+
+    private var outputDisclosure: some View {
+        DisclosureGroup(isExpanded: $isOutputExpanded) {
+            ScrollView {
+                Text(operation.log.joined(separator: "\n"))
+                    .font(.caption.monospaced())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+            .defaultScrollAnchor(.bottom)
+            .frame(maxHeight: 160)
+        } label: {
+            Text("Output")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Actions
+
+    private var actions: some View {
         HStack(spacing: Spacing.item) {
             Spacer()
-            if let onRetry {
-                Button(action: onRetry) {
-                    Label("Retry", systemImage: "arrow.clockwise")
+            if store.canRetry(operation.id) {
+                Button("Retry", systemImage: "arrow.clockwise") {
+                    Task { await store.retry(operation.id) }
                 }
-                .help("Run the operation again")
             }
             if let logFileURL = operation.logFileURL {
-                Button {
+                Button("Open Log", systemImage: "doc.text") {
                     NSWorkspace.shared.open(logFileURL)
-                } label: {
-                    Label("Open Log", systemImage: "doc.text")
                 }
                 .help("Open the full log in Console")
             }
@@ -112,117 +184,36 @@ struct ActivityRow: View {
         .font(.caption)
     }
 
-    private var statusLabel: String {
-        if !operation.steps.isEmpty {
-            return batchStatusLabel
-        }
-        switch operation.status {
-        case .running:
-            return operation.lastLogLine ?? "Running"
-        case .succeeded:
-            return "Completed"
-        case .failed(let reason):
-            return "Failed — \(reason)"
-        case .cancelled:
-            return "Cancelled"
-        }
-    }
-
-    private var batchStatusLabel: String {
-        let upgraded = operation.succeededStepCount
-        let failed = operation.failedSteps.count
-        switch operation.status {
-        case .running:
-            return "Running"
-        case .succeeded:
-            return "\(upgraded) upgraded"
-        case .failed:
-            return "\(upgraded) upgraded, \(failed) failed"
-        case .cancelled:
-            return "Cancelled after upgrading \(upgraded) of \(operation.steps.count)"
-        }
-    }
-
-    private var stepsDisclosureTitle: String {
-        let failed = operation.failedSteps.count
-        return failed > 0 ? "Packages (\(failed) failed)" : "Packages"
-    }
-
     @ViewBuilder
-    private var statusIndicator: some View {
-        switch operation.status {
-        case .running:
-            HStack(spacing: Spacing.item) {
-                ProgressView().controlSize(.small)
-                if let onCancel {
-                    Button(role: .cancel, action: onCancel) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Cancel")
-                }
+    private var contextMenu: some View {
+        if case .failed(let reason) = operation.status {
+            Button("Copy Error") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(reason, forType: .string)
             }
-        case .succeeded:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-        case .failed:
-            Image(systemName: "exclamationmark.circle.fill")
-                .foregroundStyle(.red)
-        case .cancelled:
-            Image(systemName: "minus.circle.fill")
-                .foregroundStyle(.secondary)
+        }
+        if store.canRetry(operation.id) {
+            Button("Retry") { Task { await store.retry(operation.id) } }
+        }
+        if let logFileURL = operation.logFileURL {
+            Button("Open Log") { NSWorkspace.shared.open(logFileURL) }
+            Button("Show Log in Finder") { NSWorkspace.shared.activateFileViewerSelecting([logFileURL]) }
+        }
+        if !operation.isRunning {
+            Divider()
+            Button("Remove from List") { store.remove(operation.id) }
         }
     }
 }
 
-#Preview("Running") {
-    ActivityRow(
-        operation: BrewOperation(
-            kind: .upgrade(name: "openssl@3", isCask: false),
-            log: ["Downloading openssl@3-3.6.0.bottle.tar.gz", "Installing openssl@3"]
-        ),
-        onCancel: {},
-        onForceRetry: nil
-    )
-    .padding()
-    .frame(width: 340)
-}
-
-#Preview("Upgrade All") {
-    ActivityRow(
-        operation: .upgradeAllPreview,
-        onCancel: {},
-        onForceRetry: nil
-    )
-    .padding()
-    .frame(width: 340)
-}
-
-#Preview("Succeeded") {
-    ActivityRow(
-        operation: BrewOperation(
-            kind: .install(name: "wget", isCask: false),
-            status: .succeeded,
-            completedAt: Date()
-        ),
-        onCancel: nil,
-        onForceRetry: nil
-    )
-    .padding()
-    .frame(width: 340)
-}
-
-#Preview("Failed with force retry") {
-    ActivityRow(
-        operation: BrewOperation(
-            kind: .uninstall(name: "openssl@3", isCask: false),
-            status: .failed(reason: "Refusing to uninstall openssl@3 because it is required by curl"),
-            completedAt: Date()
-        ),
-        onCancel: nil,
-        onForceRetry: {}
-    )
-    .padding()
-    .frame(width: 340)
+#Preview {
+    VStack(spacing: 0) {
+        ForEach(BrewOperation.previewList) { operation in
+            ActivityRow(operation: operation)
+            Divider()
+        }
+    }
+    .padding(.horizontal)
+    .frame(width: 380)
+    .environment(AppStores(activity: .preview(BrewOperation.previewList)))
 }

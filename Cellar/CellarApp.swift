@@ -19,18 +19,18 @@ struct CellarApp: App {
                 }
                 .task { notificationObserver.register(serviceStore: stores.services) }
                 .task { UNUserNotificationCenter.current().delegate = notificationDelegate }
-                .task { await ActivityNotificationService.shared.requestPermission() }
-                .onChange(of: stores.activity.operations) {
-                    DockProgressService.shared.update(for: stores.activity.runningBatchOperation)
-                    for operation in stores.activity.operations where !operation.isRunning {
-                        ActivityNotificationService.shared.notifyCompletion(of: operation)
-                    }
-                }
                 .onChange(of: stores.packages.lastUpdated) { updateWidget() }
                 .onChange(of: stores.services.lastUpdated) { updateWidget() }
         }
         .defaultSize(width: 1320, height: 820)
         .commands { AppCommands(updateStore: stores.updates) }
+
+        Window("Activity", id: SceneID.activity) {
+            ActivityPanel()
+                .frame(minWidth: 380, idealWidth: 440, minHeight: 320, idealHeight: 560)
+                .environment(stores)
+        }
+        .defaultPosition(.topTrailing)
 
         Window("Keyboard Shortcuts", id: SceneID.keyboardShortcuts) {
             KeyboardShortcutsView()

@@ -36,7 +36,7 @@ struct SidebarView: View {
         case .outdated:
             guard packageStore.totalOutdated > 0 else { return nil }
             return SidebarBadge(
-                text: "\(packageStore.totalOutdated)",
+                count: packageStore.totalOutdated,
                 color: .orange,
                 accessibilityLabel: "\(packageStore.totalOutdated) updates available"
             )
@@ -44,14 +44,14 @@ struct SidebarView: View {
             let failureCount = serviceStore.services.filter(\.isError).count
             if failureCount > 0 {
                 return SidebarBadge(
-                    text: "\(failureCount)",
+                    count: failureCount,
                     color: .red,
                     accessibilityLabel: "\(failureCount) services need attention"
                 )
             }
             guard serviceStore.runningCount > 0 else { return nil }
             return SidebarBadge(
-                text: "\(serviceStore.runningCount)",
+                count: serviceStore.runningCount,
                 color: .green,
                 accessibilityLabel: "\(serviceStore.runningCount) services running"
             )
@@ -62,7 +62,7 @@ struct SidebarView: View {
 }
 
 private struct SidebarBadge {
-    let text: String
+    let count: Int
     let color: Color
     let accessibilityLabel: String
 }
@@ -70,19 +70,13 @@ private struct SidebarBadge {
 private struct SidebarItemRow: View {
     let item: SidebarItem
     let badge: SidebarBadge?
-    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         HStack(spacing: Spacing.item) {
             Label(item.title, systemImage: item.icon)
             Spacer(minLength: Spacing.compact)
             if let badge {
-                Text(badge.text)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(badge.color)
-                    .padding(.horizontal, Spacing.related)
-                    .padding(.vertical, 1)
-                    .background(badge.color.opacity(contrast == .increased ? 0.28 : 0.14), in: Capsule())
+                CountBadge(count: badge.count, tint: badge.color)
                     .accessibilityLabel(badge.accessibilityLabel)
             }
         }

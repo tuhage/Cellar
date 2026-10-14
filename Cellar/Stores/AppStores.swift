@@ -6,6 +6,7 @@ import CellarCore
 @MainActor
 final class AppStores {
     let activity: ActivityStore
+    let notices = NoticeStore()
     let packages: PackageStore
     let services: ServiceStore
     let taps: TapStore
@@ -35,6 +36,11 @@ final class AppStores {
         maintenance.loadSettings()
         maintenance.loadReports()
         Self.removeObsoleteCaches()
+
+        activity.onFinish = { [notices] operation in notices.announce(operation) }
+        activity.onChange = { [activity] in
+            DockProgressService.shared.update(for: activity.runningBatchOperation)
+        }
     }
 
     /// Caches written by earlier versions that nothing reads anymore.
@@ -97,6 +103,7 @@ extension View {
     func environment(_ stores: AppStores) -> some View {
         self
             .environment(stores.activity)
+            .environment(stores.notices)
             .environment(stores.packages)
             .environment(stores.services)
             .environment(stores.taps)

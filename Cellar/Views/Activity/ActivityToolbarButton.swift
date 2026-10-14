@@ -1,93 +1,57 @@
 import SwiftUI
 
-/// Toolbar button that exposes the activity panel via a popover. Shows a
-/// activity symbol with a badge for running or failed operations. Completed
-/// operations stay available in the panel without permanently cluttering the
-/// toolbar.
+/// Toolbar button that opens the Activity panel. A badge counts running
+/// operations, or failures once nothing runs.
 struct ActivityToolbarButton: View {
     @Environment(ActivityStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPanelPresented = false
 
     var body: some View {
         Button {
             isPanelPresented.toggle()
         } label: {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: hasAttention ? "clock.arrow.circlepath" : "clock")
-                    .font(.title3)
-                    .foregroundStyle(iconTint)
-                if badgeCount > 0 {
-                    Text("\(badgeCount)")
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(badgeColor, in: Capsule())
-                        .offset(x: 6, y: -4)
+            Image(systemName: store.runningCount > 0 ? "clock.arrow.circlepath" : "clock")
+                .font(.title3)
+                .foregroundStyle(iconTint)
+                .symbolEffect(.rotate, isActive: store.runningCount > 0 && !reduceMotion)
+                .overlay(alignment: .topTrailing) {
+                    if let badge {
+                        CountBadge(count: badge.count, tint: badge.color, style: .filled)
+                            .offset(x: Spacing.item, y: -Spacing.compact)
+                    }
                 }
-            }
-            .frame(width: 28, height: 22)
         }
-        .help(helpText)
+        .help(summary)
+        .accessibilityLabel("Activity")
+        .accessibilityValue(summary)
         .popover(isPresented: $isPanelPresented, arrowEdge: .top) {
             ActivityPanel()
-                .environment(store)
+                .frame(width: 380, height: 480)
         }
         .onReceive(NotificationCenter.default.publisher(for: .openActivityPanel)) { _ in
             isPanelPresented = true
         }
     }
 
-    // MARK: - Derived state
-
-    private var hasOps: Bool { !store.operations.isEmpty }
-
-    private var failedCount: Int {
-        store.operations.filter {
-            if case .failed = $0.status { return true }
-            return false
-        }.count
+    private var badge: (count: Int, color: Color)? {
+        if store.runningCount > 0 { return (store.runningCount, .accentColor) }
+        if store.failedCount > 0 { return (store.failedCount, .red) }
+        return nil
     }
 
-    private var badgeCount: Int { store.runningCount + failedCount }
-    private var hasAttention: Bool { badgeCount > 0 }
-
-    private var hasFailures: Bool {
-        store.operations.contains {
-            if case .failed = $0.status { return true }
-            return false
-        }
-    }
-
-    private var iconTint: AnyShapeStyle {
-        if store.runningCount > 0 {
-            return AnyShapeStyle(.tint)
-        } else if hasFailures {
-            return AnyShapeStyle(.red)
-        } else if hasOps {
-            return AnyShapeStyle(.primary)
-        } else {
-            return AnyShapeStyle(.secondary)
-        }
-    }
-
-    private var badgeColor: Color {
+    private var iconTint: Color {
         if store.runningCount > 0 { return .accentColor }
-        if hasFailures { return .red }
+        if store.failedCount > 0 { return .red }
         return .secondary
     }
 
-    private var helpText: String {
-        let running = store.runningCount
-        if running > 0 {
-            return "\(running) running"
-        } else if hasFailures {
-            return "\(failedCount) failed — click to review"
-        } else if hasOps {
-            return "Activity history"
-        } else {
-            return "Activity"
+    private var summary: String {
+        switch (store.runningCount, store.failedCount) {
+        case (0, 0): "No operations need attention"
+        case (let running, 0): "\(running) running"
+        case (0, let failed): "\(failed) failed"
+        case (let running, let failed): "\(running) running, \(failed) failed"
         }
     }
 }

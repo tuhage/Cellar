@@ -190,24 +190,37 @@ nonisolated enum WindowSize {
     static let fullDetailHeight: CGFloat = 600
 }
 
-// MARK: - HoverableCardButtonStyle
+// MARK: - CardButtonStyle
 
-/// A button style that elevates shadow on hover and scales down on press.
-struct HoverableCardButtonStyle: ButtonStyle {
-    @State private var isHovered = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+/// Buttons that are whole cards or rows (stat cards, quick actions, list
+/// rows): a quiet hover tint and pressed state like Mac lists — no scaling
+/// or growing shadows.
+struct CardButtonStyle: ButtonStyle {
+    var cornerRadius: CGFloat = CornerRadius.large
 
     func makeBody(configuration: Configuration) -> some View {
+        CardButtonBody(configuration: configuration, cornerRadius: cornerRadius)
+    }
+}
+
+private struct CardButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let cornerRadius: CGFloat
+
+    @State private var isHovered = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         configuration.label
-            .scaleEffect(reduceMotion ? 1 : configuration.isPressed ? 0.98 : isHovered ? 1.01 : 1.0)
-            .shadow(
-                color: isHovered ? Shadow.elevatedColor : .clear,
-                radius: isHovered ? Shadow.elevatedBlur : 0,
-                y: isHovered ? Shadow.elevatedY : 0
-            )
-            .brightness(isHovered ? 0.015 : 0)
-            .animation(reduceMotion ? nil : AnimationToken.interactive, value: configuration.isPressed)
-            .animation(reduceMotion ? nil : AnimationToken.interactive, value: isHovered)
+            .overlay(shape.fill(.primary.opacity(highlight)).allowsHitTesting(false))
+            .contentShape(shape)
             .onHover { isHovered = $0 }
+    }
+
+    private var highlight: Double {
+        guard isEnabled else { return 0 }
+        if configuration.isPressed { return Opacity.pressedOverlay }
+        return isHovered ? Opacity.hoverOverlay : 0
     }
 }

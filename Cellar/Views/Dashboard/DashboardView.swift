@@ -3,18 +3,24 @@ import CellarCore
 
 // MARK: - DashboardView
 
+/// The overview: what needs attention first, then counts, services,
+/// updates, recent installs and taps. Every row opens its item.
 struct DashboardView: View {
     @Binding var selection: SidebarItem?
+
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(TapStore.self) private var tapStore
     @Environment(MaintenanceStore.self) private var maintenanceStore
+    @Environment(ActivityStore.self) private var activityStore
     @Environment(\.refreshAll) private var refreshAll
+
+    private static let listLimit = 5
 
     var body: some View {
         Group {
             if let summary {
-                dashboardContent(summary)
+                content(summary)
             } else if let errorMessage = packageStore.errorMessage {
                 ErrorView(message: errorMessage) {
                     Task { await refreshAll() }
@@ -23,7 +29,11 @@ struct DashboardView: View {
                 LoadingView(message: "Loading Dashboard\u{2026}")
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            attentionBanners
+        }
         .navigationTitle("Dashboard")
+        .dataFreshness(packageStore.lastUpdated)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: packageStore.isLoading || serviceStore.isLoading) {
@@ -31,6 +41,7 @@ struct DashboardView: View {
                 }
             }
         }
+        .focusedSceneValue(\.pageRefresh, refreshAll)
     }
 
     /// `nil` until the first data arrives.
@@ -44,569 +55,407 @@ struct DashboardView: View {
         )
     }
 
-    // MARK: - Content
+    // MARK: - Needs Attention
 
     @ViewBuilder
-    private func dashboardContent(_ summary: SystemSummary) -> some View {
+    private var attentionBanners: some View {
+        if let message = packageStore.errorMessage ?? serviceStore.errorMessage, summary != nil {
+            LoadErrorBanner(message: message, lastUpdated: packageStore.lastUpdated) {
+                await refreshAll()
+            }
+        }
+
+        let failedServices = serviceStore.services.filter(\.isError)
+        if let firstFailed = failedServices.first {
+            NoticeBanner(
+                tint: .red,
+                systemImage: "exclamationmark.octagon.fill",
+                title: failedServices.count == 1
+                    ? "\(firstFailed.name) failed"
+                    : "\(failedServices.count) services failed",
+                message: "Open Services to see the exit code and logs."
+            ) {
+                Button("Show") { open(firstFailed) }
+            }
+        }
+
+        let staleServices = serviceStore.servicesNeedingRestart(formulae: packageStore.formulae)
+        if !staleServices.isEmpty {
+            RestartServicesBanner(
+                services: staleServices,
+                isRestarting: staleServices.contains { activityStore.isActive(.package($0.name)) }
+            ) {
+                Task { await serviceStore.restart(staleServices) }
+            }
+        }
+
+        if activityStore.failedCount > 0 {
+            NoticeBanner(
+                tint: .orange,
+                systemImage: "exclamationmark.triangle.fill",
+                title: activityStore.failedCount == 1
+                    ? "An operation failed"
+                    : "\(activityStore.failedCount) operations failed"
+            ) {
+                Button("Show Activity") {
+                    NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                }
+            }
+        }
+    }
+
+    // MARK: - Content
+
+    private func content(_ summary: SystemSummary) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
-                statsSection(summary)
-                dashboardColumns(summary)
+                stats(summary)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: Spacing.section) {
+                        VStack(alignment: .leading, spacing: Spacing.section) {
+                            primaryColumn(summary)
+                        }
+                        .frame(minWidth: 420, maxWidth: .infinity, alignment: .topLeading)
+
+                        VStack(alignment: .leading, spacing: Spacing.section) {
+                            secondaryColumn(summary)
+                        }
+                        .frame(minWidth: 360, idealWidth: 420, maxWidth: 480, alignment: .topLeading)
+                    }
+
+                    VStack(alignment: .leading, spacing: Spacing.section) {
+                        secondaryColumn(summary)
+                        primaryColumn(summary)
+                    }
+                }
             }
             .padding(Spacing.section)
         }
     }
 
     @ViewBuilder
-    private func dashboardColumns(_ summary: SystemSummary) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: Spacing.section) {
-                VStack(alignment: .leading, spacing: Spacing.section) {
-                    if !summary.services.isEmpty {
-                        servicesSection(summary)
-                    }
-                    if !summary.recentlyInstalled.isEmpty {
-                        recentlyInstalledSection(summary)
-                    }
-                    if !summary.taps.isEmpty {
-                        tapsSection(summary)
-                    }
-                }
-                .frame(minWidth: 420, maxWidth: .infinity, alignment: .topLeading)
-
-                VStack(alignment: .leading, spacing: Spacing.section) {
-                    quickActionsSection(summary)
-                    if summary.updatesAvailable > 0 {
-                        outdatedSection(summary)
-                    }
-                }
-                .frame(minWidth: 360, idealWidth: 420, maxWidth: 480, alignment: .topLeading)
-            }
-
-            VStack(alignment: .leading, spacing: Spacing.section) {
-                if !summary.services.isEmpty {
-                    servicesSection(summary)
-                }
-                quickActionsSection(summary)
-                if !summary.recentlyInstalled.isEmpty {
-                    recentlyInstalledSection(summary)
-                }
-                if !summary.taps.isEmpty {
-                    tapsSection(summary)
-                }
-                if summary.updatesAvailable > 0 {
-                    outdatedSection(summary)
-                }
-            }
+    private func primaryColumn(_ summary: SystemSummary) -> some View {
+        if !summary.services.isEmpty {
+            servicesCard(summary)
+        }
+        if !summary.recentlyInstalled.isEmpty {
+            recentlyInstalledCard(summary)
+        }
+        if !summary.taps.isEmpty {
+            tapsCard(summary)
         }
     }
 
-    // MARK: - Stats Section
-
-    private func statsSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(title: "Overview", systemImage: "chart.bar.fill", color: .secondary)
-
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 210), spacing: Spacing.sectionContent)],
-                spacing: Spacing.sectionContent
-            ) {
-                navigableCard(to: .formulae) {
-                    StatCardView(
-                        title: "Formulae",
-                        value: "\(summary.totalFormulae)",
-                        systemImage: "terminal",
-                        color: .blue
-                    )
-                }
-
-                navigableCard(to: .casks) {
-                    StatCardView(
-                        title: "Casks",
-                        value: "\(summary.totalCasks)",
-                        systemImage: "macwindow",
-                        color: .purple
-                    )
-                }
-
-                navigableCard(to: .services) {
-                    StatCardView(
-                        title: "Services",
-                        value: "\(summary.runningServices)/\(summary.totalServices)",
-                        systemImage: "gearshape.2",
-                        color: .green
-                    )
-                }
-
-                navigableCard(to: .outdated) {
-                    StatCardView(
-                        title: "Updates",
-                        value: "\(summary.updatesAvailable)",
-                        systemImage: "arrow.triangle.2.circlepath",
-                        color: summary.updatesAvailable > 0 ? .orange : .green
-                    )
-                }
-            }
+    @ViewBuilder
+    private func secondaryColumn(_ summary: SystemSummary) -> some View {
+        quickActions(summary)
+        if summary.hasOutdatedPackages {
+            updatesCard(summary)
         }
     }
 
-    // MARK: - Services Section
+    // MARK: - Stats
 
-    private func servicesSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(
-                title: "Services at a Glance",
-                systemImage: "gearshape.2",
-                color: .green
-            ) {
-                seeAllButton(to: .services)
-            }
-
-            VStack(spacing: 0) {
-                DividedForEach(data: Array(summary.services.prefix(5))) { service in
-                    Button {
-                        selection = .services
-                    } label: {
-                        serviceRow(service)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, Spacing.compact)
-            .cardStyle()
+    private func stats(_ summary: SystemSummary) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 210), spacing: Spacing.sectionContent)],
+            spacing: Spacing.sectionContent
+        ) {
+            statCard(.formulae, value: "\(summary.totalFormulae)", color: .blue)
+            statCard(.casks, value: "\(summary.totalCasks)", color: .purple)
+            statCard(
+                .services,
+                value: "\(summary.runningServices)/\(summary.totalServices)",
+                color: summary.hasFailedServices ? .red : .green,
+                accessibilityValue: "\(summary.runningServices) of \(summary.totalServices) running"
+            )
+            statCard(.outdated, value: "\(summary.updatesAvailable)", color: summary.hasOutdatedPackages ? .orange : .green)
         }
     }
 
-    private func serviceRow(_ service: BrewServiceItem) -> some View {
-        DashboardHoverRow {
-            HStack(spacing: Spacing.row) {
-                Circle()
-                    .fill(service.status.color)
-                    .frame(width: IconSize.statusDot, height: IconSize.statusDot)
-                    .accessibilityLabel("\(service.status.label)")
-
-                Text(service.name)
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                Text(service.status.label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .listRowInset()
+    private func statCard(
+        _ item: SidebarItem,
+        value: String,
+        color: Color,
+        accessibilityValue: String? = nil
+    ) -> some View {
+        Button {
+            selection = item
+        } label: {
+            StatCardView(
+                title: item.title,
+                value: value,
+                systemImage: item.icon,
+                color: color,
+                accessibilityValue: accessibilityValue
+            )
         }
+        .buttonStyle(CardButtonStyle())
+        .accessibilityHint("Opens \(item.title)")
     }
 
-    // MARK: - Quick Actions Section
+    // MARK: - Quick Actions
 
-    private func quickActionsSection(_ summary: SystemSummary) -> some View {
+    private func quickActions(_ summary: SystemSummary) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             SectionHeaderView(title: "Quick Actions", systemImage: "bolt.fill", color: .secondary)
-
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: Spacing.sectionContent) {
-                    quickActionButtons(summary)
-                }
-
-                VStack(spacing: Spacing.sectionContent) {
-                    quickActionButtons(summary)
-                }
+                HStack(spacing: Spacing.sectionContent) { quickActionButtons(summary) }
+                VStack(spacing: Spacing.sectionContent) { quickActionButtons(summary) }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func quickActionButtons(_ summary: SystemSummary) -> some View {
+        QuickActionButton(
+            title: packageStore.isUpgradingAll ? "Upgrading\u{2026}" : "Upgrade All",
+            subtitle: upgradeAllSubtitle(summary),
+            systemImage: "arrow.up.circle.fill",
+            color: .orange,
+            isDisabled: !packageStore.isUpgradingAll
+                && (!summary.hasOutdatedPackages || packageStore.isCheckingForUpdates),
+            isProminent: true
+        ) {
+            if packageStore.isUpgradingAll {
+                NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+            } else {
+                packageStore.isUpgradePreviewPresented = true
+            }
+        }
+
+        QuickActionButton(
+            title: "Clean Up",
+            subtitle: maintenanceStore.runningTask?.kind == .cleanup ? "Cleaning up\u{2026}" : "Free disk space",
+            systemImage: "trash.circle.fill",
+            color: .blue,
+            isDisabled: maintenanceStore.isRunning
+        ) {
+            maintenanceStore.isCleanupPreviewPresented = true
+        }
+
+        QuickActionButton(
+            title: "Health Check",
+            subtitle: maintenanceStore.runningTask?.kind == .healthCheck ? "Checking\u{2026}" : "Run brew doctor",
+            systemImage: "heart.circle.fill",
+            color: .green,
+            isDisabled: maintenanceStore.isRunning
+        ) {
+            Task { await maintenanceStore.runHealthCheck() }
         }
     }
 
     private func upgradeAllSubtitle(_ summary: SystemSummary) -> String {
-        if packageStore.isUpgradingAll {
-            guard let operation = packageStore.upgradeAllOperation,
-                  let step = operation.currentStep,
-                  let position = operation.currentStepNumber
-            else { return "Show progress" }
+        if let operation = packageStore.upgradeAllOperation, operation.isRunning {
+            guard let step = operation.currentStep, let position = operation.currentStepNumber else {
+                return "Show progress"
+            }
             return "\(step.name) · \(position) of \(operation.steps.count)"
         }
         if packageStore.isCheckingForUpdates {
             return "Checking for updates\u{2026}"
         }
-        return summary.updatesAvailable > 0 ? "\(summary.updatesAvailable) available" : "All up to date"
+        return summary.hasOutdatedPackages ? "\(summary.updatesAvailable) available" : "All up to date"
     }
 
-    @ViewBuilder
-    private func quickActionButtons(_ summary: SystemSummary) -> some View {
-                QuickActionButton(
-                    title: packageStore.isUpgradingAll ? "Upgrading\u{2026}" : "Upgrade All",
-                    subtitle: upgradeAllSubtitle(summary),
-                    systemImage: "arrow.up.circle.fill",
-                    color: .orange,
-                    isDisabled: !packageStore.isUpgradingAll
-                        && (summary.updatesAvailable == 0 || packageStore.isCheckingForUpdates),
-                    isProminent: true
-                ) {
-                    // While running, the button shows where the upgrade is.
-                    if packageStore.isUpgradingAll {
-                        NotificationCenter.default.post(name: .openActivityPanel, object: nil)
-                    } else {
-                        packageStore.isUpgradePreviewPresented = true
-                    }
-                }
+    // MARK: - Lists
 
-                QuickActionButton(
-                    title: "Cleanup",
-                    subtitle: "Free disk space",
-                    systemImage: "trash.circle.fill",
-                    color: .blue,
-                    isDisabled: maintenanceStore.isRunning
-                ) {
-                    Task { await maintenanceStore.runCleanup() }
-                }
-
-                QuickActionButton(
-                    title: "Health Check",
-                    subtitle: "Run brew doctor",
-                    systemImage: "heart.circle.fill",
-                    color: .green,
-                    isDisabled: maintenanceStore.isRunning
-                ) {
-                    Task { await maintenanceStore.runHealthCheck() }
-                }
-    }
-
-
-    // MARK: - Recently Installed Section
-
-    private func recentlyInstalledSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(
-                title: "Recently Installed",
-                systemImage: "clock.arrow.circlepath",
-                color: .blue
-            ) {
-                seeAllButton(to: .formulae)
+    private func servicesCard(_ summary: SystemSummary) -> some View {
+        DashboardListCard(
+            title: "Services",
+            systemImage: SidebarItem.services.icon,
+            color: .green,
+            items: Array(summary.services.prefix(Self.listLimit)),
+            hiddenCount: summary.services.count - Self.listLimit,
+            seeAll: { selection = .services },
+            select: open
+        ) { service in
+            HStack(spacing: Spacing.row) {
+                Image(systemName: "circle.fill")
+                    .font(.system(size: IconSize.statusDot))
+                    .foregroundStyle(service.status.color)
+                    .accessibilityHidden(true)
+                Text(service.name)
+                    .fontWeight(.medium)
+                Spacer()
+                Text(service.status.label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-
-            VStack(spacing: 0) {
-                DividedForEach(data: summary.recentlyInstalled) { formula in
-                    Button {
-                        packageStore.selectedFormulaId = formula.id
-                        selection = .formulae
-                    } label: {
-                        recentlyInstalledRow(formula)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, Spacing.compact)
-            .cardStyle()
         }
     }
 
-    private func recentlyInstalledRow(_ formula: Formula) -> some View {
-        DashboardHoverRow {
+    private func updatesCard(_ summary: SystemSummary) -> some View {
+        let updates = summary.outdatedFormulae.map(DashboardUpdate.init(formula:))
+            + summary.outdatedCasks.map(DashboardUpdate.init(cask:))
+        return DashboardListCard(
+            title: "Updates",
+            systemImage: SidebarItem.outdated.icon,
+            color: .orange,
+            items: Array(updates.prefix(Self.listLimit)),
+            hiddenCount: updates.count - Self.listLimit,
+            seeAll: { selection = .outdated },
+            select: open
+        ) { update in
             HStack(spacing: Spacing.row) {
-                Image(systemName: "terminal")
+                Image(systemName: update.isCask ? SidebarItem.casks.icon : SidebarItem.formulae.icon)
+                    .foregroundStyle(update.isCask ? .purple : .blue)
+                    .frame(width: IconSize.iconColumn)
+                    .accessibilityLabel(update.isCask ? "Cask" : "Formula")
+                Text(update.name)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                Spacer()
+                Text("\(update.currentVersion) → \(update.targetVersion)")
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private func recentlyInstalledCard(_ summary: SystemSummary) -> some View {
+        DashboardListCard(
+            title: "Recently Installed",
+            systemImage: "clock.arrow.circlepath",
+            color: .blue,
+            items: summary.recentlyInstalled,
+            seeAll: { selection = .formulae },
+            select: { formula in open(DashboardUpdate(formula: formula)) }
+        ) { formula in
+            HStack(spacing: Spacing.row) {
+                Image(systemName: SidebarItem.formulae.icon)
                     .foregroundStyle(.blue)
                     .frame(width: IconSize.iconColumn)
-
+                    .accessibilityHidden(true)
                 Text(formula.name)
                     .fontWeight(.medium)
-
                 Spacer()
-
                 if let installTime = formula.installTime {
-                    Text(Self.relativeDateFormatter.localizedString(for: installTime, relativeTo: .now))
+                    Text(installTime, format: .relative(presentation: .named))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
-            .listRowInset()
         }
     }
 
-    // MARK: - Taps Section
-
-    private func tapsSection(_ summary: SystemSummary) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(
-                title: "Taps",
-                systemImage: "spigot",
-                color: .teal
-            ) {
-                seeAllButton(to: .taps)
-            }
-
-            VStack(spacing: 0) {
-                DividedForEach(data: summary.taps) { tap in
-                    Button {
-                        selection = .taps
-                    } label: {
-                        tapRow(tap)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, Spacing.compact)
-            .cardStyle()
-        }
-    }
-
-    private func tapRow(_ tap: Tap) -> some View {
-        DashboardHoverRow {
+    private func tapsCard(_ summary: SystemSummary) -> some View {
+        DashboardListCard(
+            title: "Taps",
+            systemImage: SidebarItem.taps.icon,
+            color: .teal,
+            items: Array(summary.taps.prefix(Self.listLimit)),
+            hiddenCount: summary.taps.count - Self.listLimit,
+            seeAll: { selection = .taps },
+            select: { _ in selection = .taps }
+        ) { tap in
             HStack(spacing: Spacing.row) {
-                Image(systemName: "spigot")
-                    .foregroundStyle(.teal)
-                    .frame(width: IconSize.iconColumn)
-
                 Text(tap.name)
                     .fontWeight(.medium)
-
                 if tap.official {
-                    Text("Official")
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.blue)
-                        .smallBadgeInset()
-                        .background(.blue.opacity(Opacity.badgeBackground), in: Capsule())
+                    StatusBadge(text: "Official", color: .blue)
                 }
-
                 Spacer()
-
                 Text("\(tap.totalPackages) packages")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
-            .listRowInset()
         }
     }
 
-    // MARK: - Outdated Section
+    // MARK: - Navigation
 
-    private func outdatedSection(_ summary: SystemSummary) -> some View {
-        let formulae = Array(summary.outdatedFormulae.prefix(5))
-        let casks = Array(summary.outdatedCasks.prefix(5))
-        let totalShown = formulae.count + casks.count
-        let remaining = summary.updatesAvailable - totalShown
+    private func open(_ service: BrewServiceItem) {
+        serviceStore.selectedServiceId = service.id
+        selection = .services
+    }
 
-        return VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(
-                title: "Outdated Packages",
-                systemImage: "arrow.triangle.2.circlepath",
-                color: .orange
-            ) {
-                Text("\(summary.updatesAvailable) update\(summary.updatesAvailable == 1 ? "" : "s") available")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+    private func open(_ update: DashboardUpdate) {
+        if update.isCask {
+            packageStore.selectedCaskId = update.id
+            selection = .casks
+        } else {
+            packageStore.selectedFormulaId = update.id
+            selection = .formulae
+        }
+    }
+}
+
+// MARK: - Dashboard List Card
+
+/// A titled card listing a few items; each row opens its item and "See All"
+/// opens the full page.
+private struct DashboardListCard<Item: Identifiable, Row: View>: View {
+    let title: String
+    let systemImage: String
+    let color: Color
+    let items: [Item]
+    var hiddenCount = 0
+    let seeAll: () -> Void
+    let select: (Item) -> Void
+    @ViewBuilder let row: (Item) -> Row
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
+            SectionHeaderView(title: title, systemImage: systemImage, color: color) {
+                Button(hiddenCount > 0 ? "See All (\(items.count + hiddenCount))" : "See All", action: seeAll)
+                    .buttonStyle(.link)
             }
 
             VStack(spacing: 0) {
-                ForEach(Array(formulae.enumerated()), id: \.element.id) { index, formula in
+                DividedForEach(data: items) { item in
                     Button {
-                        packageStore.selectedFormulaId = formula.id
-                        selection = .formulae
+                        select(item)
                     } label: {
-                        DashboardHoverRow {
-                            outdatedRow(
-                                name: formula.name,
-                                description: formula.desc,
-                                systemImage: "terminal",
-                                iconColor: .blue,
-                                currentVersion: formula.version,
-                                targetVersion: formula.latestVersion ?? "latest"
-                            )
-                        }
+                        row(item)
+                            .listRowInset()
+                            .padding(.horizontal, Spacing.compact)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(.plain)
-
-                    if index < formulae.count - 1 || !casks.isEmpty || remaining > 0 {
-                        Divider()
-                    }
-                }
-
-                ForEach(Array(casks.enumerated()), id: \.element.id) { index, cask in
-                    Button {
-                        packageStore.selectedCaskId = cask.id
-                        selection = .casks
-                    } label: {
-                        DashboardHoverRow {
-                            outdatedRow(
-                                name: cask.displayName,
-                                description: cask.desc,
-                                systemImage: "macwindow",
-                                iconColor: .purple,
-                                currentVersion: cask.installed ?? cask.version,
-                                targetVersion: cask.version
-                            )
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if index < casks.count - 1 || remaining > 0 {
-                        Divider()
-                    }
-                }
-
-                if remaining > 0 {
-                    Button {
-                        selection = .outdated
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text("and \(remaining) more\u{2026}")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                        }
-                        .padding(.vertical, Spacing.item)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    .buttonStyle(CardButtonStyle(cornerRadius: CornerRadius.small))
                 }
             }
-            .padding(.vertical, Spacing.compact)
+            .padding(Spacing.compact)
             .cardStyle()
         }
     }
-
-    private func outdatedRow(
-        name: String,
-        description: String?,
-        systemImage: String,
-        iconColor: Color,
-        currentVersion: String,
-        targetVersion: String
-    ) -> some View {
-        HStack {
-            Image(systemName: systemImage)
-                .foregroundStyle(iconColor)
-                .frame(width: IconSize.iconColumn)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(name)
-                    .fontWeight(.medium)
-
-                if let description {
-                    Text(description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer()
-
-            HStack(spacing: Spacing.compact) {
-                Text(currentVersion)
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.secondary)
-
-                Image(systemName: "arrow.right")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-
-                Text(targetVersion)
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.orange)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .listRowInset()
-        .contentShape(Rectangle())
-    }
-
-    // MARK: - Helpers
-
-    private func navigableCard<Content: View>(
-        to destination: SidebarItem,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        Button {
-            selection = destination
-        } label: {
-            content()
-                .overlay(alignment: .topTrailing) {
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .padding(Spacing.item)
-                }
-                .contentShape(RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
-        }
-        .buttonStyle(HoverableCardButtonStyle())
-    }
-
-    private func seeAllButton(to destination: SidebarItem) -> some View {
-        Button {
-            selection = destination
-        } label: {
-            Text("See All")
-                .font(.subheadline)
-        }
-        .buttonStyle(SeeAllButtonStyle())
-    }
-
-    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter
-    }()
 }
 
+// MARK: - Dashboard Update
 
-// MARK: - Dashboard Hover Row
+/// An outdated formula or cask as one dashboard row.
+private struct DashboardUpdate: Identifiable {
+    let id: String
+    let name: String
+    let isCask: Bool
+    let currentVersion: String
+    let targetVersion: String
 
-/// A row wrapper that highlights on hover for dashboard list sections.
-private struct DashboardHoverRow<Content: View>: View {
-    @ViewBuilder var content: () -> Content
-
-    @State private var isHovered = false
-
-    var body: some View {
-        content()
-            .padding(.horizontal, Spacing.item)
-            .background(
-                RoundedRectangle(cornerRadius: CornerRadius.small, style: .continuous)
-                    .fill(isHovered ? Color.primary.opacity(Opacity.hoverOverlay) : .clear)
-            )
-            .contentShape(Rectangle())
-            .onHover { isHovered = $0 }
-            .animation(AnimationToken.interactive, value: isHovered)
+    init(formula: Formula) {
+        id = formula.id
+        name = formula.name
+        isCask = false
+        currentVersion = formula.version
+        targetVersion = formula.latestVersion ?? "latest"
     }
-}
 
-// MARK: - See All Button Style
-
-private struct SeeAllButtonStyle: ButtonStyle {
-    @State private var isHovered = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(.blue)
-            .opacity(configuration.isPressed ? 0.6 : isHovered ? 0.8 : 1.0)
-            .animation(AnimationToken.interactive, value: isHovered)
-            .animation(AnimationToken.interactive, value: configuration.isPressed)
-            .onHover { isHovered = $0 }
+    init(cask: Cask) {
+        id = cask.id
+        name = cask.displayName
+        isCask = true
+        currentVersion = cask.installed ?? cask.version
+        targetVersion = cask.version
     }
 }
 
 // MARK: - Preview
 
 #Preview {
+    @Previewable @State var selection: SidebarItem? = .dashboard
     NavigationStack {
-        DashboardView(selection: .constant(.dashboard))
-            .environment(AppStores())
+        DashboardView(selection: $selection)
     }
-    .frame(width: 700, height: 600)
+    .environment(AppStores())
+    .frame(width: 1000, height: 760)
 }

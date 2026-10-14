@@ -23,6 +23,12 @@ final class ActivityStore {
         case none
     }
 
+    /// Called once for every finished operation — announcements.
+    var onFinish: ((BrewOperation) -> Void)?
+    /// Called when an operation starts, moves to another step or finishes —
+    /// app-wide progress such as the Dock icon. Not called per log line.
+    var onChange: (() -> Void)?
+
     /// Maximum log lines kept in memory per operation; the file keeps all.
     private static let logRingBufferSize = 200
     private var cancellationHandlers: [UUID: () -> Void] = [:]
@@ -184,6 +190,7 @@ final class ActivityStore {
         }
         let step = operations[index].steps[stepIndex]
         logService.append(id, Self.logLine(for: step, position: stepIndex + 1, of: operations[index].steps.count))
+        onChange?()
     }
 
     // MARK: Private
@@ -196,6 +203,7 @@ final class ActivityStore {
         }
         operations.insert(operation, at: 0)
         updateSleepPrevention()
+        onChange?()
         return operation.id
     }
 
@@ -228,6 +236,8 @@ final class ActivityStore {
         }
         logService.end(id, status: status)
         updateSleepPrevention()
+        onChange?()
+        onFinish?(operations[index])
     }
 
     private func retryHandler<T: Sendable>(

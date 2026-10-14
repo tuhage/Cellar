@@ -12,14 +12,14 @@ struct ContentView: View {
     }
     @State private var isBrewInstalled = BrewProcess.isInstalled
     @State private var isQuickOpenPresented = false
-    @State private var operationNotice: OperationNotice?
-    @State private var announcedOperationIDs: Set<UUID> = []
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(PackageStore.self) private var packageStore
     @Environment(MaintenanceStore.self) private var maintenanceStore
     @Environment(ActivityStore.self) private var activityStore
+    @Environment(NoticeStore.self) private var noticeStore
     @Environment(\.refreshAll) private var refreshAll
+    @Environment(\.openWindow) private var openWindow
     @Environment(\.startBackgroundWork) private var startBackgroundWork
 
     var body: some View {
@@ -85,33 +85,13 @@ struct ContentView: View {
             QuickOpenView(selection: selection, isPresented: $isQuickOpenPresented)
         }
         .overlay(alignment: .topTrailing) {
-            if let operationNotice {
-                OperationNoticeView(
-                    notice: operationNotice,
-                    showDetails: {
-                        NotificationCenter.default.post(name: .openActivityPanel, object: nil)
-                        self.operationNotice = nil
-                    },
-                    dismiss: { self.operationNotice = nil }
-                )
-                .padding(Spacing.section)
-                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+            if let notice = noticeStore.current {
+                OperationNoticeView(notice: notice)
+                    .padding(Spacing.section)
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(reduceMotion ? nil : AnimationToken.smooth, value: operationNotice)
-        .onChange(of: activityStore.operations) { _, operations in
-            guard let completed = operations.first(where: {
-                !$0.isRunning && !announcedOperationIDs.contains($0.id)
-            }) else { return }
-            announcedOperationIDs.insert(completed.id)
-            operationNotice = OperationNotice(operation: completed)
-        }
-        .task(id: operationNotice?.id) {
-            guard operationNotice != nil else { return }
-            try? await Task.sleep(for: .seconds(6))
-            guard !Task.isCancelled else { return }
-            operationNotice = nil
-        }
+        .animation(reduceMotion ? nil : AnimationToken.smooth, value: noticeStore.current)
         .urlSchemeHandler(selection: selection)
         .focusedSceneValue(\.windowCommands, windowCommands)
     }
@@ -120,7 +100,7 @@ struct ContentView: View {
         WindowCommands(
             navigate: { selection.wrappedValue = $0 },
             openQuickOpen: { isQuickOpenPresented = true },
-            showActivity: { NotificationCenter.default.post(name: .openActivityPanel, object: nil) },
+            showActivity: { openWindow(id: SceneID.activity) },
             refreshAll: refreshAll,
             canUpgradeAll: !packageStore.upgradableFormulae.isEmpty || !packageStore.outdatedCasks.isEmpty,
             previewUpgradeAll: { packageStore.isUpgradePreviewPresented = true },

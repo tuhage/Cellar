@@ -6,8 +6,9 @@ struct StatCardView: View {
     let value: String
     let systemImage: String
     var color: Color = .accentColor
+    /// Spoken instead of `value` when that reads badly ("3 of 5 running").
+    var accessibilityValue: String?
 
-    @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -33,14 +34,9 @@ struct StatCardView: View {
         }
         .padding(Spacing.detailElement)
         .cardStyle()
-        .scaleEffect(isHovered && !reduceMotion ? 1.01 : 1.0)
-        .shadow(
-            color: isHovered ? Shadow.elevatedColor : .clear,
-            radius: isHovered ? Shadow.elevatedBlur : 0,
-            y: isHovered ? Shadow.elevatedY : 0
-        )
-        .animation(reduceMotion ? nil : AnimationToken.interactive, value: isHovered)
-        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(accessibilityValue ?? value)
     }
 }
 

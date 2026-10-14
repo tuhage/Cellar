@@ -3,75 +3,66 @@ import Foundation
 import os
 import CellarCore
 
-/// Wraps `UNUserNotificationCenter` and surfaces completion notifications
-/// for aggregate Homebrew operations. Single-package operations are silent.
+/// Posts system notifications for finished operations while Cellar isn't in
+/// front. Permission is requested the first time there is something to say.
 @MainActor
 final class ActivityNotificationService {
     static let shared = ActivityNotificationService()
 
+    /// Settings toggle; notifications are on by default.
+    static let enabledKey = "showNotifications"
+
     private let center = UNUserNotificationCenter.current()
-    private var notifiedIDs = Set<UUID>()
 
     private init() {}
 
-    /// Requests notification authorization once at app launch. Safe to call
-    /// repeatedly; the system handles the deduplication.
-    func requestPermission() async {
-        do {
-            _ = try await center.requestAuthorization(options: [.alert, .sound])
-        } catch let error as UNError where error.code == .notificationsNotAllowed {
-            Log.notifications.info("Notification permission denied by user")
-        } catch {
-            Log.notifications.error("Notification authorization request failed: \(error.localizedDescription, privacy: .public)")
-        }
+    var isEnabled: Bool {
+        UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
     }
 
-    /// Posts a notification when an aggregate operation finishes. Only
-    /// `.upgradeAll(count:)` triggers a notification today; other kinds are
-    /// silent to avoid spam.
-    func notifyCompletion(of op: BrewOperation) {
-        // De-duplicate — only fire once per op id
-        guard !notifiedIDs.contains(op.id) else { return }
-        guard case .upgradeAll(let count) = op.kind else { return }
-        notifiedIDs.insert(op.id)
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        await center.notificationSettings().authorizationStatus
+    }
 
-        let upgraded = op.steps.isEmpty ? count : op.succeededStepCount
+    func post(_ notice: OperationNotice) {
+        guard isEnabled else { return }
         let content = UNMutableNotificationContent()
-        switch op.status {
-        case .succeeded:
-            content.title = "Upgrade Complete"
-            content.body = "\(upgraded) packages upgraded."
-        case .failed(let reason):
-            let failed = op.failedSteps
-            content.title = failed.isEmpty ? "Upgrade Failed" : "Upgrade Finished with Errors"
-            content.body = failed.isEmpty
-                ? reason
-                : "\(upgraded) upgraded, \(failed.count) failed: \(failed.map(\.name).joined(separator: ", "))"
-        case .cancelled:
-            content.title = "Upgrade Cancelled"
-            content.body = "Cancelled after upgrading \(upgraded) of \(count) packages."
-        case .running:
-            return
-        }
+        content.title = notice.title
+        content.body = notice.message ?? ""
         content.sound = .default
+        let request = UNNotificationRequest(identifier: "activity.\(notice.id.uuidString)", content: content, trigger: nil)
 
-        let request = UNNotificationRequest(
-            identifier: "activity.\(op.id.uuidString)",
-            content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
-        )
         Task {
+            guard await requestAuthorizationIfNeeded() else { return }
             do {
                 try await center.add(request)
             } catch {
-                Log.notifications.error("Failed to add activity notification: \(error.localizedDescription, privacy: .public)")
+                Log.notifications.error("Failed to add notification: \(error.localizedDescription, privacy: .public)")
             }
+        }
+    }
+
+    /// Asks once; afterwards the choice made in System Settings applies.
+    @discardableResult
+    func requestAuthorizationIfNeeded() async -> Bool {
+        switch await authorizationStatus() {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .notDetermined:
+            do {
+                return try await center.requestAuthorization(options: [.alert, .sound])
+            } catch {
+                Log.notifications.error("Notification authorization failed: \(error.localizedDescription, privacy: .public)")
+                return false
+            }
+        default:
+            return false
         }
     }
 }
 
-/// Forwards notifications to the active foreground app. Without this delegate
-/// macOS suppresses any notification fired while Cellar is the active app.
+/// Shows notifications even while Cellar is the active app — macOS hides
+/// them otherwise.
 final class ActivityNotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,

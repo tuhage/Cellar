@@ -40,33 +40,11 @@ struct QuickActionButton: View {
                 color.opacity(isProminent ? 0.065 : 0),
                 in: RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
             )
+            .cardStyle(cornerRadius: CornerRadius.card)
         }
-        .buttonStyle(QuickActionButtonStyle())
+        .buttonStyle(CardButtonStyle(cornerRadius: CornerRadius.card))
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.5 : 1)
-    }
-}
-
-// MARK: - Button Style
-
-private struct QuickActionButtonStyle: ButtonStyle {
-    @State private var isHovered = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .cardStyle(cornerRadius: CornerRadius.card)
-            .scaleEffect(reduceMotion ? 1 : configuration.isPressed ? 0.98 : 1.0)
-            .brightness(configuration.isPressed ? -0.02 : isHovered ? 0.02 : 0)
-            .shadow(
-                color: isHovered ? Shadow.elevatedColor : .clear,
-                radius: isHovered ? Shadow.elevatedBlur : 0,
-                y: isHovered ? Shadow.elevatedY : 0
-            )
-            .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
-            .animation(reduceMotion ? nil : AnimationToken.interactive, value: configuration.isPressed)
-            .animation(reduceMotion ? nil : AnimationToken.interactive, value: isHovered)
-            .onHover { isHovered = $0 }
     }
 }
 

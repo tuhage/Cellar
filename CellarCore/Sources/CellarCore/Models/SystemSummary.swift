@@ -85,10 +85,19 @@ public struct SystemSummary: Codable, Sendable {
             updatesAvailable: outdatedFormulae.count + outdatedCasks.count,
             outdatedFormulae: outdatedFormulae,
             outdatedCasks: outdatedCasks,
-            services: services,
+            services: services.sorted(by: attentionOrder),
             recentlyInstalled: Array(recentlyInstalled),
             taps: taps
         )
+    }
+
+    /// Failed services first, then running ones, then the rest — so a short
+    /// list shows what needs attention.
+    private static func attentionOrder(_ lhs: BrewServiceItem, _ rhs: BrewServiceItem) -> Bool {
+        func rank(_ service: BrewServiceItem) -> Int {
+            service.isError ? 0 : service.isRunning ? 1 : 2
+        }
+        return (rank(lhs), lhs.name) < (rank(rhs), rhs.name)
     }
 
     // MARK: Preview
