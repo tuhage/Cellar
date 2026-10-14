@@ -313,7 +313,7 @@ struct QuickOpenView: View {
         guard parts.count == 2 else { return nil }
         switch parts[0] {
         case "destination":
-            return SidebarItem(rawValue: parts[1]).map(QuickOpenItem.destination)
+            return SidebarItem.resolve(parts[1]).map(QuickOpenItem.destination)
         case "formula":
             return packageStore.formulae.first { $0.id == parts[1] }.map(QuickOpenItem.formula)
         case "cask":
@@ -379,7 +379,7 @@ private struct QuickOpenItem: Identifiable {
 
     var subtitle: String {
         switch kind {
-        case .destination(let item): item.section.title
+        case .destination(let item): item.section.title ?? "Overview"
         case .formula(let formula): formula.desc ?? "Version \(formula.version)"
         case .cask(let cask): cask.desc ?? cask.token
         case .service(let service): service.status.label
@@ -427,6 +427,5 @@ private struct QuickOpenItem: Identifiable {
     @Previewable @State var isPresented = true
 
     QuickOpenView(selection: $selection, isPresented: $isPresented)
-        .environment(PackageStore())
-        .environment(ServiceStore())
+        .environment(AppStores())
 }

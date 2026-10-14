@@ -6,7 +6,6 @@ struct OutdatedView: View {
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(ActivityStore.self) private var activityStore
 
-    @State private var isConfirmingUpgradeAll = false
     @State private var searchText = ""
 
     private var filteredFormulae: [Formula] {
@@ -57,9 +56,6 @@ struct OutdatedView: View {
         .task {
             await store.loadAll()
         }
-        .sheet(isPresented: $isConfirmingUpgradeAll) {
-            UpgradeAllSheet()
-        }
     }
 
     // MARK: - Update Check
@@ -82,14 +78,11 @@ struct OutdatedView: View {
     private var restartBanner: some View {
         let services = servicesNeedingRestart
         if !services.isEmpty {
-            VStack(spacing: 0) {
-                RestartServicesBanner(
-                    services: services,
-                    isRestarting: services.contains { activityStore.isActive(target: $0.name) }
-                ) {
-                    Task { await serviceStore.restart(services) }
-                }
-                Divider()
+            RestartServicesBanner(
+                services: services,
+                isRestarting: services.contains { activityStore.isActive(.package($0.name)) }
+            ) {
+                Task { await serviceStore.restart(services) }
             }
         }
     }
@@ -98,18 +91,17 @@ struct OutdatedView: View {
 
     private var outdatedList: some View {
         VStack(spacing: 0) {
-            if store.isUpgradingAll {
-                upgradeAllProgress
+            if let operation = store.upgradeAllOperation, operation.isRunning {
+                RunningOperationBar(operation: operation)
                     .transition(.opacity)
             } else {
                 updateSummary
                     .transition(.opacity)
+                Divider()
                 if let failedBatch {
-                    Divider()
-                    failedBatchSummary(failedBatch)
+                    failedBatchBanner(failedBatch)
                 }
             }
-            Divider()
 
             List {
                 if !filteredFormulae.isEmpty {
@@ -188,7 +180,7 @@ struct OutdatedView: View {
             Spacer()
 
             Button {
-                isConfirmingUpgradeAll = true
+                store.isUpgradePreviewPresented = true
             } label: {
                 Label("Upgrade All", systemImage: "arrow.up.circle.fill")
             }
@@ -203,81 +195,26 @@ struct OutdatedView: View {
 
     // MARK: - Failed Batch
 
-    /// The latest Upgrade All, if it left packages that can be retried.
+    /// The latest Upgrade All, if it failed and can be retried.
     private var failedBatch: BrewOperation? {
-        guard let operation = store.upgradeAllOperation,
-              store.canRetryFailedUpgrades(of: operation)
-        else { return nil }
+        guard let operation = store.upgradeAllOperation, activityStore.canRetry(operation.id) else { return nil }
         return operation
     }
 
-    private func failedBatchSummary(_ operation: BrewOperation) -> some View {
-        let names = operation.failedSteps.map(\.name).formatted(.list(type: .and))
-        return HStack(spacing: Spacing.item) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
-            Text("\(names) failed to upgrade.")
-                .font(.callout)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: Spacing.item)
+    private func failedBatchBanner(_ operation: BrewOperation) -> some View {
+        NoticeBanner(
+            tint: .red,
+            systemImage: "exclamationmark.triangle.fill",
+            title: "\(operation.failedSteps.map(\.name).formatted(.list(type: .and))) failed to upgrade."
+        ) {
             Button("Details") {
                 NotificationCenter.default.post(name: .openActivityPanel, object: nil)
             }
             Button("Retry") {
-                store.retryFailedUpgrades(of: operation)
+                Task { await activityStore.retry(operation.id) }
             }
         }
-        .controlSize(.small)
-        .padding(.horizontal, Spacing.cardPadding)
-        .padding(.vertical, Spacing.item)
-        .background(.red.opacity(0.05))
     }
-
-    // MARK: - Upgrade All Progress
-
-    /// Takes the summary bar's place while Upgrade All runs, so progress is
-    /// visible without covering the list.
-    private var upgradeAllProgress: some View {
-        HStack(alignment: .top, spacing: Spacing.sectionContent) {
-            Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.orange)
-                .frame(width: IconSize.mediumIcon, height: IconSize.mediumIcon)
-                .background(.orange.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.medium))
-
-            Group {
-                if let operation = store.upgradeAllOperation {
-                    BatchProgressView(operation: operation)
-                } else {
-                    Text("Upgrading all packages\u{2026}")
-                        .font(.callout)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .frame(maxWidth: 560, alignment: .leading)
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: Spacing.item) {
-                Button("Details") {
-                    NotificationCenter.default.post(name: .openActivityPanel, object: nil)
-                }
-                .help("Show every package and brew's output in Activity")
-
-                Button("Cancel") {
-                    store.cancelUpgradeAll()
-                }
-                .disabled(store.upgradeAllOperation?.isRunning == false)
-                .help("Stop after cancelling the package that is upgrading now")
-            }
-            .controlSize(.small)
-        }
-        .padding(.horizontal, Spacing.cardPadding)
-        .padding(.vertical, Spacing.row)
-        .background(.orange.opacity(0.045))
-    }
-
 }
 
 // MARK: - Outdated Package Row
@@ -298,7 +235,7 @@ private struct OutdatedPackageRow: View {
     @State private var isHovered = false
 
     private var isUpgrading: Bool {
-        activityStore.isActive(target: packageName)
+        activityStore.isActive(.package(packageName))
     }
 
     private var batchStep: BrewOperation.Step? {
@@ -397,9 +334,7 @@ private struct OutdatedPackageRow: View {
 #Preview {
     NavigationStack {
         OutdatedView()
-            .environment(PackageStore())
-            .environment(ServiceStore())
-            .environment(ActivityStore())
+            .environment(AppStores())
     }
     .frame(width: 600, height: 500)
 }

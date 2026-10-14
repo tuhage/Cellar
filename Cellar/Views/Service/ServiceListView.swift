@@ -144,14 +144,11 @@ struct ServiceListView: View {
     private var restartBanner: some View {
         let services = store.servicesNeedingRestart(formulae: packageStore.formulae)
         if !services.isEmpty {
-            VStack(spacing: 0) {
-                RestartServicesBanner(
-                    services: services,
-                    isRestarting: services.contains { activityStore.isActive(target: $0.name) }
-                ) {
-                    Task { await store.restart(services) }
-                }
-                Divider()
+            RestartServicesBanner(
+                services: services,
+                isRestarting: services.contains { activityStore.isActive(.package($0.name)) }
+            ) {
+                Task { await store.restart(services) }
             }
         }
     }
@@ -357,9 +354,7 @@ private struct ServiceStatusBadge: View {
 #Preview {
     NavigationStack {
         ServiceListView()
-            .environment(ServiceStore())
-            .environment(PackageStore())
-            .environment(ActivityStore())
+            .environment(AppStores())
     }
     .frame(width: 700, height: 500)
 }

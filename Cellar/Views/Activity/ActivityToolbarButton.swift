@@ -100,33 +100,18 @@ extension Notification.Name {
 
 #Preview("Idle") {
     ActivityToolbarButton()
-        .environment(ActivityStore())
+        .environment(AppStores())
         .padding()
 }
 
 #Preview("Running") {
-    let store = ActivityStore()
-    _ = store.register(kind: .upgrade(name: "openssl@3", isCask: false))
-    _ = store.register(kind: .upgradeAll(count: 33))
-    return ActivityToolbarButton()
-        .environment(store)
+    ActivityToolbarButton()
+        .environment(ActivityStore.preview([.upgradeAllPreview]))
         .padding()
 }
 
-#Preview("Failed") {
-    let store = ActivityStore()
-    let id = store.register(kind: .upgrade(name: "ffmpeg", isCask: false))
-    store.setStatus(id, .failed(reason: "Build error"))
-    return ActivityToolbarButton()
-        .environment(store)
-        .padding()
-}
-
-#Preview("Completed Only") {
-    let store = ActivityStore()
-    let id = store.register(kind: .install(name: "ripgrep", isCask: false))
-    store.setStatus(id, .succeeded)
-    return ActivityToolbarButton()
-        .environment(store)
+#Preview("Mixed") {
+    ActivityToolbarButton()
+        .environment(ActivityStore.preview(BrewOperation.previewList))
         .padding()
 }

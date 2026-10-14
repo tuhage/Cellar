@@ -13,8 +13,6 @@ final class ActivityLogService {
         .appending(path: "Library/Logs/Cellar", directoryHint: .isDirectory)
 
     private static let retainedFileCount = 50
-    private static let isRunningForPreviews =
-        ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
     private var handles: [UUID: FileHandle] = [:]
 
     private static let fileNameFormatter = makeFormatter("yyyy-MM-dd HH.mm.ss")
@@ -26,7 +24,7 @@ final class ActivityLogService {
 
     /// Creates the operation's log file and returns its location.
     func begin(_ operation: BrewOperation) -> URL? {
-        guard !Self.isRunningForPreviews else { return nil }
+        guard !ProcessInfo.processInfo.isRunningForPreviews else { return nil }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             pruneOldLogs()

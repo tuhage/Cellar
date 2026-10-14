@@ -77,6 +77,11 @@ public nonisolated final class PersistenceService: Sendable {
         }
     }
 
+    /// Loads a cache entry with its timestamp, or `nil` when there is none.
+    public func loadCacheEntry<T: Codable & Sendable>(_ type: T.Type, from fileName: String) -> CacheEntry<T>? {
+        try? load(CacheEntry<T>.self, from: fileName)
+    }
+
     /// Wraps data in a `CacheEntry` with the current timestamp and saves it.
     public func saveToCache<T: Codable & Sendable>(_ data: T, to fileName: String) {
         do {

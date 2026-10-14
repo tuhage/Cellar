@@ -408,7 +408,7 @@ struct PackageDetailView: View {
 #Preview("Formula Detail") {
     NavigationStack {
         PackageDetailView(package: .formula(Formula.preview))
-            .environment(PackageStore())
+            .environment(AppStores())
     }
     .frame(width: 600, height: 700)
 }
@@ -416,7 +416,7 @@ struct PackageDetailView: View {
 #Preview("Cask Detail") {
     NavigationStack {
         PackageDetailView(package: .cask(Cask.preview))
-            .environment(PackageStore())
+            .environment(AppStores())
     }
     .frame(width: 600, height: 700)
 }

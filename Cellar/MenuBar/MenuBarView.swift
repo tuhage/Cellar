@@ -14,6 +14,7 @@ struct MenuBarView: View {
     @Environment(ResourceStore.self) private var resourceStore
 
     @State private var isLoadingResources = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         headerSection
@@ -120,8 +121,9 @@ struct MenuBarView: View {
             )
             .disabled(true)
 
-            Button("Upgrade All") {
-                packageStore.upgradeAll()
+            Button("Upgrade All\u{2026}") {
+                showMainWindow()
+                packageStore.isUpgradePreviewPresented = true
             }
             .disabled(packageStore.isCheckingForUpdates)
         }
@@ -163,10 +165,7 @@ struct MenuBarView: View {
     private var appSection: some View {
         Group {
             Button("Open Cellar") {
-                NSApplication.shared.activate(ignoringOtherApps: true)
-                if let window = NSApplication.shared.windows.first(where: { $0.canBecomeMain }) {
-                    window.makeKeyAndOrderFront(nil)
-                }
+                showMainWindow()
             }
             .keyboardShortcut("o")
 
@@ -180,6 +179,12 @@ struct MenuBarView: View {
     }
 
     // MARK: - Helpers
+
+    /// Brings the main window forward, reopening it if it was closed.
+    private func showMainWindow() {
+        openWindow(id: SceneID.main)
+        NSApplication.shared.activate()
+    }
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -207,8 +212,5 @@ struct MenuBarView: View {
 
 #Preview {
     MenuBarView()
-        .environment(PackageStore())
-        .environment(ServiceStore())
-        .environment(MaintenanceStore())
-        .environment(ResourceStore())
+        .environment(AppStores())
 }

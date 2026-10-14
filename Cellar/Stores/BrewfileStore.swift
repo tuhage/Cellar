@@ -45,10 +45,7 @@ final class BrewfileStore: LoadableStore {
     var brewfileContent: String = ""
     var isLoading = false
     var errorMessage: String?
-
-    // Action stream (shared for install / cleanup output)
-    var actionStream: AsyncThrowingStream<String, Error>?
-    var actionTitle: String?
+    var lastUpdated: Date?
 
     // Check result
     var checkResult: String?
@@ -61,21 +58,27 @@ final class BrewfileStore: LoadableStore {
         return profiles.first { $0.id == selectedProfileId }
     }
 
-    var isPerformingAction: Bool { actionStream != nil }
+    /// The install, export or cleanup running for the selected profile.
+    var runningOperation: BrewOperation? {
+        selectedProfile.flatMap { activityStore.runningOperation(for: .brewfile($0.name)) }
+    }
+
+    var isPerformingAction: Bool { runningOperation != nil }
 
     var brewfileExistsOnDisk: Bool {
         guard let profile = selectedProfile else { return false }
         return FileManager.default.fileExists(atPath: profile.path)
     }
 
-    // MARK: Activity
-
-    var activityStore: ActivityStore?
-
     // MARK: Dependencies
 
+    let activityStore: ActivityStore
     private let persistence = PersistenceService()
     private let service = BrewService.shared
+
+    init(activityStore: ActivityStore) {
+        self.activityStore = activityStore
+    }
 
     private static let fileName = "brewfile_profiles.json"
 
@@ -113,16 +116,8 @@ final class BrewfileStore: LoadableStore {
 
         switch mode {
         case .empty:
-            let url = URL(fileURLWithPath: path)
-            let parentDir = url.deletingLastPathComponent()
-            do {
-                try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
-                let header = "# Brewfile\n# Created \(Date().formatted(date: .abbreviated, time: .omitted))\n"
-                try header.write(to: url, atomically: true, encoding: .utf8)
-                loadBrewfileContent(for: profile)
-            } catch {
-                errorMessage = "Failed to create Brewfile: \(error.localizedDescription)"
-            }
+            createEmptyBrewfileIfMissing(at: path)
+            loadBrewfileContent(for: profile)
         case .generate:
             Task { await exportBrewfile(to: profile) }
         }
@@ -159,40 +154,41 @@ final class BrewfileStore: LoadableStore {
         }
     }
 
-    /// Creates a default profile if none exist yet.
+    /// Creates a default profile if none exist yet. An existing `~/Brewfile`
+    /// is adopted as is, never overwritten.
     func ensureDefaultProfile() {
         guard profiles.isEmpty else { return }
         createProfile(name: "Default", path: "\(NSHomeDirectory())/Brewfile")
     }
 
+    /// Writes a commented header to a new Brewfile. Leaves existing files alone.
+    private func createEmptyBrewfileIfMissing(at path: String) {
+        guard !FileManager.default.fileExists(atPath: path) else { return }
+        let url = URL(fileURLWithPath: path)
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let header = "# Brewfile\n# Created \(Date().formatted(date: .abbreviated, time: .omitted))\n"
+            try header.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            errorMessage = "Failed to create Brewfile: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Export
 
-    /// Exports the current Homebrew state into the selected profile's Brewfile.
+    /// Writes the currently installed packages into the profile's Brewfile.
     func exportBrewfile(to profile: BrewfileProfile) async {
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .brewfileInstall)
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                try await self.service.bundleDump(to: profile.path)
+        await activityStore.perform(.brewfileExport(name: profile.name)) { _ in
+            try await self.service.bundleDump(to: profile.path)
+            if let index = self.profiles.firstIndex(where: { $0.id == profile.id }) {
+                self.profiles[index].lastExported = Date()
+                self.saveProfiles()
             }
-            // Update last exported timestamp
-            if let index = profiles.firstIndex(where: { $0.id == profile.id }) {
-                profiles[index].lastExported = Date()
-                saveProfiles()
-            }
-            loadBrewfileContent(for: profile)
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            if let opID {
-                activityStore?.setStatus(opID, isOperationCancellation(error)
-                    ? .cancelled : .failed(reason: error.localizedDescription))
-            }
-            if !isOperationCancellation(error) {
-                errorMessage = "Export failed: \(error.localizedDescription)"
-            }
+            self.loadBrewfileContent(for: profile)
         }
-        isLoading = false
     }
 
     // MARK: - Check
@@ -201,81 +197,30 @@ final class BrewfileStore: LoadableStore {
     func checkBrewfile(for profile: BrewfileProfile) async {
         isChecking = true
         checkResult = nil
-        errorMessage = nil
         do {
             let output = try await service.bundleCheck(at: profile.path)
             checkResult = output.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
-            checkResult = "Check failed: \(error.localizedDescription)"
+            checkResult = "Check failed: \(error.briefDescription)"
         }
         isChecking = false
     }
 
-    // MARK: - Cleanup
+    // MARK: - Install & Cleanup
 
-    /// Runs `brew bundle cleanup` to remove packages not listed in the Brewfile.
-    func cleanupBrewfile(for profile: BrewfileProfile) {
-        actionTitle = "Brewfile Cleanup"
-        let opID = activityStore?.register(kind: .brewfileCleanup)
-        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
-        let task = Task {
-            do {
-                let output = try await self.service.bundleCleanup(at: profile.path)
-                let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                let line = message.isEmpty ? "Nothing to clean up." : message
-                if let opID { activityStore?.appendLog(opID, line) }
-                continuation.yield(line)
-                continuation.finish()
-                if let opID { activityStore?.setStatus(opID, .succeeded) }
-            } catch {
-                continuation.finish(throwing: error)
-                if let opID {
-                    activityStore?.setStatus(
-                        opID,
-                        Task.isCancelled ? .cancelled : .failed(reason: error.localizedDescription)
-                    )
-                }
-            }
+    /// Runs `brew bundle cleanup` for the profile's Brewfile.
+    func cleanupBrewfile(for profile: BrewfileProfile) async {
+        await activityStore.perform(.brewfileCleanup(name: profile.name)) { activity in
+            let output = try await self.service.bundleCleanup(at: profile.path)
+            activity.log(output: output.isEmpty ? "Nothing to clean up." : output)
         }
-        if let opID {
-            activityStore?.setCancellationHandler(opID) { task.cancel() }
-        }
-        actionStream = stream
     }
 
-    /// Starts a streaming install session via the action stream.
-    func beginInstall(from profile: BrewfileProfile) {
-        actionTitle = "Installing from Brewfile"
-        let opID = activityStore?.register(kind: .brewfileInstall)
-        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
-        let task = Task {
-            do {
-                for try await line in self.service.bundleInstall(from: profile.path) {
-                    if let opID { activityStore?.appendLog(opID, line) }
-                    continuation.yield(line)
-                }
-                continuation.finish()
-                if let opID { activityStore?.setStatus(opID, .succeeded) }
-            } catch {
-                continuation.finish(throwing: error)
-                if let opID {
-                    activityStore?.setStatus(
-                        opID,
-                        Task.isCancelled ? .cancelled : .failed(reason: error.localizedDescription)
-                    )
-                }
-            }
+    /// Runs `brew bundle install` for the profile's Brewfile.
+    func install(from profile: BrewfileProfile) async {
+        await activityStore.perform(.brewfileInstall(name: profile.name)) { activity in
+            try await activity.stream(self.service.bundleInstall(from: profile.path))
         }
-        if let opID {
-            activityStore?.setCancellationHandler(opID) { task.cancel() }
-        }
-        actionStream = stream
-    }
-
-    /// Dismisses the current action stream.
-    func dismissAction() {
-        actionStream = nil
-        actionTitle = nil
     }
 
     // MARK: - Content

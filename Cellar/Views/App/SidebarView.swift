@@ -10,20 +10,25 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $selection) {
             ForEach(SidebarSection.allCases) { section in
-                let items = SidebarItem.items(for: section)
-                if !items.isEmpty {
-                    Section(section.title) {
-                        ForEach(items) { item in
-                            SidebarItemRow(item: item, badge: badge(for: item))
-                                .tag(item)
-                        }
+                if let title = section.title {
+                    Section(title) {
+                        rows(for: section)
                     }
+                } else {
+                    rows(for: section)
                 }
             }
         }
         .listStyle(.sidebar)
         .scrollIndicators(.hidden)
         .navigationTitle("Cellar")
+    }
+
+    private func rows(for section: SidebarSection) -> some View {
+        ForEach(SidebarItem.items(for: section)) { item in
+            SidebarItemRow(item: item, badge: badge(for: item))
+                .tag(item)
+        }
     }
 
     private func badge(for item: SidebarItem) -> SidebarBadge? {
@@ -88,9 +93,7 @@ private struct SidebarItemRow: View {
     @Previewable @State var selection: SidebarItem? = .dashboard
     NavigationSplitView {
         SidebarView(selection: $selection)
-            .environment(PackageStore())
-            .environment(ServiceStore())
-            .environment(TapStore())
+            .environment(AppStores())
     } detail: {
         Text(selection?.title ?? "Select an item")
     }

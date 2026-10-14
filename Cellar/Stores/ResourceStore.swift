@@ -23,6 +23,7 @@ final class ResourceStore: LoadableStore {
 
     var isLoading = false
     var errorMessage: String?
+    var lastUpdated: Date?
     private var homebrewPrefix: String?
 
     // MARK: Computed
@@ -37,10 +38,6 @@ final class ResourceStore: LoadableStore {
 
     var sortedUsages: [ResourceUsage] {
         usages.sorted { $0.memoryMB > $1.memoryMB }
-    }
-
-    var lastUpdated: Date? {
-        usages.map(\.timestamp).max()
     }
 
     func history(for serviceName: String) -> [ResourceUsage] {
@@ -99,6 +96,7 @@ final class ResourceStore: LoadableStore {
             samples.append(usage)
             usageHistory[usage.serviceName] = Array(samples.suffix(12))
         }
+        lastUpdated = Date()
     }
 
     func loadDiskUsage() async {

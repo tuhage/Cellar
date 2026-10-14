@@ -9,33 +9,19 @@ struct RestartServicesBanner: View {
     let restart: () -> Void
 
     var body: some View {
-        HStack(spacing: Spacing.sectionContent) {
-            Image(systemName: "arrow.clockwise.circle.fill")
-                .font(.title3)
-                .foregroundStyle(.blue)
-
-            VStack(alignment: .leading, spacing: Spacing.textPair) {
-                Text(title)
-                    .font(.callout.weight(.medium))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: Spacing.item)
-
+        NoticeBanner(
+            tint: .blue,
+            systemImage: "arrow.clockwise.circle.fill",
+            title: title,
+            message: message
+        ) {
             if isRestarting {
                 ProgressView()
                     .controlSize(.small)
             } else {
                 Button(services.count == 1 ? "Restart" : "Restart All", action: restart)
-                    .controlSize(.small)
             }
         }
-        .padding(.horizontal, Spacing.cardPadding)
-        .padding(.vertical, Spacing.row)
-        .background(.blue.opacity(0.06))
-        .accessibilityElement(children: .combine)
     }
 
     private var title: String {
@@ -46,10 +32,10 @@ struct RestartServicesBanner: View {
         return "\(names) are still running previous versions"
     }
 
-    private var detail: String {
+    private var message: String {
         let base = "Upgraded while running. Restart to use the new version."
         return services.contains(where: \.requiresRoot)
-            ? base + " You'll be asked for your password."
+            ? base + " You’ll be asked for your password."
             : base
     }
 }

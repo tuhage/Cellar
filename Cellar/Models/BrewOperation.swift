@@ -1,19 +1,24 @@
 import Foundation
 import CellarCore
 
-/// Represents a single tracked Homebrew operation in the activity panel.
+/// One tracked Homebrew operation, as shown in the Activity panel.
 struct BrewOperation: Identifiable, Equatable {
     let id: UUID
     let kind: Kind
     var status: Status
     let startedAt: Date
     var completedAt: Date?
+    /// The user asked to cancel. The operation keeps running until brew has
+    /// actually stopped, so its package stays busy until then.
+    var isCancelling = false
+    /// Started by Cellar itself (such as the daily update check) rather than
+    /// the user, so its completion isn't announced.
+    let isBackground: Bool
     var log: [String]
     /// The operation's log on disk, under ~/Library/Logs/Cellar.
     var logFileURL: URL?
     /// When brew last printed anything; drives the "no output for a while" hint.
     var lastOutputAt: Date?
-    var error: String?
     /// Per-package breakdown for batch operations such as Upgrade All.
     var steps: [Step]
 
@@ -23,9 +28,9 @@ struct BrewOperation: Identifiable, Equatable {
         status: Status = .running,
         startedAt: Date = Date(),
         completedAt: Date? = nil,
+        isBackground: Bool = false,
         log: [String] = [],
         lastOutputAt: Date? = nil,
-        error: String? = nil,
         steps: [Step] = []
     ) {
         self.id = id
@@ -33,139 +38,42 @@ struct BrewOperation: Identifiable, Equatable {
         self.status = status
         self.startedAt = startedAt
         self.completedAt = completedAt
+        self.isBackground = isBackground
         self.log = log
         self.lastOutputAt = lastOutputAt
-        self.error = error
         self.steps = steps
+    }
+
+    /// `true` while the underlying brew process is running.
+    var isRunning: Bool {
+        status == .running
+    }
+
+    var isFailed: Bool {
+        if case .failed = status { return true }
+        return false
+    }
+
+    /// "Installing wget" while running, "Installed wget" once it succeeded.
+    var title: String {
+        status == .succeeded ? kind.completionTitle : kind.displayTitle
+    }
+
+    /// The latest non-empty output line, without brew's `==>` marker, for a
+    /// one-line "what is brew doing" hint.
+    var lastLogLine: String? {
+        guard let line = log.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) else {
+            return nil
+        }
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("==>") else { return trimmed }
+        return trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
     }
 }
 
+// MARK: - Status
+
 extension BrewOperation {
-
-    /// What the operation is doing. The associated values carry just enough
-    /// context for the UI label and `isActive(target:)` lookups.
-    enum Kind: Equatable {
-        case install(name: String, isCask: Bool)
-        case upgrade(name: String, isCask: Bool)
-        case uninstall(name: String, isCask: Bool)
-        case upgradeAll(count: Int)
-        case serviceStart(name: String)
-        case serviceStop(name: String)
-        case serviceRestart(name: String)
-        case serviceKill(name: String)
-        case tapAdd(url: String)
-        case tapRemove(name: String)
-        case brewfileInstall
-        case brewfileCleanup
-        case cleanup
-        case healthCheck
-        case brewUpdate
-        case projectActivate(name: String)
-        case projectDeactivate(name: String)
-
-        /// Human-readable label for the activity row.
-        var displayTitle: String {
-            switch self {
-            case .install(let name, _): "Installing \(name)"
-            case .upgrade(let name, _): "Upgrading \(name)"
-            case .uninstall(let name, _): "Uninstalling \(name)"
-            case .upgradeAll(let count): "Upgrading \(count) \(count == 1 ? "package" : "packages")"
-            case .serviceStart(let name): "Starting \(name)"
-            case .serviceStop(let name): "Stopping \(name)"
-            case .serviceRestart(let name): "Restarting \(name)"
-            case .serviceKill(let name): "Force stopping \(name)"
-            case .tapAdd(let url): "Adding tap \(url)"
-            case .tapRemove(let name): "Removing tap \(name)"
-            case .brewfileInstall: "Installing from Brewfile"
-            case .brewfileCleanup: "Cleaning up Brewfile"
-            case .cleanup: "Homebrew cleanup"
-            case .healthCheck: "Homebrew doctor"
-            case .brewUpdate: "Checking for updates"
-            case .projectActivate(let name): "Activating \(name)"
-            case .projectDeactivate(let name): "Deactivating \(name)"
-            }
-        }
-
-        /// Human-readable completion copy used by transient success feedback.
-        var completionTitle: String {
-            switch self {
-            case .install(let name, _): "Installed \(name)"
-            case .upgrade(let name, _): "Upgraded \(name)"
-            case .uninstall(let name, _): "Uninstalled \(name)"
-            case .upgradeAll(let count): "Upgraded \(count) \(count == 1 ? "package" : "packages")"
-            case .serviceStart(let name): "Started \(name)"
-            case .serviceStop(let name): "Stopped \(name)"
-            case .serviceRestart(let name): "Restarted \(name)"
-            case .serviceKill(let name): "Force stopped \(name)"
-            case .tapAdd(let url): "Added tap \(url)"
-            case .tapRemove(let name): "Removed tap \(name)"
-            case .brewfileInstall: "Installed Brewfile packages"
-            case .brewfileCleanup: "Cleaned up Brewfile"
-            case .cleanup: "Homebrew cleanup completed"
-            case .healthCheck: "Homebrew doctor completed"
-            case .brewUpdate: "Package list is up to date"
-            case .projectActivate(let name): "Activated \(name)"
-            case .projectDeactivate(let name): "Deactivated \(name)"
-            }
-        }
-
-        /// SF Symbol shown on the leading edge of the activity row.
-        var symbolName: String {
-            switch self {
-            case .install: "arrow.down.circle"
-            case .upgrade, .upgradeAll: "arrow.up.circle"
-            case .uninstall: "trash"
-            case .serviceStart: "play.circle"
-            case .serviceStop: "stop.circle"
-            case .serviceRestart: "arrow.clockwise.circle"
-            case .serviceKill: "bolt.slash.circle"
-            case .tapAdd: "plus.circle"
-            case .tapRemove: "minus.circle"
-            case .brewfileInstall: "doc.badge.arrow.up"
-            case .brewfileCleanup: "doc.badge.gearshape"
-            case .cleanup: "trash.circle"
-            case .healthCheck: "stethoscope"
-            case .brewUpdate: "arrow.triangle.2.circlepath"
-            case .projectActivate: "play.fill"
-            case .projectDeactivate: "stop.fill"
-            }
-        }
-
-        /// Name targeted by this operation (for `isActive(target:)` lookups).
-        /// Returns `nil` for kinds that aren't keyed by a single package name.
-        var targetName: String? {
-            switch self {
-            case .install(let name, _),
-                 .upgrade(let name, _),
-                 .uninstall(let name, _),
-                 .serviceStart(let name),
-                 .serviceStop(let name),
-                 .serviceRestart(let name),
-                 .serviceKill(let name),
-                 .tapRemove(let name),
-                 .projectActivate(let name),
-                 .projectDeactivate(let name):
-                name
-            case .tapAdd(let url):
-                url
-            case .upgradeAll, .brewfileInstall, .brewfileCleanup, .cleanup, .healthCheck, .brewUpdate:
-                nil
-            }
-        }
-
-        /// Whether the operation changes packages and is worth a log file.
-        /// Quick service toggles and read-only checks are left out.
-        var isLoggedToDisk: Bool {
-            switch self {
-            case .install, .upgrade, .uninstall, .upgradeAll, .tapAdd, .tapRemove,
-                 .brewfileInstall, .brewfileCleanup, .cleanup, .brewUpdate:
-                true
-            case .serviceStart, .serviceStop, .serviceRestart, .serviceKill,
-                 .healthCheck, .projectActivate, .projectDeactivate:
-                false
-            }
-        }
-    }
 
     enum Status: Equatable {
         case running
@@ -173,11 +81,121 @@ extension BrewOperation {
         case failed(reason: String)
         case cancelled
     }
+}
 
-    /// `true` while the underlying brew process is running.
-    var isRunning: Bool {
-        if case .running = status { return true }
-        return false
+// MARK: - Target
+
+extension BrewOperation {
+
+    /// What an operation keeps busy. A formula and its service share a
+    /// `.package` target, so a service can't be restarted mid-upgrade.
+    enum Target: Hashable {
+        case package(String)
+        case tap(String)
+        case brewfile(String)
+        case project(String)
+        /// Homebrew as a whole: batch upgrades, `brew update`, cleanup.
+        case homebrew
+    }
+}
+
+// MARK: - Kind
+
+extension BrewOperation {
+
+    /// What the operation does. Every case lives here so titles, symbols and
+    /// targets are defined in one place.
+    enum Kind: Equatable {
+        // Packages
+        case install(name: String, isCask: Bool)
+        case upgrade(name: String, isCask: Bool)
+        case reinstall(name: String, isCask: Bool)
+        case uninstall(name: String, isCask: Bool)
+        case pin(name: String)
+        case unpin(name: String)
+        case upgradeAll(count: Int)
+        // Services
+        case serviceStart(name: String)
+        case serviceRun(name: String)
+        case serviceStop(name: String)
+        case serviceRestart(name: String)
+        case serviceForceQuit(name: String)
+        // Taps
+        case tapAdd(name: String)
+        case tapRemove(name: String)
+        // Brewfiles and projects
+        case brewfileInstall(name: String)
+        case brewfileExport(name: String)
+        case brewfileCleanup(name: String)
+        case projectActivate(name: String)
+        case projectDeactivate(name: String)
+        // Homebrew maintenance
+        case brewUpdate
+        case cleanup
+        case autoremove
+        case healthCheck
+
+        /// "Upgrading wget" — shown while the operation runs.
+        var displayTitle: String { descriptor.running }
+
+        /// "Upgraded wget" — shown once it succeeded.
+        var completionTitle: String { descriptor.done }
+
+        /// SF Symbol for the activity row and notices.
+        var symbolName: String { descriptor.symbol }
+
+        var target: Target {
+            switch self {
+            case .install(let name, _), .upgrade(let name, _), .reinstall(let name, _),
+                 .uninstall(let name, _), .pin(let name), .unpin(let name),
+                 .serviceStart(let name), .serviceRun(let name), .serviceStop(let name),
+                 .serviceRestart(let name), .serviceForceQuit(let name):
+                .package(name)
+            case .tapAdd(let name), .tapRemove(let name):
+                .tap(name)
+            case .brewfileInstall(let name), .brewfileExport(let name), .brewfileCleanup(let name):
+                .brewfile(name)
+            case .projectActivate(let name), .projectDeactivate(let name):
+                .project(name)
+            case .upgradeAll, .brewUpdate, .cleanup, .autoremove, .healthCheck:
+                .homebrew
+            }
+        }
+
+        private var descriptor: (running: String, done: String, symbol: String) {
+            switch self {
+            case .install(let name, _): ("Installing \(name)", "Installed \(name)", "arrow.down.circle")
+            case .upgrade(let name, _): ("Upgrading \(name)", "Upgraded \(name)", "arrow.up.circle")
+            case .reinstall(let name, _): ("Reinstalling \(name)", "Reinstalled \(name)", "arrow.clockwise.circle")
+            case .uninstall(let name, _): ("Uninstalling \(name)", "Uninstalled \(name)", "trash")
+            case .pin(let name): ("Pinning \(name)", "Pinned \(name)", "pin")
+            case .unpin(let name): ("Unpinning \(name)", "Unpinned \(name)", "pin.slash")
+            case .upgradeAll(let count):
+                ("Upgrading \(Self.packages(count))", "Upgraded \(Self.packages(count))", "arrow.up.circle")
+            case .serviceStart(let name): ("Starting \(name)", "Started \(name)", "play.circle")
+            case .serviceRun(let name): ("Running \(name) once", "Started \(name) for this session", "play.circle")
+            case .serviceStop(let name): ("Stopping \(name)", "Stopped \(name)", "stop.circle")
+            case .serviceRestart(let name): ("Restarting \(name)", "Restarted \(name)", "arrow.clockwise.circle")
+            case .serviceForceQuit(let name): ("Force quitting \(name)", "Force quit \(name)", "bolt.slash.circle")
+            case .tapAdd(let name): ("Adding tap \(name)", "Added tap \(name)", "plus.circle")
+            case .tapRemove(let name): ("Removing tap \(name)", "Removed tap \(name)", "minus.circle")
+            case .brewfileInstall(let name):
+                ("Installing from \(name)", "Installed packages from \(name)", "doc.badge.arrow.up")
+            case .brewfileExport(let name): ("Exporting to \(name)", "Exported to \(name)", "square.and.arrow.down")
+            case .brewfileCleanup(let name):
+                ("Removing packages not in \(name)", "Removed packages not in \(name)", "doc.badge.gearshape")
+            case .projectActivate(let name): ("Activating \(name)", "Activated \(name)", "play.fill")
+            case .projectDeactivate(let name): ("Deactivating \(name)", "Deactivated \(name)", "stop.fill")
+            case .brewUpdate: ("Checking for package updates", "Package list is up to date", "arrow.triangle.2.circlepath")
+            case .cleanup: ("Cleaning up Homebrew", "Cleaned up Homebrew", "trash.circle")
+            case .autoremove: ("Removing unused dependencies", "Removed unused dependencies", "shippingbox")
+            case .healthCheck: ("Running brew doctor", "Finished brew doctor", "stethoscope")
+            }
+        }
+
+        private static func packages(_ count: Int) -> String {
+            "\(count) \(count == 1 ? "package" : "packages")"
+        }
     }
 }
 
@@ -265,16 +283,5 @@ extension BrewOperation {
     /// Position of the running step, 1-based ("3 of 8").
     var currentStepNumber: Int? {
         steps.firstIndex { $0.status == .running }.map { $0 + 1 }
-    }
-
-    /// The latest non-empty output line, without brew's `==>` marker, for a
-    /// one-line "what is brew doing" hint.
-    var lastLogLine: String? {
-        guard let line = log.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) else {
-            return nil
-        }
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("==>") else { return trimmed }
-        return trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
     }
 }

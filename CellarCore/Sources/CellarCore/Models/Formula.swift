@@ -82,8 +82,13 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
 
     // MARK: Actions
 
+    /// Streams `brew install` output line by line.
+    public static func installOutput(name: String) -> AsyncThrowingStream<String, Error> {
+        BrewService.shared.install(name, isCask: false)
+    }
+
     public static func install(name: String) async throws {
-        for try await _ in BrewService.shared.install(name, isCask: false) {}
+        for try await _ in installOutput(name: name) {}
     }
 
     /// Streams `brew upgrade` output line by line. Uses the fully qualified

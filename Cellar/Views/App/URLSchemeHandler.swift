@@ -30,7 +30,7 @@ struct URLSchemeHandler: ViewModifier {
         }
 
         // Direct sidebar navigation: cellar://dashboard, cellar://services, etc.
-        if let item = SidebarItem(rawValue: host) {
+        if let item = SidebarItem.resolve(host) {
             selection = item
         }
     }

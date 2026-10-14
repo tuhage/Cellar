@@ -230,6 +230,5 @@ private struct PlanRow: View {
 
 #Preview {
     UpgradeAllSheet()
-        .environment(PackageStore())
-        .environment(ServiceStore())
+        .environment(AppStores())
 }

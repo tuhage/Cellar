@@ -23,9 +23,7 @@ struct ActivityPanel: View {
                                     ? { store.cancel(op.id) }
                                     : nil,
                                 onForceRetry: shouldOfferForceRetry(op) ? { forceRetry(op) } : nil,
-                                onRetryFailed: packageStore.canRetryFailedUpgrades(of: op)
-                                    ? { packageStore.retryFailedUpgrades(of: op) }
-                                    : nil
+                                onRetry: store.canRetry(op.id) ? { retry(op) } : nil
                             )
                             .padding(.horizontal, Spacing.cardPadding)
                             Divider()
@@ -38,6 +36,10 @@ struct ActivityPanel: View {
         }
         .frame(width: 360)
         .frame(minHeight: 140, maxHeight: 480)
+    }
+
+    private func retry(_ operation: BrewOperation) {
+        Task { await store.retry(operation.id) }
     }
 
     // MARK: - Force Retry
@@ -72,12 +74,8 @@ struct ActivityPanel: View {
     }
 
     private func directForceUninstall(name: String, isCask: Bool) async {
-        let opID = store.register(kind: .uninstall(name: name, isCask: isCask))
-        do {
+        await store.perform(.uninstall(name: name, isCask: isCask)) { _ in
             try await BrewService.shared.uninstall(name, force: true)
-            store.setStatus(opID, .succeeded)
-        } catch {
-            store.setStatus(opID, .failed(reason: error.localizedDescription))
         }
     }
 
@@ -163,22 +161,11 @@ private struct ClearCompletedButton: View {
 }
 
 #Preview("Populated") {
-    let store = ActivityStore()
-    _ = store.register(kind: .upgrade(name: "openssl@3", isCask: false))
-    _ = store.register(kind: .upgradeAll(count: 33))
-    let id3 = store.register(kind: .install(name: "wget", isCask: false))
-    store.setStatus(id3, .succeeded)
-    let id4 = store.register(kind: .uninstall(name: "stale-formula", isCask: false))
-    store.setStatus(id4, .failed(reason: "Refusing to uninstall stale-formula because it is required by other-formula"))
-    return ActivityPanel()
-        .environment(store)
-        .environment(PackageStore())
-        .environment(ServiceStore())
+    ActivityPanel()
+        .environment(AppStores(activity: .preview(BrewOperation.previewList)))
 }
 
 #Preview("Empty") {
     ActivityPanel()
-        .environment(ActivityStore())
-        .environment(PackageStore())
-        .environment(ServiceStore())
+        .environment(AppStores())
 }

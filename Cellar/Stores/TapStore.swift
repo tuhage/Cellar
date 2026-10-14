@@ -4,10 +4,7 @@ import CellarCore
 
 // MARK: - TapStore
 
-/// Manages the state for Homebrew taps.
-///
-/// Coordinates loading, filtering, and add/remove operations.
-/// Views bind to this store for the tap list UI.
+/// Installed Homebrew taps and the actions that add or remove them.
 @Observable
 @MainActor
 final class TapStore: LoadableStore {
@@ -20,18 +17,17 @@ final class TapStore: LoadableStore {
 
     var isLoading = false
     var errorMessage: String?
+    var lastUpdated: Date?
     var searchQuery = ""
-    var actionStream: AsyncThrowingStream<String, Error>?
 
-    // MARK: Activity
+    // MARK: Dependencies
 
-    var activityStore: ActivityStore?
+    let activityStore: ActivityStore
+    private static let cache = CachePolicy(fileName: "cache-taps.json")
 
-    // MARK: Cache
-
-    private let persistence = PersistenceService()
-    private static let cacheMaxAge: TimeInterval = 300
-    private static let cacheFile = "cache-taps.json"
+    init(activityStore: ActivityStore) {
+        self.activityStore = activityStore
+    }
 
     // MARK: Computed
 
@@ -40,99 +36,40 @@ final class TapStore: LoadableStore {
         return taps.filter { $0.name.localizedCaseInsensitiveContains(searchQuery) }
     }
 
+    /// The tap being added or removed, if any.
+    var runningOperation: BrewOperation? {
+        activityStore.runningOperation { operation in
+            if case .tap = operation.kind.target { return true }
+            return false
+        }
+    }
+
     // MARK: Actions
 
-    /// Loads all Homebrew taps.
     func load(forceRefresh: Bool = false) async {
-        let (restored, needsFetch) = persistence.restoreIfNeeded(
-            current: taps, from: Self.cacheFile,
-            maxAge: Self.cacheMaxAge, forceRefresh: forceRefresh
-        )
-        taps = restored
-        guard needsFetch else { return }
-
-        isLoading = true
-        errorMessage = nil
-        do {
-            try await refreshTaps()
-        } catch {
-            if !isOperationCancellation(error) {
-                errorMessage = "Taps couldn’t be loaded. Please try again."
-            }
+        await load(
+            cache: Self.cache,
+            force: forceRefresh,
+            failureMessage: "Taps couldn’t be loaded."
+        ) {
+            try await Tap.all
+        } apply: { taps in
+            self.taps = taps
         }
-        isLoading = false
     }
 
-    /// Adds a tap by name and provides a stream for progress output.
-    func addTap(_ name: String) {
-        guard activityStore?.isActive(target: name) != true else {
-            errorMessage = "\(name) is already in progress"
-            return
+    /// Adds a tap; progress and output appear in Activity.
+    func addTap(_ name: String) async {
+        await activityStore.perform(.tapAdd(name: name)) { activity in
+            try await activity.stream(BrewService.shared.addTap(name))
+            await self.load(forceRefresh: true)
         }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .tapAdd(url: name))
-        let underlying = BrewService.shared.addTap(name)
-        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
-        let task = Task {
-            do {
-                for try await line in underlying {
-                    if let opID { activityStore?.appendLog(opID, line) }
-                    continuation.yield(line)
-                }
-                continuation.finish()
-                if let opID { activityStore?.setStatus(opID, .succeeded) }
-                await load(forceRefresh: true)
-            } catch {
-                continuation.finish(throwing: error)
-                if let opID {
-                    activityStore?.setStatus(
-                        opID,
-                        Task.isCancelled ? .cancelled : .failed(reason: error.localizedDescription)
-                    )
-                }
-                isLoading = false
-                errorMessage = error.localizedDescription
-            }
-        }
-        if let opID {
-            activityStore?.setCancellationHandler(opID) { task.cancel() }
-        }
-        actionStream = stream
     }
 
-    /// Removes a tap and reloads the tap list.
     func removeTap(_ tap: Tap) async {
-        guard activityStore?.isActive(target: tap.name) != true else { return }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .tapRemove(name: tap.name))
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                try await tap.remove()
-            }
-            try await refreshTaps()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            if let opID {
-                activityStore?.setStatus(opID, isOperationCancellation(error)
-                    ? .cancelled : .failed(reason: error.localizedDescription))
-            }
-            if !isOperationCancellation(error) { errorMessage = error.localizedDescription }
+        await activityStore.perform(.tapRemove(name: tap.name)) { _ in
+            try await tap.remove()
+            await self.load(forceRefresh: true)
         }
-        isLoading = false
-    }
-
-    /// Dismisses the active action stream overlay.
-    func dismissAction() {
-        actionStream = nil
-        isLoading = false
-    }
-
-    // MARK: Private
-
-    private func refreshTaps() async throws {
-        taps = try await Tap.all
-        persistence.saveToCache(taps, to: Self.cacheFile)
     }
 }

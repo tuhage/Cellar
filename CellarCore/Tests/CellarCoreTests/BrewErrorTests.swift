@@ -45,4 +45,15 @@ struct BrewErrorTests {
         #expect(error.errorDescription != nil)
         #expect(!(error.errorDescription ?? "").isEmpty)
     }
+
+    @Test("brewError_summary_usesLastErrorLine")
+    func brewError_summary_usesLastErrorLine() {
+        let error = BrewError.processFailure(
+            exitCode: 1,
+            stderr: "Warning: something\nError: first\n==> Details\nError: Cask 'maestro' is not installed.\n"
+        )
+
+        #expect(error.summary == "Cask 'maestro' is not installed.")
+        #expect(BrewError.processFailure(exitCode: 2, stderr: "").summary == "Brew command failed (exit 2).")
+    }
 }

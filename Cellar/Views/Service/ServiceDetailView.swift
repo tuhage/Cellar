@@ -238,7 +238,7 @@ private struct ServiceDetailStatusBadge: View {
 #Preview("Running Service") {
     NavigationStack {
         ServiceDetailView(service: BrewServiceItem.preview)
-            .environment(ServiceStore())
+            .environment(AppStores())
     }
     .frame(width: 600, height: 700)
 }
@@ -256,7 +256,7 @@ private struct ServiceDetailStatusBadge: View {
                 registered: true
             )
         )
-        .environment(ServiceStore())
+        .environment(AppStores())
     }
     .frame(width: 600, height: 700)
 }

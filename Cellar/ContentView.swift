@@ -6,7 +6,7 @@ struct ContentView: View {
 
     private var selection: Binding<SidebarItem?> {
         Binding(
-            get: { SidebarItem(rawValue: storedSelection) },
+            get: { SidebarItem.resolve(storedSelection) ?? .dashboard },
             set: { newValue in storedSelection = (newValue ?? .dashboard).rawValue }
         )
     }
@@ -17,10 +17,10 @@ struct ContentView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(PackageStore.self) private var packageStore
-    @Environment(ServiceStore.self) private var serviceStore
-    @Environment(TapStore.self) private var tapStore
     @Environment(MaintenanceStore.self) private var maintenanceStore
     @Environment(ActivityStore.self) private var activityStore
+    @Environment(\.refreshAll) private var refreshAll
+    @Environment(\.startBackgroundWork) private var startBackgroundWork
 
     var body: some View {
         Group {
@@ -36,10 +36,17 @@ struct ContentView: View {
             guard !isBrewInstalled else { return }
             isBrewInstalled = BrewProcess.isInstalled
         }
+        .task(id: isBrewInstalled) {
+            guard isBrewInstalled else { return }
+            await startBackgroundWork()
+        }
     }
 
     private var mainContent: some View {
-        NavigationSplitView {
+        @Bindable var packages = packageStore
+        @Bindable var maintenance = maintenanceStore
+
+        return NavigationSplitView {
             SidebarView(selection: selection)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
         } detail: {
@@ -67,6 +74,12 @@ struct ContentView: View {
             ToolbarItem(placement: .secondaryAction) {
                 ActivityToolbarButton()
             }
+        }
+        .sheet(isPresented: $packages.isUpgradePreviewPresented) {
+            UpgradeAllSheet()
+        }
+        .sheet(isPresented: $maintenance.isCleanupPreviewPresented) {
+            CleanupPreviewSheet()
         }
         .sheet(isPresented: $isQuickOpenPresented) {
             QuickOpenView(selection: selection, isPresented: $isQuickOpenPresented)
@@ -100,37 +113,22 @@ struct ContentView: View {
             operationNotice = nil
         }
         .urlSchemeHandler(selection: selection)
-        .onReceive(NotificationCenter.default.publisher(for: .refreshAll)) { _ in
-            guard isBrewInstalled else { return }
-            Task { await refreshAll() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .upgradeAll)) { _ in
-            guard isBrewInstalled else { return }
-            packageStore.upgradeAll()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .cleanup)) { _ in
-            guard isBrewInstalled else { return }
-            Task { await maintenanceStore.runCleanup() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .refreshServices)) { _ in
-            guard isBrewInstalled else { return }
-            Task { await serviceStore.load(forceRefresh: true) }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .openQuickOpen)) { _ in
-            isQuickOpenPresented = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToSidebarItem)) { notification in
-            guard let rawValue = notification.userInfo?["item"] as? String,
-                  let item = SidebarItem(rawValue: rawValue) else { return }
-            selection.wrappedValue = item
-        }
+        .focusedSceneValue(\.windowCommands, windowCommands)
     }
 
-    private func refreshAll() async {
-        async let packages: () = packageStore.loadAll(forceRefresh: true)
-        async let services: () = serviceStore.load(forceRefresh: true)
-        async let taps: () = tapStore.load(forceRefresh: true)
-        _ = await (packages, services, taps)
+    private var windowCommands: WindowCommands {
+        WindowCommands(
+            navigate: { selection.wrappedValue = $0 },
+            openQuickOpen: { isQuickOpenPresented = true },
+            showActivity: { NotificationCenter.default.post(name: .openActivityPanel, object: nil) },
+            refreshAll: refreshAll,
+            canUpgradeAll: !packageStore.upgradableFormulae.isEmpty || !packageStore.outdatedCasks.isEmpty,
+            previewUpgradeAll: { packageStore.isUpgradePreviewPresented = true },
+            canCleanUp: !maintenanceStore.isRunning,
+            previewCleanup: { maintenanceStore.isCleanupPreviewPresented = true },
+            canCheckForUpdates: !activityStore.isActive(.homebrew),
+            checkForPackageUpdates: { Task { await packageStore.checkForUpdates() } }
+        )
     }
 }
 
@@ -156,10 +154,6 @@ private struct DetailView: View {
             TapListView()
         case .dependencies:
             DependencyGraphView()
-        case .resources:
-            ResourceMonitorView()
-        case .projects:
-            ProjectListView()
         case .maintenance:
             MaintenanceView()
         }
@@ -168,13 +162,5 @@ private struct DetailView: View {
 
 #Preview {
     ContentView()
-        .environment(PackageStore())
-        .environment(ServiceStore())
-        .environment(DependencyStore())
-        .environment(BrewfileStore())
-        .environment(TapStore())
-        .environment(ResourceStore())
-        .environment(ProjectStore())
-        .environment(MaintenanceStore())
-        .environment(ActivityStore())
+        .environment(AppStores())
 }

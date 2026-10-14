@@ -231,6 +231,6 @@ private struct ProjectRemovalButton: View {
 
 #Preview {
     ProjectDetailView(project: .preview, missingPackages: .constant([]))
-        .environment(ProjectStore())
+        .environment(AppStores())
         .frame(width: 600, height: 500)
 }

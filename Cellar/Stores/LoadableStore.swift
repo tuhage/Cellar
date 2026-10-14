@@ -1,43 +1,59 @@
 import Foundation
+import CellarCore
 
-/// A protocol that formalises the loading/error state shared by all Store objects.
+/// Loading and error state shared by stores that list data from brew.
 ///
-/// Provides:
-/// - `isLoading` / `errorMessage` requirements
-/// - `clearError()` default implementation
-/// - `withLoading(_:)` async helper that manages the loading flag and surfaces errors
-///
-/// All stores conforming to this protocol must be `@MainActor` classes.
+/// `isLoading` and `errorMessage` describe loading only. Actions (install,
+/// start, cleanup…) run through `ActivityStore.perform`, which reports their
+/// progress and failures.
 @MainActor
 protocol LoadableStore: AnyObject {
     var isLoading: Bool { get set }
     var errorMessage: String? { get set }
+    /// When the data was last fetched from brew.
+    var lastUpdated: Date? { get set }
+}
+
+/// Where a brew listing is cached and how long it stays fresh.
+struct CachePolicy {
+    let fileName: String
+    var maxAge: TimeInterval = 300
 }
 
 extension LoadableStore {
 
-    func clearError() {
-        errorMessage = nil
-    }
+    /// Shows cached data at once, then fetches from brew when the cache is
+    /// stale or `force` is set. A failed fetch keeps what is showing and
+    /// reports `failureMessage`.
+    func load<Value: Codable & Sendable>(
+        cache: CachePolicy,
+        force: Bool = false,
+        failureMessage: String,
+        fetch: @MainActor () async throws -> Value,
+        apply: @MainActor (Value) -> Void
+    ) async {
+        let persistence = PersistenceService()
+        if lastUpdated == nil, let entry = persistence.loadCacheEntry(Value.self, from: cache.fileName) {
+            apply(entry.data)
+            lastUpdated = entry.timestamp
+        }
+        if let lastUpdated, !force, Date().timeIntervalSince(lastUpdated) < cache.maxAge {
+            return
+        }
+        guard force || !isLoading else { return }
 
-    /// Runs `block`, managing `isLoading` and surfacing any thrown error into `errorMessage`.
-    /// Returns `nil` if `block` throws; returns the value otherwise.
-    func withLoading<T: Sendable>(
-        _ block: @MainActor () async throws -> T
-    ) async -> T? {
         isLoading = true
-        errorMessage = nil
         defer { isLoading = false }
         do {
-            return try await block()
+            let value = try await fetch()
+            apply(value)
+            lastUpdated = Date()
+            errorMessage = nil
+            persistence.saveToCache(value, to: cache.fileName)
         } catch {
-            // SwiftUI routinely cancels view-bound tasks when a view goes
-            // away. That is expected lifecycle behaviour, not a user-facing
-            // failure.
             if !isOperationCancellation(error) {
-                errorMessage = error.localizedDescription
+                errorMessage = failureMessage
             }
-            return nil
         }
     }
 }

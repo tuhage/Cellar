@@ -68,9 +68,10 @@ struct MaintenanceView: View {
                 reportsSection
             }
             .formStyle(.grouped)
-
-            if store.isLoading {
-                runningOverlay
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let task = store.runningTask {
+                RunningOperationBar(operation: task)
             }
         }
         .navigationTitle("Maintenance")
@@ -89,7 +90,7 @@ struct MaintenanceView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .disabled(store.isLoading)
+                .disabled(store.isRunning)
 
                 Button {
                     Task { await store.runHealthCheck() }
@@ -98,7 +99,7 @@ struct MaintenanceView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .disabled(store.isLoading)
+                .disabled(store.isRunning)
 
                 Button {
                     Task { await store.runAll() }
@@ -107,7 +108,7 @@ struct MaintenanceView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(store.isLoading)
+                .disabled(store.isRunning)
             }
 
             if let errorMessage = store.errorMessage {
@@ -173,33 +174,6 @@ struct MaintenanceView: View {
             value: 1,
             to: lastRun ?? .now
         )
-    }
-
-    // MARK: - Running Overlay
-
-    private var runningOverlay: some View {
-        ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea()
-
-            VStack(spacing: Spacing.cardPadding) {
-                ProgressView()
-                    .controlSize(.large)
-
-                if let action = store.currentAction {
-                    Text(action)
-                        .font(.headline)
-                }
-
-                Text("Please wait while Homebrew completes the task.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(Spacing.section)
-            .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: CornerRadius.extraLarge))
-            .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
-        }
     }
 }
 
@@ -285,6 +259,6 @@ private extension View {
     NavigationStack {
         MaintenanceView()
     }
-    .environment(MaintenanceStore())
+    .environment(AppStores())
     .frame(width: 600, height: 700)
 }

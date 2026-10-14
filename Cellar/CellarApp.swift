@@ -5,61 +5,34 @@ import UserNotifications
 
 @main
 struct CellarApp: App {
-    @State private var packageStore = PackageStore()
-    @State private var serviceStore = ServiceStore()
-    @State private var dependencyStore = DependencyStore()
-    @State private var brewfileStore = BrewfileStore()
-    @State private var tapStore = TapStore()
-    @State private var resourceStore = ResourceStore()
-    @State private var projectStore = ProjectStore()
-    @State private var maintenanceStore = MaintenanceStore()
-    @State private var updateStore = UpdateStore()
-    @State private var activityStore = ActivityStore()
+    @State private var stores = AppStores()
     @State private var notificationDelegate = ActivityNotificationDelegate()
 
     private let notificationObserver = FinderSyncNotificationObserver()
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: SceneID.main) {
             ContentView()
-                .environment(packageStore)
-                .environment(serviceStore)
-                .environment(dependencyStore)
-                .environment(brewfileStore)
-                .environment(tapStore)
-                .environment(resourceStore)
-                .environment(projectStore)
-                .environment(maintenanceStore)
-                .environment(updateStore)
-                .environment(activityStore)
+                .environment(stores)
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     handleSpotlightActivity(activity)
                 }
-                .task { notificationObserver.register(serviceStore: serviceStore) }
-                .task {
-                    wireStores()
-                    maintenanceStore.loadSettings()
-                    maintenanceStore.loadReports()
-                    UNUserNotificationCenter.current().delegate = notificationDelegate
-                    // Not queued behind the permission prompt, which waits
-                    // for the user to answer.
-                    Task { await packageStore.checkForUpdatesIfDue() }
-                    await ActivityNotificationService.shared.requestPermission()
-                    await runMaintenanceScheduler()
-                }
-                .onChange(of: activityStore.operations) {
-                    DockProgressService.shared.update(for: activityStore.runningBatchOperation)
-                    for op in activityStore.operations {
-                        guard !op.isRunning else { continue }
-                        guard case .upgradeAll = op.kind else { continue }
-                        ActivityNotificationService.shared.notifyCompletion(of: op)
+                .task { notificationObserver.register(serviceStore: stores.services) }
+                .task { UNUserNotificationCenter.current().delegate = notificationDelegate }
+                .task { await ActivityNotificationService.shared.requestPermission() }
+                .onChange(of: stores.activity.operations) {
+                    DockProgressService.shared.update(for: stores.activity.runningBatchOperation)
+                    for operation in stores.activity.operations where !operation.isRunning {
+                        ActivityNotificationService.shared.notifyCompletion(of: operation)
                     }
                 }
+                .onChange(of: stores.packages.lastUpdated) { updateWidget() }
+                .onChange(of: stores.services.lastUpdated) { updateWidget() }
         }
         .defaultSize(width: 1320, height: 820)
-        .commands { AppCommands(updateStore: updateStore) }
+        .commands { AppCommands(updateStore: stores.updates) }
 
-        Window("Keyboard Shortcuts", id: "keyboard-shortcuts") {
+        Window("Keyboard Shortcuts", id: SceneID.keyboardShortcuts) {
             KeyboardShortcutsView()
         }
         .windowResizability(.contentSize)
@@ -67,43 +40,23 @@ struct CellarApp: App {
 
         Settings {
             SettingsView()
-                .environment(updateStore)
+                .environment(stores)
         }
 
         MenuBarExtra("Cellar", systemImage: "mug") {
             MenuBarView()
-                .environment(packageStore)
-                .environment(serviceStore)
-                .environment(maintenanceStore)
-                .environment(resourceStore)
+                .environment(stores)
         }
         .menuBarExtraStyle(.menu)
     }
 
-    // MARK: - Store Wiring
-
-    private func wireStores() {
-        packageStore.activityStore = activityStore
-        serviceStore.activityStore = activityStore
-        tapStore.activityStore = activityStore
-        brewfileStore.activityStore = activityStore
-        maintenanceStore.activityStore = activityStore
-        projectStore.activityStore = activityStore
-    }
-
-    private func runMaintenanceScheduler() async {
-        guard BrewProcess.isInstalled else { return }
-        await maintenanceStore.checkSchedule()
-
-        while !Task.isCancelled {
-            do {
-                try await Task.sleep(for: .seconds(3_600))
-            } catch {
-                return
-            }
-            await maintenanceStore.checkSchedule()
-            await packageStore.checkForUpdatesIfDue()
-        }
+    private func updateWidget() {
+        WidgetSnapshotService.update(
+            formulae: stores.packages.formulae,
+            casks: stores.packages.casks,
+            services: stores.services.services,
+            taps: stores.taps.taps
+        )
     }
 
     // MARK: - Spotlight
@@ -115,10 +68,10 @@ struct CellarApp: App {
 
         if identifier.hasPrefix("formula:") {
             UserDefaults.standard.set(SidebarItem.formulae.rawValue, forKey: "selectedSidebarItem")
-            packageStore.selectedFormulaId = String(identifier.dropFirst("formula:".count))
+            stores.packages.selectedFormulaId = String(identifier.dropFirst("formula:".count))
         } else if identifier.hasPrefix("cask:") {
             UserDefaults.standard.set(SidebarItem.casks.rawValue, forKey: "selectedSidebarItem")
-            packageStore.selectedCaskId = String(identifier.dropFirst("cask:".count))
+            stores.packages.selectedCaskId = String(identifier.dropFirst("cask:".count))
         }
     }
 }

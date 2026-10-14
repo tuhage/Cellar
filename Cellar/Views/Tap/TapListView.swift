@@ -41,14 +41,9 @@ struct TapListView: View {
                 tapTable
             }
         }
-        .overlay {
-            if let stream = store.actionStream {
-                ProcessOutputView(title: "Adding Tap", stream: stream)
-                    .background(.background)
-                    .onDisappear {
-                        store.dismissAction()
-                        Task { await store.load(forceRefresh: true) }
-                    }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let operation = store.runningOperation {
+                RunningOperationBar(operation: operation)
             }
         }
         .navigationTitle("Taps")
@@ -224,7 +219,7 @@ private struct AddTapSheet: View {
                 .keyboardShortcut(.cancelAction)
 
                 Button("Add Tap") {
-                    store.addTap(tapName)
+                    Task { await store.addTap(tapName) }
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -241,7 +236,7 @@ private struct AddTapSheet: View {
 #Preview {
     NavigationStack {
         TapListView()
-            .environment(TapStore())
+            .environment(AppStores())
     }
     .frame(width: 700, height: 500)
 }

@@ -20,6 +20,7 @@ final class ProjectStore: LoadableStore {
     var activeProjectId: UUID?
     var isLoading = false
     var errorMessage: String?
+    var lastUpdated: Date?
 
     // MARK: Computed
 
@@ -33,14 +34,15 @@ final class ProjectStore: LoadableStore {
         return projects.first { $0.id == activeProjectId }
     }
 
-    // MARK: Activity
-
-    var activityStore: ActivityStore?
-
     // MARK: Dependencies
 
+    let activityStore: ActivityStore
     private let persistence = PersistenceService()
     private let service = BrewService.shared
+
+    init(activityStore: ActivityStore) {
+        self.activityStore = activityStore
+    }
 
     private static let fileName = "project_environments.json"
 
@@ -104,97 +106,62 @@ final class ProjectStore: LoadableStore {
 
     // MARK: - Activate / Deactivate
 
-    /// Activates a project by starting all its services.
+    /// Activates a project by starting its services, after stopping the
+    /// previously active project's ones. Rolls back on failure.
     func activate(_ project: ProjectEnvironment) async {
-        guard activityStore?.isActive(target: project.name) != true else { return }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .projectActivate(name: project.name))
-
         let previousProject = activeProject?.id == project.id ? nil : activeProject
-        var stoppedPreviousServices: [String] = []
-        var startedNewServices: [String] = []
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                if let previousProject {
-                    for serviceName in previousProject.services {
-                        try await self.service.stopService(serviceName)
-                        stoppedPreviousServices.append(serviceName)
-                    }
+        await activityStore.perform(.projectActivate(name: project.name)) { activity in
+            var stopped: [String] = []
+            var started: [String] = []
+            do {
+                for name in previousProject?.services ?? [] {
+                    try await self.service.stopService(name)
+                    stopped.append(name)
                 }
-
-                for serviceName in project.services {
-                    try await self.service.startService(serviceName)
-                    startedNewServices.append(serviceName)
+                for name in project.services {
+                    try await self.service.startService(name)
+                    started.append(name)
                 }
+            } catch {
+                await self.rollBack(starting: stopped, stopping: started, in: activity)
+                throw error
             }
-            activeProjectId = project.id
-            saveActiveId()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            // Restore the exact pre-activation state as far as possible.
-            var rollbackFailures: [String] = []
-            for serviceName in startedNewServices.reversed() {
-                do { try await service.stopService(serviceName) }
-                catch { rollbackFailures.append("stop \(serviceName)") }
-            }
-            for serviceName in stoppedPreviousServices {
-                do { try await service.startService(serviceName) }
-                catch { rollbackFailures.append("restart \(serviceName)") }
-            }
-            activeProjectId = previousProject?.id
-            saveActiveId()
-
-            let rollbackNote = rollbackFailures.isEmpty
-                ? " Previous state was restored."
-                : " Rollback also failed for: \(rollbackFailures.joined(separator: ", "))."
-            if let opID {
-                activityStore?.setStatus(opID, isOperationCancellation(error)
-                    ? .cancelled : .failed(reason: error.localizedDescription))
-            }
-            if !isOperationCancellation(error) {
-                errorMessage = "Failed to activate project: \(error.localizedDescription).\(rollbackNote)"
-            }
+            self.setActiveProject(project.id)
         }
-        isLoading = false
     }
 
-    /// Deactivates the currently active project by stopping all its services.
+    /// Deactivates the active project by stopping its services. Rolls back
+    /// on failure.
     func deactivate() async {
         guard let project = activeProject else { return }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .projectDeactivate(name: project.name))
-
-        var stoppedServices: [String] = []
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                for serviceName in project.services {
-                    try await self.service.stopService(serviceName)
-                    stoppedServices.append(serviceName)
+        await activityStore.perform(.projectDeactivate(name: project.name)) { activity in
+            var stopped: [String] = []
+            do {
+                for name in project.services {
+                    try await self.service.stopService(name)
+                    stopped.append(name)
                 }
+            } catch {
+                await self.rollBack(starting: stopped, stopping: [], in: activity)
+                throw error
             }
-            activeProjectId = nil
-            saveActiveId()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            var rollbackFailures: [String] = []
-            for serviceName in stoppedServices {
-                do { try await service.startService(serviceName) }
-                catch { rollbackFailures.append(serviceName) }
-            }
-            let rollbackNote = rollbackFailures.isEmpty
-                ? " Previous state was restored."
-                : " Could not restart: \(rollbackFailures.joined(separator: ", "))."
-            if let opID {
-                activityStore?.setStatus(opID, isOperationCancellation(error)
-                    ? .cancelled : .failed(reason: error.localizedDescription))
-            }
-            if !isOperationCancellation(error) {
-                errorMessage = "Failed to deactivate project: \(error.localizedDescription).\(rollbackNote)"
-            }
+            self.setActiveProject(nil)
         }
-        isLoading = false
+    }
+
+    /// Best-effort restore of the services touched before a failure.
+    private func rollBack(starting toStart: [String], stopping toStop: [String], in activity: ActivityContext) async {
+        for name in toStop.reversed() {
+            do { try await service.stopService(name) } catch { activity.log("Rollback couldn’t stop \(name)") }
+        }
+        for name in toStart {
+            do { try await service.startService(name) } catch { activity.log("Rollback couldn’t start \(name)") }
+        }
+    }
+
+    private func setActiveProject(_ id: UUID?) {
+        activeProjectId = id
+        saveActiveId()
     }
 
     // MARK: - Service Management

@@ -5,24 +5,19 @@ import CellarCore
 
 struct DashboardView: View {
     @Binding var selection: SidebarItem?
-    @State private var dashboardStore = DashboardStore()
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(TapStore.self) private var tapStore
+    @Environment(MaintenanceStore.self) private var maintenanceStore
+    @Environment(\.refreshAll) private var refreshAll
 
     var body: some View {
         Group {
-            if let stream = dashboardStore.actionStream {
-                ActionOutputView(
-                    title: dashboardStore.actionTitle ?? "Running",
-                    stream: stream,
-                    onDismiss: { dashboardStore.dismissAction() }
-                )
-            } else if let summary = dashboardStore.summary {
+            if let summary {
                 dashboardContent(summary)
-            } else if let errorMessage = dashboardStore.errorMessage {
+            } else if let errorMessage = packageStore.errorMessage {
                 ErrorView(message: errorMessage) {
-                    Task { await refresh(forceRefresh: true) }
+                    Task { await refreshAll() }
                 }
             } else {
                 LoadingView(message: "Loading Dashboard\u{2026}")
@@ -31,19 +26,22 @@ struct DashboardView: View {
         .navigationTitle("Dashboard")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                RefreshToolbarButton(isLoading: dashboardStore.isLoading) {
-                    await refresh(forceRefresh: true)
+                RefreshToolbarButton(isLoading: packageStore.isLoading || serviceStore.isLoading) {
+                    await refreshAll()
                 }
             }
         }
-        .task {
-            dashboardStore.restoreCachedSummary()
-            await refresh()
-        }
-        .onChange(of: packageStore.formulae) { updateSummary() }
-        .onChange(of: packageStore.casks) { updateSummary() }
-        .onChange(of: serviceStore.services) { updateSummary() }
-        .onChange(of: tapStore.taps) { updateSummary() }
+    }
+
+    /// `nil` until the first data arrives.
+    private var summary: SystemSummary? {
+        guard packageStore.lastUpdated != nil || serviceStore.lastUpdated != nil else { return nil }
+        return SystemSummary.current(
+            formulae: packageStore.formulae,
+            casks: packageStore.casks,
+            services: serviceStore.services,
+            taps: tapStore.taps
+        )
     }
 
     // MARK: - Content
@@ -244,16 +242,14 @@ struct DashboardView: View {
                     systemImage: "arrow.up.circle.fill",
                     color: .orange,
                     isDisabled: !packageStore.isUpgradingAll
-                        && (summary.updatesAvailable == 0
-                            || dashboardStore.isPerformingAction
-                            || packageStore.isCheckingForUpdates),
+                        && (summary.updatesAvailable == 0 || packageStore.isCheckingForUpdates),
                     isProminent: true
                 ) {
                     // While running, the button shows where the upgrade is.
                     if packageStore.isUpgradingAll {
                         NotificationCenter.default.post(name: .openActivityPanel, object: nil)
                     } else {
-                        packageStore.upgradeAll()
+                        packageStore.isUpgradePreviewPresented = true
                     }
                 }
 
@@ -262,9 +258,9 @@ struct DashboardView: View {
                     subtitle: "Free disk space",
                     systemImage: "trash.circle.fill",
                     color: .blue,
-                    isDisabled: dashboardStore.isPerformingAction
+                    isDisabled: maintenanceStore.isRunning
                 ) {
-                    dashboardStore.cleanup()
+                    Task { await maintenanceStore.runCleanup() }
                 }
 
                 QuickActionButton(
@@ -272,42 +268,12 @@ struct DashboardView: View {
                     subtitle: "Run brew doctor",
                     systemImage: "heart.circle.fill",
                     color: .green,
-                    isDisabled: dashboardStore.isPerformingAction
+                    isDisabled: maintenanceStore.isRunning
                 ) {
-                    dashboardStore.healthCheck()
+                    Task { await maintenanceStore.runHealthCheck() }
                 }
     }
 
-    // MARK: - Shared Store Coordination
-
-    private func refresh(forceRefresh: Bool = false) async {
-        dashboardStore.isLoading = true
-        dashboardStore.errorMessage = nil
-
-        async let packages: () = packageStore.loadAll(forceRefresh: forceRefresh)
-        async let services: () = serviceStore.load(forceRefresh: forceRefresh)
-        async let taps: () = tapStore.load(forceRefresh: forceRefresh)
-        _ = await (packages, services, taps)
-
-        updateSummary()
-        dashboardStore.errorMessage = packageStore.errorMessage
-            ?? serviceStore.errorMessage
-            ?? tapStore.errorMessage
-        dashboardStore.isLoading = false
-    }
-
-    private func updateSummary() {
-        guard !packageStore.formulae.isEmpty
-                || !packageStore.casks.isEmpty
-                || !serviceStore.services.isEmpty
-                || !tapStore.taps.isEmpty else { return }
-        dashboardStore.update(
-            formulae: packageStore.formulae,
-            casks: packageStore.casks,
-            services: serviceStore.services,
-            taps: tapStore.taps
-        )
-    }
 
     // MARK: - Recently Installed Section
 
@@ -640,7 +606,7 @@ private struct SeeAllButtonStyle: ButtonStyle {
 #Preview {
     NavigationStack {
         DashboardView(selection: .constant(.dashboard))
-            .environment(PackageStore())
+            .environment(AppStores())
     }
     .frame(width: 700, height: 600)
 }

@@ -21,6 +21,7 @@ final class DependencyStore: LoadableStore {
 
     var isLoading = false
     var errorMessage: String?
+    var lastUpdated: Date?
     var searchQuery = ""
     var selectedNodeName: String?
     var showOrphansOnly: Bool {
@@ -71,6 +72,7 @@ final class DependencyStore: LoadableStore {
         do {
             let output = try await service.depsInstalled()
             graph = DependencyGraph.build(from: output)
+            lastUpdated = Date()
         } catch {
             errorMessage = error.localizedDescription
         }

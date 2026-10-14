@@ -24,18 +24,7 @@ struct BrewfileView: View {
 
     var body: some View {
         Group {
-            if let stream = store.actionStream {
-                ActionOutputView(
-                    title: store.actionTitle ?? "Running",
-                    stream: stream,
-                    onDismiss: {
-                        store.dismissAction()
-                        if let profile = store.selectedProfile {
-                            store.loadBrewfileContent(for: profile)
-                        }
-                    }
-                )
-            } else if let profile = store.selectedProfile {
+            if let profile = store.selectedProfile {
                 if store.brewfileExistsOnDisk {
                     brewfileContent
                 } else {
@@ -71,7 +60,7 @@ struct BrewfileView: View {
         ) {
             Button("Cleanup", role: .destructive) {
                 guard let profile = store.selectedProfile else { return }
-                store.cleanupBrewfile(for: profile)
+                Task { await store.cleanupBrewfile(for: profile) }
             }
         } message: {
             Text("Remove all packages not listed in the current Brewfile? This cannot be undone.")
@@ -283,7 +272,7 @@ struct BrewfileView: View {
                     isDisabled: isDisabled
                 ) {
                     guard let profile = store.selectedProfile else { return }
-                    store.beginInstall(from: profile)
+                    Task { await store.install(from: profile) }
                 }
 
                 QuickActionButton(
@@ -694,7 +683,7 @@ private extension View {
 #Preview {
     NavigationStack {
         BrewfileView()
-            .environment(BrewfileStore())
+            .environment(AppStores())
     }
     .frame(width: WindowSize.fullDetailWidth, height: WindowSize.fullDetailHeight)
 }

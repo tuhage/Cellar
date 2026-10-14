@@ -26,17 +26,13 @@ final class ServiceStore: LoadableStore {
 
     var isLoading = false
     var errorMessage: String?
+    var lastUpdated: Date?
     var selectedServiceId: String?
 
-    // MARK: Activity
+    // MARK: Dependencies
 
-    var activityStore: ActivityStore?
-
-    // MARK: Cache
-
-    private let persistence = PersistenceService()
-    private static let cacheMaxAge: TimeInterval = 300
-    private static let cacheFile = "cache-services.json"
+    let activityStore: ActivityStore
+    private static let cache = CachePolicy(fileName: "cache-services.json")
 
     // MARK: Filter State
 
@@ -95,7 +91,8 @@ final class ServiceStore: LoadableStore {
 
     // MARK: Init
 
-    init() {
+    init(activityStore: ActivityStore) {
+        self.activityStore = activityStore
         let defaults = UserDefaults.standard
         self.showsUnusedServices = defaults.bool(forKey: Self.showsUnusedKey)
         self.showsHiddenServices = defaults.bool(forKey: Self.showsHiddenKey)
@@ -121,23 +118,15 @@ final class ServiceStore: LoadableStore {
 
     /// Loads all Homebrew services.
     func load(forceRefresh: Bool = false) async {
-        let (restored, needsFetch) = persistence.restoreIfNeeded(
-            current: services, from: Self.cacheFile,
-            maxAge: Self.cacheMaxAge, forceRefresh: forceRefresh
-        )
-        services = restored
-        guard needsFetch else { return }
-
-        isLoading = true
-        errorMessage = nil
-        do {
-            try await refreshServices()
-        } catch {
-            if !isOperationCancellation(error) {
-                errorMessage = "Services couldn’t be loaded. Please try again."
-            }
+        await load(
+            cache: Self.cache,
+            force: forceRefresh,
+            failureMessage: "Services couldn’t be loaded."
+        ) {
+            try await BrewServiceItem.all
+        } apply: { services in
+            self.services = services
         }
-        isLoading = false
     }
 
     /// Running services whose process started before their formula's
@@ -164,117 +153,46 @@ final class ServiceStore: LoadableStore {
         }
     }
 
-    /// Starts a service and reloads the service list.
-    /// Services registered under `root` are started with elevated privileges.
+    /// Services registered under `root` are managed with elevated privileges.
     func start(_ service: BrewServiceItem) async {
-        guard activityStore?.isActive(target: service.name) != true else { return }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .serviceStart(name: service.name))
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                try await service.start(privileged: service.requiresRoot)
-            }
-            try await refreshServices()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            handleActionFailure(error, opID: opID)
+        await run(.serviceStart(name: service.name)) {
+            try await service.start(privileged: service.requiresRoot)
         }
-        isLoading = false
     }
 
-    /// Stops a service and reloads the service list.
-    /// Services registered under `root` are stopped with elevated privileges.
     func stop(_ service: BrewServiceItem) async {
-        guard activityStore?.isActive(target: service.name) != true else { return }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .serviceStop(name: service.name))
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                try await service.stop(privileged: service.requiresRoot)
-            }
-            try await refreshServices()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            handleActionFailure(error, opID: opID)
+        await run(.serviceStop(name: service.name)) {
+            try await service.stop(privileged: service.requiresRoot)
         }
-        isLoading = false
     }
 
-    /// Force-kills a service (SIGKILL) and reloads the service list.
-    func kill(_ service: BrewServiceItem) async {
-        guard activityStore?.isActive(target: service.name) != true else {
-            errorMessage = "\(service.name) is already in progress"
-            return
-        }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .serviceKill(name: service.name))
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                try await service.kill()
-            }
-            try await refreshServices()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            handleActionFailure(error, opID: opID)
-        }
-        isLoading = false
-    }
-
-    /// Uninstalls the formula backing a service and reloads the service list.
-    func uninstall(_ service: BrewServiceItem, force: Bool = false) async {
-        guard activityStore?.isActive(target: service.name) != true else {
-            errorMessage = "\(service.name) is already in progress"
-            return
-        }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .uninstall(name: service.name, isCask: false))
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                try await BrewService.shared.uninstall(service.name, force: force)
-            }
-            try await refreshServices()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            handleActionFailure(error, opID: opID)
-        }
-        isLoading = false
-    }
-
-    /// Restarts a service and reloads the service list.
-    /// Services registered under `root` are restarted with elevated privileges.
     func restart(_ service: BrewServiceItem) async {
-        guard activityStore?.isActive(target: service.name) != true else { return }
-        isLoading = true
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .serviceRestart(name: service.name))
-        do {
-            try await withCancellableActivity(activityStore, id: opID) {
-                try await service.restart(privileged: service.requiresRoot)
-            }
-            try await refreshServices()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            handleActionFailure(error, opID: opID)
+        await run(.serviceRestart(name: service.name)) {
+            try await service.restart(privileged: service.requiresRoot)
         }
-        isLoading = false
+    }
+
+    func kill(_ service: BrewServiceItem) async {
+        await run(.serviceForceQuit(name: service.name)) {
+            try await service.kill()
+        }
+    }
+
+    /// Uninstalls the formula backing a service.
+    func uninstall(_ service: BrewServiceItem, force: Bool = false) async {
+        await run(.uninstall(name: service.name, isCask: false)) {
+            try await BrewService.shared.uninstall(service.name, force: force)
+        }
     }
 
     // MARK: Private
 
-    /// Surfaces an action failure. A user-dismissed admin prompt
-    /// (`BrewError.cancelled`) is treated as a quiet cancellation rather
-    /// than an error.
-    private func handleActionFailure(_ error: Error, opID: UUID?) {
-        if isOperationCancellation(error) {
-            if let opID { activityStore?.setStatus(opID, .cancelled) }
-            return
+    /// Runs a service action as an activity, then reloads the list.
+    private func run(_ kind: BrewOperation.Kind, _ action: @escaping @MainActor () async throws -> Void) async {
+        await activityStore.perform(kind) { _ in
+            try await action()
+            await self.load(forceRefresh: true)
         }
-        errorMessage = error.localizedDescription
-        if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
     }
 
     private static func processStartDates(of services: [BrewServiceItem]) -> [String: Date] {
@@ -284,10 +202,5 @@ final class ServiceStore: LoadableStore {
             },
             uniquingKeysWith: { first, _ in first }
         )
-    }
-
-    private func refreshServices() async throws {
-        services = try await BrewServiceItem.all
-        persistence.saveToCache(services, to: Self.cacheFile)
     }
 }

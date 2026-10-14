@@ -59,7 +59,7 @@ struct CaskListView: View {
                 LoadingView(message: "Loading Casks\u{2026}")
             } else if let errorMessage = store.errorMessage, store.casks.isEmpty {
                 ErrorView(message: errorMessage) {
-                    Task { await store.loadCasks() }
+                    Task { await store.loadAll() }
                 }
             } else if isSearching {
                 searchResultsList
@@ -82,12 +82,12 @@ struct CaskListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
-                    await store.loadCasks(forceRefresh: true)
+                    await store.loadAll(forceRefresh: true)
                 }
             }
         }
         .task {
-            await store.loadCasks()
+            await store.loadAll()
         }
         .inspector(isPresented: isInspectorPresented) {
             if let selectedCask {
@@ -369,7 +369,7 @@ private enum CaskScope: String, CaseIterable, Identifiable {
 #Preview {
     NavigationStack {
         CaskListView()
-            .environment(PackageStore())
+            .environment(AppStores())
     }
     .frame(width: 700, height: 500)
 }

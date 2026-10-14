@@ -5,7 +5,7 @@ struct ActivityRow: View {
     let operation: BrewOperation
     let onCancel: (() -> Void)?
     let onForceRetry: (() -> Void)?
-    var onRetryFailed: (() -> Void)?
+    var onRetry: (() -> Void)?
 
     @State private var isLogExpanded = false
     @State private var isStepsExpanded = false
@@ -21,7 +21,7 @@ struct ActivityRow: View {
                     Text(operation.kind.displayTitle)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    if !showsBatchProgress {
+                    if !operation.isRunning {
                         Text(statusLabel)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -33,8 +33,8 @@ struct ActivityRow: View {
                 statusIndicator
             }
 
-            if showsBatchProgress {
-                BatchProgressView(operation: operation)
+            if operation.isRunning {
+                OperationProgressView(operation: operation)
             }
 
             if case .failed = operation.status, let onForceRetry {
@@ -65,7 +65,7 @@ struct ActivityRow: View {
                 }
             }
 
-            if onRetryFailed != nil || operation.logFileURL != nil {
+            if onRetry != nil || operation.logFileURL != nil {
                 actionButtons
             }
 
@@ -92,11 +92,11 @@ struct ActivityRow: View {
     private var actionButtons: some View {
         HStack(spacing: Spacing.item) {
             Spacer()
-            if let onRetryFailed {
-                Button(action: onRetryFailed) {
-                    Label("Retry Failed", systemImage: "arrow.clockwise")
+            if let onRetry {
+                Button(action: onRetry) {
+                    Label("Retry", systemImage: "arrow.clockwise")
                 }
-                .help("Upgrade the packages that failed again")
+                .help("Run the operation again")
             }
             if let logFileURL = operation.logFileURL {
                 Button {
@@ -110,10 +110,6 @@ struct ActivityRow: View {
         .buttonStyle(.borderless)
         .controlSize(.small)
         .font(.caption)
-    }
-
-    private var showsBatchProgress: Bool {
-        operation.isRunning && !operation.steps.isEmpty
     }
 
     private var statusLabel: String {

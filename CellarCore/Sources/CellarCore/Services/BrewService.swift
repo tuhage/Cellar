@@ -3,7 +3,8 @@ import Foundation
 public nonisolated final class BrewService: Sendable {
     public static let shared = BrewService()
 
-    private let process: BrewProcessProtocol
+    /// Internal so per-domain extensions in other files can run commands.
+    let process: BrewProcessProtocol
 
     public init(process: BrewProcessProtocol = BrewProcess()) {
         self.process = process
@@ -46,7 +47,7 @@ public nonisolated final class BrewService: Sendable {
     /// `--formula` / `--cask` is always explicit: without it brew resolves a
     /// bare name like `maestro` to a same-named cask instead of the formula.
     public func install(_ name: String, isCask: Bool = false) -> AsyncThrowingStream<String, Error> {
-        process.stream(["install", isCask ? "--cask" : "--formula", name])
+        process.stream(["install", isCask ? "--cask" : "--formula", name], includingStandardError: true)
     }
 
     public func uninstall(_ name: String, force: Bool = false) async throws {

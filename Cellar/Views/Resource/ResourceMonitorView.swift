@@ -111,7 +111,7 @@ struct ResourceMonitorView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .disabled(maintenanceStore.isLoading)
+                .disabled(maintenanceStore.isRunning)
             }
 
             if let diskUsage = store.diskUsage {
@@ -419,8 +419,6 @@ private extension View {
     NavigationStack {
         ResourceMonitorView()
     }
-    .environment(ServiceStore())
-    .environment(ResourceStore())
-    .environment(MaintenanceStore())
+    .environment(AppStores())
     .frame(width: 700, height: 600)
 }

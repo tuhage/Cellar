@@ -3,12 +3,14 @@ import CellarCore
 
 // MARK: - AppCommands
 
-/// Keyboard shortcut commands for the Cellar menu bar.
-///
-/// Uses `NotificationCenter` to communicate actions to views, since
-/// `Commands` structs cannot directly access `@Environment` stores.
+/// The app's menu commands. They act on the frontmost main window through
+/// focused values, so each item is enabled only when it can do something.
 struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.windowCommands) private var window
+    @FocusedValue(\.pageRefresh) private var pageRefresh
+    @FocusedValue(\.selectedPackage) private var package
+    @FocusedValue(\.selectedService) private var service
     let updateStore: UpdateStore
 
     var body: some Commands {
@@ -16,72 +18,90 @@ struct AppCommands: Commands {
 
         CommandGroup(replacing: .help) {
             Button("Keyboard Shortcuts") {
-                openWindow(id: "keyboard-shortcuts")
+                openWindow(id: SceneID.keyboardShortcuts)
             }
             .keyboardShortcut("/", modifiers: .command)
         }
 
         CommandGroup(after: .appInfo) {
-            Button("Check for Updates\u{2026}") {
+            Button("Check for Cellar Updates\u{2026}") {
                 updateStore.checkForUpdates()
             }
         }
 
         CommandMenu("Navigate") {
-            Button("Quick Open\u{2026}") {
-                NotificationCenter.default.post(name: .openQuickOpen, object: nil)
-            }
-            .keyboardShortcut("k", modifiers: .command)
+            Button("Quick Open\u{2026}") { window?.openQuickOpen() }
+                .shortcut(.quickOpen)
+                .disabled(window == nil)
+
+            Button("Show Activity") { window?.showActivity() }
+                .shortcut(.showActivity)
+                .disabled(window == nil)
 
             Divider()
 
             ForEach(Array(SidebarItem.allCases.prefix(9).enumerated()), id: \.element.id) { index, item in
-                Button(item.title) {
-                    NotificationCenter.default.post(
-                        name: .navigateToSidebarItem,
-                        object: nil,
-                        userInfo: ["item": item.rawValue]
-                    )
-                }
-                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                Button(item.title) { window?.navigate(item) }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                    .disabled(window == nil)
             }
         }
 
         CommandMenu("Packages") {
-            Button("Refresh All") {
-                NotificationCenter.default.post(name: .refreshAll, object: nil)
-            }
-            .keyboardShortcut("r", modifiers: .command)
+            Button("Refresh") { refresh() }
+                .shortcut(.refresh)
+                .disabled(window == nil)
 
-            Button("Upgrade All") {
-                NotificationCenter.default.post(name: .upgradeAll, object: nil)
-            }
-            .keyboardShortcut("u", modifiers: [.command, .shift])
+            Button("Check for Package Updates") { window?.checkForPackageUpdates() }
+                .shortcut(.checkForPackageUpdates)
+                .disabled(window?.canCheckForUpdates != true)
+
+            Button("Upgrade All\u{2026}") { window?.previewUpgradeAll() }
+                .shortcut(.upgradeAll)
+                .disabled(window?.canUpgradeAll != true)
 
             Divider()
 
-            Button("Cleanup") {
-                NotificationCenter.default.post(name: .cleanup, object: nil)
-            }
-            .keyboardShortcut("k", modifiers: [.command, .shift])
+            Button(package.map { "Upgrade \($0.name)" } ?? "Upgrade") { package?.upgrade() }
+                .shortcut(.upgradeSelection)
+                .disabled(package?.canUpgrade != true || package?.isBusy == true)
+
+            Button(package?.isPinned == true ? "Unpin" : "Pin") { package?.togglePin() }
+                .disabled(package?.isPinned == nil || package?.isBusy == true)
+
+            Button(package.map { "Uninstall \($0.name)\u{2026}" } ?? "Uninstall\u{2026}") { package?.uninstall() }
+                .shortcut(.uninstallSelection)
+                .disabled(package == nil || package?.isBusy == true)
+
+            Divider()
+
+            Button("Clean Up\u{2026}") { window?.previewCleanup() }
+                .shortcut(.cleanUp)
+                .disabled(window?.canCleanUp != true)
         }
 
         CommandMenu("Services") {
-            Button("Refresh Services") {
-                NotificationCenter.default.post(name: .refreshServices, object: nil)
+            Button(service?.isRunning == true ? "Stop" : "Start") {
+                guard let service else { return }
+                service.isRunning ? service.stop() : service.start()
             }
-            .keyboardShortcut("r", modifiers: [.command, .option])
+            .shortcut(.toggleService)
+            .disabled(service == nil || service?.isBusy == true)
+
+            Button("Restart") { service?.restart() }
+                .shortcut(.restartService)
+                .disabled(service?.isRunning != true || service?.isBusy == true)
         }
     }
-}
 
-// MARK: - Notification Names
-
-extension Notification.Name {
-    static let refreshAll = Notification.Name("cellar.refreshAll")
-    static let upgradeAll = Notification.Name("cellar.upgradeAll")
-    static let cleanup = Notification.Name("cellar.cleanup")
-    static let refreshServices = Notification.Name("cellar.refreshServices")
-    static let openQuickOpen = Notification.Name("cellar.openQuickOpen")
-    static let navigateToSidebarItem = Notification.Name("cellar.navigateToSidebarItem")
+    /// ⌘R reloads the visible page, or everything when it has no own refresh.
+    private func refresh() {
+        Task {
+            if let pageRefresh {
+                await pageRefresh()
+            } else {
+                await window?.refreshAll()
+            }
+        }
+    }
 }

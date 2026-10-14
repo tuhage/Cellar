@@ -60,7 +60,7 @@ struct FormulaListView: View {
                 LoadingView(message: "Loading Formulae\u{2026}")
             } else if let errorMessage = store.errorMessage, store.formulae.isEmpty {
                 ErrorView(message: errorMessage) {
-                    Task { await store.loadFormulae() }
+                    Task { await store.loadAll() }
                 }
             } else if isSearching {
                 searchResultsList
@@ -83,12 +83,12 @@ struct FormulaListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 RefreshToolbarButton(isLoading: store.isLoading) {
-                    await store.loadFormulae(forceRefresh: true)
+                    await store.loadAll(forceRefresh: true)
                 }
             }
         }
         .task {
-            await store.loadFormulae()
+            await store.loadAll()
         }
         .inspector(isPresented: isInspectorPresented) {
             if let selectedFormula {
@@ -374,7 +374,7 @@ private enum FormulaScope: String, CaseIterable, Identifiable {
 #Preview {
     NavigationStack {
         FormulaListView()
-            .environment(PackageStore())
+            .environment(AppStores())
     }
     .frame(width: 700, height: 500)
 }

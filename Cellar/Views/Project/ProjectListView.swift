@@ -432,7 +432,7 @@ private extension View {
 #Preview {
     NavigationStack {
         ProjectListView()
-            .environment(ProjectStore())
+            .environment(AppStores())
     }
     .frame(width: 800, height: 600)
 }

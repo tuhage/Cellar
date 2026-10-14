@@ -64,8 +64,13 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
 
     // MARK: Actions
 
+    /// Streams `brew install --cask` output line by line.
+    public func installOutput() -> AsyncThrowingStream<String, Error> {
+        BrewService.shared.install(fullToken.isEmpty ? token : fullToken, isCask: true)
+    }
+
     public func install() async throws {
-        for try await _ in BrewService.shared.install(token, isCask: true) {}
+        for try await _ in installOutput() {}
     }
 
     public func uninstall(force: Bool = false) async throws {

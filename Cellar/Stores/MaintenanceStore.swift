@@ -4,11 +4,11 @@ import CellarCore
 
 // MARK: - MaintenanceStore
 
-/// Manages maintenance schedule settings, runs brew cleanup and doctor tasks,
-/// and persists a history of maintenance reports.
+/// Maintenance schedule, `brew cleanup` / `brew doctor` runs and their
+/// report history. Runs are tracked in Activity like any other operation.
 @Observable
 @MainActor
-final class MaintenanceStore: LoadableStore {
+final class MaintenanceStore {
 
     // MARK: Data
 
@@ -17,21 +17,31 @@ final class MaintenanceStore: LoadableStore {
 
     // MARK: State
 
-    var isLoading = false
+    /// Failures to read or write the schedule and reports.
     var errorMessage: String?
-    var currentAction: String?
-
-    // MARK: Activity
-
-    var activityStore: ActivityStore?
+    /// Set to show the cleanup preview from anywhere in the app.
+    var isCleanupPreviewPresented = false
 
     // MARK: Dependencies
 
+    let activityStore: ActivityStore
     private let persistence = PersistenceService()
     private let service = BrewService.shared
 
     private static let scheduleFileName = "maintenance_schedule.json"
     private static let reportsFileName = "maintenance_reports.json"
+    private static let maxReports = 100
+
+    init(activityStore: ActivityStore) {
+        self.activityStore = activityStore
+    }
+
+    /// The cleanup or health check that is running, if any.
+    var runningTask: BrewOperation? {
+        activityStore.runningOperation { $0.kind == .cleanup || $0.kind == .healthCheck }
+    }
+
+    var isRunning: Bool { runningTask != nil }
 
     // MARK: - Persistence
 
@@ -62,11 +72,8 @@ final class MaintenanceStore: LoadableStore {
         )
     }
 
-    /// Persists the current report history to disk.
     private func saveReports() {
-        if reports.count > 100 {
-            reports = Array(reports.prefix(100))
-        }
+        reports = Array(reports.prefix(Self.maxReports))
         do {
             try persistence.save(reports, to: Self.reportsFileName)
         } catch {
@@ -76,107 +83,40 @@ final class MaintenanceStore: LoadableStore {
 
     // MARK: - Actions
 
-    /// Runs `brew cleanup` and records a report.
-    func runCleanup() async {
-        isLoading = true
-        currentAction = "Running cleanup\u{2026}"
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .cleanup)
-
-        do {
-            let output = try await withCancellableActivity(activityStore, id: opID) {
-                var output = ""
-                for try await line in self.service.cleanup() {
-                    if let opID { self.activityStore?.appendLog(opID, line) }
-                    output += line + "\n"
-                }
-                return output
-            }
-
-            let summary = cleanupSummary(from: output)
-            let report = MaintenanceReport(
-                type: .cleanup,
-                summary: summary,
-                details: output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : output.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-
-            schedule.lastCleanup = report.date
-            reports.insert(report, at: 0)
-
-            saveSettings()
-            saveReports()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            if let opID {
-                activityStore?.setStatus(opID, isOperationCancellation(error)
-                    ? .cancelled : .failed(reason: error.localizedDescription))
-            }
-            if !isOperationCancellation(error) {
-                errorMessage = "Cleanup failed: \(error.localizedDescription)"
-            }
-        }
-
-        isLoading = false
-        currentAction = nil
+    /// Runs `brew cleanup` and records a report. Returns whether it succeeded.
+    @discardableResult
+    func runCleanup(background: Bool = false) async -> Bool {
+        await activityStore.perform(.cleanup, background: background) { activity in
+            let output = try await activity.stream(self.service.cleanup()).joined(separator: "\n")
+            self.record(.cleanup, summary: Self.cleanupSummary(from: output), output: output)
+        } != nil
     }
 
-    /// Runs `brew doctor` and records a report.
-    func runHealthCheck() async {
-        isLoading = true
-        currentAction = "Running health check\u{2026}"
-        errorMessage = nil
-        let opID = activityStore?.register(kind: .healthCheck)
-
-        do {
-            let output = try await withCancellableActivity(activityStore, id: opID) {
-                try await self.service.doctor()
-            }
-            output.split(separator: "\n").forEach {
-                if let opID { activityStore?.appendLog(opID, String($0)) }
-            }
-
-            let summary = healthCheckSummary(from: output)
-            let report = MaintenanceReport(
-                type: .healthCheck,
-                summary: summary,
-                details: output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : output.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-
-            schedule.lastHealthCheck = report.date
-            reports.insert(report, at: 0)
-
-            saveSettings()
-            saveReports()
-            if let opID { activityStore?.setStatus(opID, .succeeded) }
-        } catch {
-            if let opID {
-                activityStore?.setStatus(opID, isOperationCancellation(error)
-                    ? .cancelled : .failed(reason: error.localizedDescription))
-            }
-            if !isOperationCancellation(error) {
-                errorMessage = "Health check failed: \(error.localizedDescription)"
-            }
-        }
-
-        isLoading = false
-        currentAction = nil
+    /// Runs `brew doctor` and records a report. Returns whether it succeeded.
+    @discardableResult
+    func runHealthCheck(background: Bool = false) async -> Bool {
+        await activityStore.perform(.healthCheck, background: background) { activity in
+            let output = try await self.service.doctor()
+            activity.log(output: output)
+            self.record(.healthCheck, summary: Self.healthCheckSummary(from: output), output: output)
+        } != nil
     }
 
-    /// Runs both cleanup and health check sequentially.
+    /// Runs cleanup, then the health check — unless cleanup failed or was
+    /// cancelled.
     func runAll() async {
-        await runCleanup()
-        guard errorMessage == nil else { return }
+        guard await runCleanup() else { return }
         await runHealthCheck()
     }
 
-    /// Checks if any scheduled task is overdue and runs it.
+    /// Runs any overdue scheduled task in the background.
     func checkSchedule() async {
-        guard !isLoading else { return }
+        guard !isRunning else { return }
         if schedule.isCleanupOverdue {
-            await runCleanup()
+            await runCleanup(background: true)
         }
         if schedule.isHealthCheckOverdue {
-            await runHealthCheck()
+            await runHealthCheck(background: true)
         }
     }
 
@@ -186,10 +126,22 @@ final class MaintenanceStore: LoadableStore {
         saveReports()
     }
 
-    // MARK: - Summarization
+    // MARK: - Reports
+
+    private func record(_ type: MaintenanceReportType, summary: String, output: String) {
+        let details = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let report = MaintenanceReport(type: type, summary: summary, details: details.isEmpty ? nil : details)
+        switch type {
+        case .cleanup: schedule.lastCleanup = report.date
+        case .healthCheck: schedule.lastHealthCheck = report.date
+        }
+        reports.insert(report, at: 0)
+        saveSettings()
+        saveReports()
+    }
 
     /// Extracts a human-readable summary from `brew cleanup` output.
-    private func cleanupSummary(from output: String) -> String {
+    private static func cleanupSummary(from output: String) -> String {
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return "Nothing to clean up. Homebrew is tidy."
@@ -205,7 +157,7 @@ final class MaintenanceStore: LoadableStore {
     }
 
     /// Extracts a human-readable summary from `brew doctor` output.
-    private func healthCheckSummary(from output: String) -> String {
+    private static func healthCheckSummary(from output: String) -> String {
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed.contains("Your system is ready to brew") {
             return "Your system is ready to brew. No issues found."

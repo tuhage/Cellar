@@ -167,6 +167,8 @@ nonisolated enum Opacity {
     static let pressedOverlay: Double = 0.08
     /// Thin border stroke
     static let subtleBorder: Double = 0.08
+    /// Background tint for page banners
+    static let bannerBackground: Double = 0.07
 }
 
 // MARK: - WindowSize
