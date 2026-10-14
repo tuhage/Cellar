@@ -76,7 +76,8 @@ struct PackageDetailView: View {
         VStack(alignment: .leading, spacing: Spacing.item) {
             primaryButton
 
-            HStack(spacing: Spacing.item) {
+            // Wraps instead of truncating "Uninstall…" in a narrow inspector.
+            FlowLayout(spacing: Spacing.item) {
                 if case .formula(let formula) = shown, formula.isInstalled {
                     Button {
                         Task { await store.setPinned(!formula.pinned, for: [formula]) }
@@ -98,7 +99,6 @@ struct PackageDetailView: View {
                     Label("More", systemImage: "ellipsis.circle")
                 }
                 .menuIndicator(.hidden)
-                .fixedSize()
                 .help("More actions")
             }
         }

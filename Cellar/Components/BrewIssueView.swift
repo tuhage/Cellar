@@ -59,6 +59,7 @@ private struct RemedyControl: View {
                 HStack(spacing: Spacing.item) {
                     button
                     CopyButton(text: command, title: "Copy Command")
+                        .controlSize(.small)
                 }
             }
         default:
