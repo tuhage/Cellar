@@ -51,7 +51,7 @@ struct BrewfileListColumn: View {
     }
 
     private func row(for brewfile: Brewfile) -> some View {
-        BrewfileRow(brewfile: brewfile)
+        BrewfileRow(brewfile: brewfile, store: store)
             .tag(brewfile.id)
             .contextMenu {
                 BrewfileMenuItems(brewfile: brewfile, sheet: $sheet, confirmation: $confirmation)
@@ -80,8 +80,8 @@ struct BrewfileListColumn: View {
 
 private struct BrewfileRow: View {
     let brewfile: Brewfile
-
-    @Environment(BrewfileStore.self) private var store
+    /// Passed in rather than read from the environment: see `PackageStatusView`.
+    let store: BrewfileStore
 
     var body: some View {
         Label {

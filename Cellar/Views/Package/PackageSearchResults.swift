@@ -31,7 +31,7 @@ struct PackageSearchResults: View {
             if !results.isEmpty {
                 Section {
                     ForEach(results) { package in
-                        SearchResultRow(package: package)
+                        SearchResultRow(package: package, store: store)
                     }
                 } header: {
                     CountedSectionHeader(
@@ -78,6 +78,8 @@ struct PackageSearchResults: View {
 
 private struct SearchResultRow: View {
     let package: PackageType
+    /// Passed in rather than read from the environment: see `PackageStatusView`.
+    let store: PackageStore
 
     var body: some View {
         HStack(spacing: Spacing.sectionContent) {
@@ -95,7 +97,7 @@ private struct SearchResultRow: View {
             if package.isInstalled {
                 StatusBadge(text: "Installed", color: .green, icon: "checkmark")
             } else {
-                PackageInstallButton(package: package)
+                PackageInstallButton(package: package, store: store)
             }
         }
         .padding(.vertical, Spacing.textPair)
@@ -105,9 +107,10 @@ private struct SearchResultRow: View {
 /// Install, or its progress while it runs.
 struct PackageInstallButton: View {
     let package: PackageType
+    /// Passed in rather than read from the environment: see `PackageStatusView`.
+    let store: PackageStore
 
-    @Environment(PackageStore.self) private var store
-    @Environment(ActivityStore.self) private var activityStore
+    private var activityStore: ActivityStore { store.activityStore }
 
     var body: some View {
         if let activity = PackageActivity(package, activityStore: activityStore) {

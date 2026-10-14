@@ -62,7 +62,7 @@ struct PackageTable: View {
                 .width(min: 80, ideal: 120)
 
                 TableColumn("Status") { package in
-                    PackageStatusView(package: package)
+                    PackageStatusView(package: package, activityStore: store.activityStore)
                 }
                 .width(min: 80, ideal: 180)
             }
@@ -91,7 +91,6 @@ struct PackageTable: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .fixedSize()
 
             Spacer()
 

@@ -105,7 +105,7 @@ struct OutdatedView: View {
                     if !packages.isEmpty {
                         Section {
                             ForEach(packages) { package in
-                                OutdatedPackageRow(package: package)
+                                OutdatedPackageRow(package: package, store: store)
                             }
                         } header: {
                             CountedSectionHeader(title: kind.title, systemImage: kind.systemImage, count: packages.count)
@@ -219,9 +219,10 @@ struct OutdatedView: View {
 
 private struct OutdatedPackageRow: View {
     let package: PackageType
+    /// Passed in rather than read from the environment: see `PackageStatusView`.
+    let store: PackageStore
 
-    @Environment(PackageStore.self) private var store
-    @Environment(ActivityStore.self) private var activityStore
+    private var activityStore: ActivityStore { store.activityStore }
 
     var body: some View {
         HStack(spacing: Spacing.sectionContent) {

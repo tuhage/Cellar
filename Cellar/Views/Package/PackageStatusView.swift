@@ -84,10 +84,13 @@ struct PackageActivityLabel: View {
 
 /// A package's current activity, or badges for its state: outdated,
 /// pinned, deprecated and so on.
+///
+/// Takes the activity store rather than reading the environment: it lives
+/// in table cells, which AppKit can redraw on a selection change without
+/// the window's environment objects.
 struct PackageStatusView: View {
     let package: PackageType
-
-    @Environment(ActivityStore.self) private var activityStore
+    let activityStore: ActivityStore
 
     var body: some View {
         if let activity = PackageActivity(package, activityStore: activityStore) {
@@ -134,8 +137,8 @@ struct PackageBadges: View {
 
 #Preview {
     VStack(alignment: .leading, spacing: Spacing.item) {
-        PackageStatusView(package: .formula(.preview))
-        PackageStatusView(package: .cask(.preview))
+        PackageStatusView(package: .formula(.preview), activityStore: ActivityStore())
+        PackageStatusView(package: .cask(.preview), activityStore: ActivityStore())
         PackageActivityLabel(activity: .operation(.upgrade(name: "wget", isCask: false)))
         PackageActivityLabel(activity: .batchStep(.pending))
         PackageActivityLabel(activity: .batchStep(.failed(.init(reason: "Download failed", issue: .offline))))
