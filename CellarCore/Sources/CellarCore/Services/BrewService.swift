@@ -93,26 +93,6 @@ public nonisolated final class BrewService: Sendable {
         return output.stdout
     }
 
-    // MARK: - Brewfile
-
-    public func bundleDump(to path: String) async throws {
-        try await runChecked(["bundle", "dump", "--file=\(path)", "--force"])
-    }
-
-    public func bundleInstall(from path: String) -> AsyncThrowingStream<String, Error> {
-        process.stream(["bundle", "install", "--file=\(path)"])
-    }
-
-    public func bundleCheck(at path: String) async throws -> String {
-        let output = try await process.run(["bundle", "check", "--file=\(path)"])
-        return output.stdout + output.stderr
-    }
-
-    public func bundleCleanup(at path: String) async throws -> String {
-        let output = try await process.run(["bundle", "cleanup", "--file=\(path)"])
-        return output.stdout
-    }
-
     // MARK: - Pin
 
     public func pin(_ name: String) async throws {

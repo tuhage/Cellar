@@ -11,7 +11,6 @@ final class AppStores {
     let services: ServiceStore
     let taps: TapStore
     let brewfiles: BrewfileStore
-    let projects: ProjectStore
     let maintenance: MaintenanceStore
     let dependencies: DependencyStore
     let serviceMetrics = ServiceMetricsStore()
@@ -30,8 +29,7 @@ final class AppStores {
         dependencies = DependencyStore(packageStore: packages)
         services = ServiceStore(activityStore: activity)
         taps = TapStore(activityStore: activity)
-        brewfiles = BrewfileStore(activityStore: activity)
-        projects = ProjectStore(activityStore: activity)
+        brewfiles = BrewfileStore(activityStore: activity, packages: packages, services: services, taps: taps)
         maintenance = MaintenanceStore(activityStore: activity)
         maintenance.loadSettings()
         maintenance.loadReports()
@@ -108,7 +106,6 @@ extension View {
             .environment(stores.services)
             .environment(stores.taps)
             .environment(stores.brewfiles)
-            .environment(stores.projects)
             .environment(stores.maintenance)
             .environment(stores.dependencies)
             .environment(stores.serviceMetrics)

@@ -38,6 +38,19 @@ final class CellarFinderSyncExtension: FIFinderSync {
         }
 
         let menu = NSMenu(title: "Cellar")
+
+        if let brewfileURL = targetedBrewfileURL(for: menuKind) {
+            let openItem = NSMenuItem(
+                title: "Open in Cellar",
+                action: #selector(openBrewfileAction(_:)),
+                keyEquivalent: ""
+            )
+            openItem.representedObject = brewfileURL
+            openItem.target = self
+            menu.addItem(openItem)
+            menu.addItem(.separator())
+        }
+
         let snapshot = WidgetSnapshot.load()
         let runningNames = snapshot?.runningServiceNames ?? []
         let stoppedNames = snapshot?.stoppedServiceNames ?? []
@@ -83,7 +96,30 @@ final class CellarFinderSyncExtension: FIFinderSync {
         return menu
     }
 
+    /// The Brewfile of the right-clicked folder (or the Brewfile itself),
+    /// if there is one.
+    private func targetedBrewfileURL(for menuKind: FIMenuKind) -> URL? {
+        let controller = FIFinderSyncController.default()
+        let target = menuKind == .contextualMenuForContainer
+            ? controller.targetedURL()
+            : controller.selectedItemURLs()?.first
+        guard let target else { return nil }
+        let brewfileURL = target.lastPathComponent == "Brewfile" ? target : target.appendingPathComponent("Brewfile")
+        return FileManager.default.fileExists(atPath: brewfileURL.path) ? brewfileURL : nil
+    }
+
     // MARK: - Actions
+
+    /// Opens the Brewfile on Cellar's Brewfiles page via `cellar://brewfile?path=…`.
+    @objc private func openBrewfileAction(_ sender: NSMenuItem) {
+        guard let brewfileURL = sender.representedObject as? URL else { return }
+        var components = URLComponents()
+        components.scheme = "cellar"
+        components.host = "brewfile"
+        components.queryItems = [URLQueryItem(name: "path", value: brewfileURL.path)]
+        guard let url = components.url else { return }
+        NSWorkspace.shared.open(url)
+    }
 
     @objc private func stopServiceAction(_ sender: NSMenuItem) {
         guard let serviceName = sender.representedObject as? String else { return }

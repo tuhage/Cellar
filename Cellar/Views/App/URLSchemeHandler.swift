@@ -5,6 +5,7 @@ import CellarCore
 struct URLSchemeHandler: ViewModifier {
     @Binding var selection: SidebarItem?
     @Environment(PackageStore.self) private var packageStore
+    @Environment(BrewfileStore.self) private var brewfileStore
 
     func body(content: Content) -> some View {
         content.onOpenURL { url in handleURL(url) }
@@ -26,6 +27,16 @@ struct URLSchemeHandler: ViewModifier {
             if let token = url.pathComponents.dropFirst().first {
                 packageStore.selectedCaskId = token
             }
+            return
+        }
+
+        // A folder's Brewfile, from Finder's "Open in Cellar": cellar://brewfile?path=<path>
+        if host == "brewfile",
+           let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+               .queryItems?.first(where: { $0.name == "path" })?.value,
+           path.hasPrefix("/") {
+            selection = .brewfile
+            brewfileStore.open(path: path)
             return
         }
 

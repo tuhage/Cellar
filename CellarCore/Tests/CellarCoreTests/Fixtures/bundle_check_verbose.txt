@@ -1,0 +1,10 @@
+brew bundle can't satisfy your Brewfile's dependencies.
+→ Tap homebrew/core needs to be tapped.
+→ Cask firefox needs to be installed.
+→ VSCode Extension ms-python.python needs to be installed.
+→ App Final Cut Pro needs to be installed.
+→ Formula wget needs to be installed.
+→ Formula mobile-dev-inc/tap/maestro needs to be installed or updated.
+→ Formula jq needs to be linked.
+→ Service postgresql@16 needs to be started.
+Satisfy missing dependencies with `brew bundle install`.
