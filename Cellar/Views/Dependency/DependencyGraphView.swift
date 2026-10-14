@@ -30,7 +30,7 @@ struct DependencyGraphView: View {
                 }
             }
             .toolbar { toolbar(graph) }
-            .pageInspector(.dependency, isPresented: $isInspectorPresented) {
+            .pageInspector(isPresented: $isInspectorPresented) {
                 inspector(graph)
             }
             .task(id: store.packageStore.lastUpdated) { await store.load() }
@@ -70,13 +70,11 @@ struct DependencyGraphView: View {
     private func filterBar(_ graph: DependencyGraph) -> some View {
         @Bindable var store = store
 
-        return Picker("Show", selection: $store.filter) {
+        return FilterPicker(title: "Show", selection: $store.filter) {
             ForEach(DependencyFilter.allCases, id: \.self) { filter in
                 Text("\(filter.title) \(filter.count(in: graph))").tag(filter)
             }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
         .padding(.horizontal, Spacing.cardPadding)
         .padding(.vertical, Spacing.item)
     }

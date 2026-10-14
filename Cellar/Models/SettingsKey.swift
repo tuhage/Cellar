@@ -39,10 +39,6 @@ enum SettingsKey {
         "\(page.rawValue)InspectorPresented"
     }
 
-    static func inspectorWidth(_ page: InspectorPage) -> String {
-        "\(page.rawValue)InspectorWidth"
-    }
-
     // MARK: Migration
 
     /// Old raw value → current one.

@@ -48,7 +48,7 @@ struct TapListView: View {
             .dataFreshness(store.lastUpdated)
             .searchable(text: $store.searchQuery, prompt: "Filter taps")
             .toolbar { toolbar }
-            .pageInspector(.tap, isPresented: $isInspectorPresented) {
+            .pageInspector(isPresented: $isInspectorPresented) {
                 inspector
             }
             .task { await store.load() }

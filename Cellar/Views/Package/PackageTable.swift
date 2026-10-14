@@ -84,13 +84,11 @@ struct PackageTable: View {
 
     private func filterBar(shownCount: Int) -> some View {
         HStack {
-            Picker("Filter", selection: $filter) {
+            FilterPicker(title: "Filter", selection: $filter) {
                 ForEach(PackageFilter.filters(for: kind)) { filter in
                     Text(filter.title).tag(filter)
                 }
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
 
             Spacer()
 

@@ -45,7 +45,7 @@ struct ServiceListView: View {
             .toolbar { toolbarContent }
             .task { await store.load() }
             .task { await metrics.monitor { store.services } }
-            .pageInspector(.service, isPresented: $showsInspector, hasContent: store.selectedService != nil) {
+            .pageInspector(isPresented: $showsInspector, hasContent: store.selectedService != nil) {
                 if let service = store.selectedService {
                     ServiceDetailView(service: service, pendingAction: $pendingAction)
                         .id(service.name)
@@ -167,21 +167,21 @@ struct ServiceListView: View {
                     .fontWeight(.medium)
                     .padding(.vertical, Spacing.textPair)
             }
-            .width(min: 120, ideal: 200)
+            .width(min: 120, ideal: 180)
             .customizationID("name")
             .disabledCustomizationBehavior(.visibility)
 
             TableColumn("Status", value: \.status) { row in
                 ServiceStatusBadge(service: row.service, isBusy: store.isBusy(row.service))
             }
-            .width(min: 90, ideal: 110)
+            .width(min: 90, ideal: 100)
             .customizationID("status")
 
             TableColumn("CPU", sortUsing: KeyPathComparator(\.cpuPercent)) { row in
                 MetricText(text: row.usage?.cpuText)
                     .help("Share of one CPU core, including worker processes; 100% is a full core.")
             }
-            .width(min: 50, ideal: 70)
+            .width(min: 50, ideal: 60)
             .alignment(.numeric)
             .customizationID("cpu")
 
@@ -202,14 +202,14 @@ struct ServiceListView: View {
             TableColumn("PID", sortUsing: KeyPathComparator(\.pid)) { row in
                 MetricText(text: row.pid.map(String.init))
             }
-            .width(min: 50, ideal: 70)
+            .width(min: 50, ideal: 60)
             .alignment(.numeric)
             .customizationID("pid")
 
             TableColumn("User", sortUsing: KeyPathComparator(\.user)) { row in
                 userCell(row.service)
             }
-            .width(min: 60, ideal: 100)
+            .width(min: 60, ideal: 80)
             .customizationID("user")
         }
         .tableStyle(.inset(alternatesRowBackgrounds: false))

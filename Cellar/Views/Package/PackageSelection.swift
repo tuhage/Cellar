@@ -20,7 +20,7 @@ private struct PackageSelectionModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .pageInspector(.package, isPresented: $showsInspector, hasContent: selected != nil) {
+            .pageInspector(isPresented: $showsInspector, hasContent: selected != nil) {
                 if let selected {
                     PackageDetailView(package: selected)
                         // Fresh state per package, so nothing leaks between them.
