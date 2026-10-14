@@ -44,10 +44,12 @@ public struct ProcessOutput: Sendable {
 // MARK: - Implementation
 
 public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
-    private let brewPath: String
+    private let brewPathOverride: String?
 
-    public init(brewPath: String = BrewProcess.resolveBrewPath()) {
-        self.brewPath = brewPath
+    /// `brewPath` is for tests; by default the path is resolved on every
+    /// call, so a brew located during onboarding takes effect at once.
+    public init(brewPath: String? = nil) {
+        self.brewPathOverride = brewPath
     }
 
     public func run(_ arguments: [String]) async throws -> ProcessOutput {
@@ -234,23 +236,36 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
 
     // MARK: - Brew Path Resolution
 
+    private var brewPath: String {
+        brewPathOverride ?? Self.resolveBrewPath()
+    }
+
     private static let brewCandidatePaths = [
         "/opt/homebrew/bin/brew",              // Apple Silicon
         "/usr/local/bin/brew",                 // Intel
         "/home/linuxbrew/.linuxbrew/bin/brew"  // Linux
     ]
 
-    public static var isInstalled: Bool {
-        brewCandidatePaths.contains { FileManager.default.fileExists(atPath: $0) }
+    private static let customBrewPathKey = "customBrewPath"
+
+    /// A brew executable the user picked, for installs outside the
+    /// standard prefixes. Checked before the standard locations.
+    public static var customBrewPath: String? {
+        get { UserDefaults.standard.string(forKey: customBrewPathKey) }
+        set { UserDefaults.standard.set(newValue, forKey: customBrewPathKey) }
     }
 
-    private static let _resolvedPath: String = {
-        brewCandidatePaths.first { FileManager.default.fileExists(atPath: $0) }
-            ?? "/opt/homebrew/bin/brew"
-    }()
+    public static var isInstalled: Bool {
+        installedBrewPath != nil
+    }
 
     public static func resolveBrewPath() -> String {
-        _resolvedPath
+        installedBrewPath ?? brewCandidatePaths[0]
+    }
+
+    private static var installedBrewPath: String? {
+        ([customBrewPath].compactMap(\.self) + brewCandidatePaths)
+            .first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
     private static func brewEnvironment() -> [String: String] {

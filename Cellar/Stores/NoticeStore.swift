@@ -18,7 +18,7 @@ final class NoticeStore {
     func announce(_ operation: BrewOperation) {
         guard !operation.isBackground, !operation.isRunning else { return }
         let notice = OperationNotice(operation: operation)
-        guard Self.isMainWindowInFront else {
+        guard NSApplication.shared.isMainWindowInFront else {
             ActivityNotificationService.shared.post(notice)
             return
         }
@@ -49,12 +49,6 @@ final class NoticeStore {
             try? await Task.sleep(for: Self.displayDuration)
             guard !Task.isCancelled, self?.current?.id == current.id else { return }
             self?.current = nil
-        }
-    }
-
-    private static var isMainWindowInFront: Bool {
-        NSApplication.shared.isActive && NSApplication.shared.windows.contains { window in
-            window.isVisible && window.identifier?.rawValue.hasPrefix(SceneID.main) == true
         }
     }
 }

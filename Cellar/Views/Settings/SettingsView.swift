@@ -1,60 +1,195 @@
 import SwiftUI
 import FinderSync
+import ServiceManagement
+import UserNotifications
 import CellarCore
 
 struct SettingsView: View {
+    @AppStorage(SettingsKey.selectedSettingsTab) private var selectedTab = SettingsTab.general.rawValue
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             GeneralTab()
                 .tabItem { Label("General", systemImage: "gear") }
+                .tag(SettingsTab.general.rawValue)
+
+            MaintenanceTab()
+                .tabItem { Label("Maintenance", systemImage: "wrench.and.screwdriver") }
+                .tag(SettingsTab.maintenance.rawValue)
 
             ExtensionsTab()
                 .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
+                .tag(SettingsTab.extensions.rawValue)
 
             AboutTab()
                 .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(SettingsTab.about.rawValue)
         }
-        .frame(width: 540, height: 520)
+        .frame(width: 540, height: 540)
     }
 }
 
 // MARK: - General
 
 private struct GeneralTab: View {
-    @AppStorage("refreshInterval") private var refreshInterval = 5.0
-    @AppStorage("showMenuBarExtra") private var showMenuBarExtra = true
-    @AppStorage("confirmBeforeUninstall") private var confirmBeforeUninstall = true
-    @AppStorage("showNotifications") private var showNotifications = true
-    @AppStorage(PackageStore.automaticCheckSettingKey) private var checksPackageUpdatesAutomatically = true
+    @AppStorage(SettingsKey.showsMenuBarExtra) private var showsMenuBarExtra = true
+    @AppStorage(SettingsKey.serviceRefreshInterval) private var refreshInterval = AppStores.defaultServiceRefreshInterval
+    @AppStorage(SettingsKey.confirmsBeforeUninstall) private var confirmsBeforeUninstall = true
+    @AppStorage(SettingsKey.checksPackageUpdatesDaily) private var checksPackageUpdatesDaily = true
+
+    private static let refreshIntervals: [Double] = [10, 15, 30, 60]
 
     var body: some View {
         Form {
             Section {
-                Picker("Service Refresh Interval", selection: $refreshInterval) {
-                    Text("2 seconds").tag(2.0)
-                    Text("5 seconds").tag(5.0)
-                    Text("10 seconds").tag(10.0)
-                    Text("30 seconds").tag(30.0)
-                }
-                Toggle("Show Menu Bar Icon", isOn: $showMenuBarExtra)
+                OpenAtLoginToggle()
+                Toggle("Show Menu Bar Icon", isOn: $showsMenuBarExtra)
             }
 
             Section {
-                Toggle("Check for Package Updates Daily", isOn: $checksPackageUpdatesAutomatically)
-                Toggle("Confirm Before Uninstall", isOn: $confirmBeforeUninstall)
+                Toggle("Check for Package Updates Daily", isOn: $checksPackageUpdatesDaily)
+                Toggle("Confirm Before Uninstalling", isOn: $confirmsBeforeUninstall)
             } header: {
                 Text("Packages")
             } footer: {
-                Text("Runs `brew update` once a day so Outdated lists the latest versions.")
+                Text("Runs `brew update` once a day so Updates lists the latest versions.")
             }
 
             Section {
-                Toggle("Enable Notifications", isOn: $showNotifications)
+                Picker("Refresh Status Every", selection: $refreshInterval) {
+                    ForEach(Self.refreshIntervals, id: \.self) { seconds in
+                        Text(Duration.seconds(seconds).formatted(.units(width: .wide))).tag(seconds)
+                    }
+                }
             } header: {
-                Text("Notifications")
+                Text("Services")
+            } footer: {
+                Text("Service status refreshes only while Cellar is the active app.")
+            }
+
+            NotificationsSection()
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - Open at Login
+
+private struct OpenAtLoginToggle: View {
+    @State private var isEnabled = SMAppService.mainApp.status == .enabled
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Toggle("Open at Login", isOn: Binding(get: { isEnabled }, set: setEnabled))
+        if let errorMessage {
+            Text(errorMessage)
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
+    }
+
+    private func setEnabled(_ enabled: Bool) {
+        errorMessage = nil
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isEnabled = SMAppService.mainApp.status == .enabled
+    }
+}
+
+// MARK: - Notifications
+
+private struct NotificationsSection: View {
+    @AppStorage(SettingsKey.showsNotifications) private var showsNotifications = true
+    @State private var status: UNAuthorizationStatus = .notDetermined
+
+    private static let systemSettingsURL = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")
+
+    var body: some View {
+        Section {
+            Toggle("Notify When Operations Finish", isOn: $showsNotifications)
+                .onChange(of: showsNotifications) { _, enabled in
+                    guard enabled else { return }
+                    Task {
+                        await ActivityNotificationService.shared.requestAuthorizationIfNeeded()
+                        await refreshStatus()
+                    }
+                }
+
+            if showsNotifications, status == .denied {
+                LabeledContent {
+                    if let url = Self.systemSettingsURL {
+                        Link("Open System Settings", destination: url)
+                    }
+                } label: {
+                    Text("Notifications are turned off for Cellar in System Settings.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text("Shown when an operation finishes while Cellar is in the background.")
+        }
+        .task { await refreshStatus() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await refreshStatus() }
+        }
+    }
+
+    private func refreshStatus() async {
+        status = await ActivityNotificationService.shared.authorizationStatus()
+    }
+}
+
+// MARK: - Maintenance
+
+private struct MaintenanceTab: View {
+    @Environment(MaintenanceStore.self) private var store
+
+    var body: some View {
+        @Bindable var store = store
+
+        Form {
+            Section {
+                Toggle("Clean Up Automatically", isOn: $store.schedule.autoCleanup)
+                Picker("Frequency", selection: $store.schedule.cleanupFrequency) {
+                    frequencyOptions
+                }
+                .disabled(!store.schedule.autoCleanup)
+            } header: {
+                Text("Cleanup")
+            } footer: {
+                Text("Removes old package versions and cached downloads.")
+            }
+
+            Section {
+                Toggle("Run Health Check Automatically", isOn: $store.schedule.autoHealthCheck)
+                Picker("Frequency", selection: $store.schedule.healthCheckFrequency) {
+                    frequencyOptions
+                }
+                .disabled(!store.schedule.autoHealthCheck)
+            } header: {
+                Text("Health Check")
+            } footer: {
+                Text("Runs `brew doctor`. Scheduled tasks run only while Cellar is open; Cellar checks once an hour whether one is due.")
             }
         }
         .formStyle(.grouped)
+        .onChange(of: [store.schedule.autoCleanup, store.schedule.autoHealthCheck]) { self.store.saveSettings() }
+        .onChange(of: [store.schedule.cleanupFrequency, store.schedule.healthCheckFrequency]) { self.store.saveSettings() }
+    }
+
+    private var frequencyOptions: some View {
+        ForEach(MaintenanceFrequency.allCases, id: \.self) { frequency in
+            Text(frequency.title).tag(frequency)
+        }
     }
 }
 
@@ -87,6 +222,7 @@ private struct ExtensionsTab: View {
 // MARK: - About
 
 private struct AboutTab: View {
+    private static let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     private static let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
 
     var body: some View {
@@ -102,9 +238,10 @@ private struct AboutTab: View {
                     Text("Cellar")
                         .font(.title2.bold())
 
-                    Text("Build \(Self.buildNumber)")
+                    Text("Version \(Self.version) (\(Self.buildNumber))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.sectionContent)
@@ -144,12 +281,7 @@ private struct UpdateSection: View {
         @Bindable var store = store
 
         Section {
-            LabeledContent("Current Version") {
-                Text("\(store.currentVersion) (\(store.currentBuild))")
-                    .foregroundStyle(.secondary)
-            }
-
-            Toggle("Check for Updates Automatically", isOn: $store.automaticallyChecksForUpdates)
+            Toggle("Check for Cellar Updates Automatically", isOn: $store.automaticallyChecksForUpdates)
 
             Toggle("Download and Install Automatically", isOn: $store.automaticallyDownloadsUpdates)
                 .disabled(!store.automaticallyChecksForUpdates)
@@ -164,7 +296,7 @@ private struct UpdateSection: View {
             Button {
                 store.checkForUpdates()
             } label: {
-                Label("Check for Updates\u{2026}", systemImage: "arrow.triangle.2.circlepath")
+                Label("Check for Cellar Updates\u{2026}", systemImage: "arrow.triangle.2.circlepath")
             }
         } header: {
             Text("Updates")
@@ -335,53 +467,45 @@ private struct FinderExtensionRow: View {
 
 // MARK: - Finder Monitored Paths
 
+/// Folders the Finder extension watches for Brewfiles, edited like any Mac
+/// list: select a row, then + or −.
 private struct FinderMonitoredPathsRow: View {
     @State private var paths: [String] = AppGroupStorage.finderSyncPaths
+    @State private var selection: String?
 
     var body: some View {
-        LabeledContent("Monitored Folders") {
-            VStack(alignment: .trailing, spacing: Spacing.compact) {
-                ForEach(paths, id: \.self) { path in
-                    HStack(spacing: Spacing.related) {
-                        Text(abbreviate(path))
-                            .font(.callout)
-                            .fontDesign(.monospaced)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-
-                        Button {
-                            remove(path)
-                        } label: {
-                            Image(systemName: "minus")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.red)
-                                .frame(width: 20, height: 20)
-                                .background(.red.opacity(0.10), in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Remove \(abbreviate(path))")
-                    }
-                }
-
-                Button("Add Folder\u{2026}") {
-                    addFolder()
-                }
-                .font(.callout)
+        VStack(alignment: .leading, spacing: 0) {
+            List(paths, id: \.self, selection: $selection) { path in
+                Label(abbreviate(path), systemImage: "folder")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
+            .frame(minHeight: 96)
+            .listStyle(.bordered(alternatesRowBackgrounds: true))
+
+            HStack(spacing: 0) {
+                Button("Add Folder", systemImage: "plus", action: addFolder)
+                Button("Remove Folder", systemImage: "minus") {
+                    if let selection { remove(selection) }
+                }
+                .disabled(selection == nil)
+                Spacer()
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .padding(.top, Spacing.compact)
         }
     }
 
     private func abbreviate(_ path: String) -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
+        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
     private func remove(_ path: String) {
         paths.removeAll { $0 == path }
-        save()
+        selection = nil
+        AppGroupStorage.finderSyncPaths = paths
     }
 
     private func addFolder() {
@@ -391,20 +515,13 @@ private struct FinderMonitoredPathsRow: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let path = url.path
-
-        guard !paths.contains(path) else { return }
+        guard panel.runModal() == .OK, let path = panel.url?.path, !paths.contains(path) else { return }
         paths.append(path)
-        save()
-    }
-
-    private func save() {
         AppGroupStorage.finderSyncPaths = paths
     }
 }
 
 #Preview {
     SettingsView()
-        .environment(UpdateStore(startingUpdater: false))
+        .environment(AppStores())
 }

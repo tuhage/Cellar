@@ -1,24 +1,32 @@
 import SwiftUI
 import CellarCore
 
+/// Shown until Homebrew is found: installs it through Terminal, notices when
+/// the install finishes, and lets users point to a brew in a custom location.
 struct OnboardingView: View {
     let onBrewDetected: () -> Void
 
+    @State private var isWaitingForInstall = false
     @State private var isCopied = false
-    @State private var showNotFoundError = false
+    @State private var errorMessage: String?
 
     private static let installCommand =
         "/bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+    private static let detectionInterval: Duration = .seconds(3)
 
     var body: some View {
         VStack(spacing: Spacing.section) {
             header
-            setupSteps
             commandBox
             actions
         }
         .frame(maxWidth: 480)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(AnimationToken.smooth, value: isWaitingForInstall)
+        .animation(AnimationToken.smooth, value: errorMessage)
+        .task(id: isWaitingForInstall) {
+            await detectInstall()
+        }
     }
 
     // MARK: - Header
@@ -29,55 +37,21 @@ struct OnboardingView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 96, height: 96)
-                .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
+                .accessibilityHidden(true)
 
             VStack(spacing: Spacing.item) {
                 Text("Welcome to Cellar")
                     .font(.largeTitle)
                     .fontWeight(.bold)
 
-                Text("Cellar requires Homebrew to manage your packages, casks, and services. Install Homebrew to get started.")
-                    .font(.body)
+                Text("Cellar manages packages, apps and services with Homebrew. Install Homebrew to get started.")
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-            }
-        }
-    }
 
-    // MARK: - Command Box
-
-    private var setupSteps: some View {
-        HStack(alignment: .top, spacing: Spacing.sectionContent) {
-            setupStep(number: 1, title: "Install", subtitle: "Open Terminal")
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .padding(.top, Spacing.item)
-            setupStep(number: 2, title: "Complete", subtitle: "Follow Homebrew")
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .padding(.top, Spacing.item)
-            setupStep(number: 3, title: "Recheck", subtitle: "Return to Cellar")
-        }
-        .padding(Spacing.sectionContent)
-        .cardStyle(cornerRadius: CornerRadius.card)
-    }
-
-    private func setupStep(number: Int, title: String, subtitle: String) -> some View {
-        HStack(spacing: Spacing.item) {
-            Text("\(number)")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.tint)
-                .frame(width: 24, height: 24)
-                .background(.tint.opacity(Opacity.iconBackground), in: Circle())
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.callout.weight(.medium))
-                Text(subtitle)
-                    .font(.caption2)
+                Text("The installer runs in Terminal, asks for your password, may install the Xcode Command Line Tools, and takes a few minutes.")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
     }
@@ -87,20 +61,19 @@ struct OnboardingView: View {
     private var commandBox: some View {
         HStack {
             Text(Self.installCommand)
-                .font(.system(.callout, design: .monospaced))
+                .font(.callout.monospaced())
                 .textSelection(.enabled)
                 .lineLimit(2)
 
             Spacer()
 
             Button(action: copyInstallCommand) {
-                Label(isCopied ? "Copied!" : "Copy", systemImage: isCopied ? "checkmark" : "doc.on.doc")
+                Label(isCopied ? "Copied" : "Copy", systemImage: isCopied ? "checkmark" : "doc.on.doc")
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.bordered)
         }
         .padding(Spacing.sectionContent)
-        .background(.primary.opacity(0.03))
         .cardStyle(cornerRadius: CornerRadius.card)
     }
 
@@ -108,30 +81,41 @@ struct OnboardingView: View {
 
     private var actions: some View {
         VStack(spacing: Spacing.sectionContent) {
-            Button(action: openTerminalWithInstallCommand) {
-                Label("Install in Terminal", systemImage: "terminal")
-                    .frame(maxWidth: .infinity)
+            if isWaitingForInstall {
+                Label {
+                    Text("Waiting for Homebrew\u{2026} Cellar continues as soon as the install finishes.")
+                } icon: {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                .font(.callout)
+            } else {
+                Button(action: openInstallerInTerminal) {
+                    Label("Install in Terminal", systemImage: "terminal")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .shadow(color: Shadow.cardColor, radius: Shadow.cardBlur, y: Shadow.cardY)
 
-            Button(action: recheckBrew) {
-                Label("Check Again", systemImage: "arrow.clockwise")
+            HStack(spacing: Spacing.sectionContent) {
+                Button("Check Again", systemImage: "arrow.clockwise", action: recheck)
+                Button("Locate brew\u{2026}", systemImage: "folder", action: locateBrew)
+                    .help("Choose a brew executable installed outside /opt/homebrew or /usr/local")
             }
-            .controlSize(.large)
 
-            if showNotFoundError {
-                Label("Homebrew was not found. Please install it and try again.", systemImage: "xmark.circle.fill")
+            if let errorMessage {
+                Label(errorMessage, systemImage: "xmark.circle.fill")
                     .foregroundStyle(.red)
                     .font(.callout)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    .animation(AnimationToken.snap, value: showNotFoundError)
+                    .transition(.opacity)
             }
 
-            Link(destination: URL(string: "https://brew.sh")!) {
-                Label("Learn more at brew.sh", systemImage: "safari")
-                    .font(.callout)
+            if let url = URL(string: "https://brew.sh") {
+                Link(destination: url) {
+                    Label("Learn more at brew.sh", systemImage: "safari")
+                        .font(.callout)
+                }
             }
         }
     }
@@ -148,27 +132,63 @@ struct OnboardingView: View {
         }
     }
 
-    private func recheckBrew() {
+    private func recheck() {
         if BrewProcess.isInstalled {
             onBrewDetected()
         } else {
-            showNotFoundError = true
+            errorMessage = "Homebrew wasn’t found. Install it, or locate brew if it’s somewhere else."
         }
     }
 
-    private func openTerminalWithInstallCommand() {
-        let script = """
-        tell application "Terminal"
-            activate
-            do script "\(Self.installCommand)"
-        end tell
-        """
-        guard let appleScript = NSAppleScript(source: script) else { return }
-        var error: NSDictionary?
-        appleScript.executeAndReturnError(&error)
+    /// Polls while the installer runs in Terminal.
+    private func detectInstall() async {
+        while isWaitingForInstall, !Task.isCancelled {
+            if BrewProcess.isInstalled {
+                onBrewDetected()
+                return
+            }
+            try? await Task.sleep(for: Self.detectionInterval)
+        }
+    }
+
+    /// Opens the installer as a `.command` file, which Terminal runs —
+    /// no Apple Events permission needed.
+    private func openInstallerInTerminal() {
+        errorMessage = nil
+        let script = FileManager.default.temporaryDirectory.appending(path: "Install Homebrew.command")
+        do {
+            try "#!/bin/bash\n\(Self.installCommand)\n".write(to: script, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        } catch {
+            errorMessage = "Couldn’t prepare the installer: \(error.localizedDescription)"
+            return
+        }
+        guard NSWorkspace.shared.open(script) else {
+            errorMessage = "Couldn’t open Terminal. Copy the command and run it yourself."
+            return
+        }
+        isWaitingForInstall = true
+    }
+
+    private func locateBrew() {
+        let panel = NSOpenPanel()
+        panel.title = "Locate brew"
+        panel.message = "Choose the brew executable, usually in the bin folder of your Homebrew prefix."
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.treatsFilePackagesAsDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        guard url.lastPathComponent == "brew", FileManager.default.isExecutableFile(atPath: url.path) else {
+            errorMessage = "That isn’t a brew executable."
+            return
+        }
+        BrewProcess.customBrewPath = url.path
+        recheck()
     }
 }
 
 #Preview("Onboarding") {
     OnboardingView(onBrewDetected: {})
+        .frame(width: 800, height: 700)
 }

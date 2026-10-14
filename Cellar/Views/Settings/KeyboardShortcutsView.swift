@@ -1,44 +1,28 @@
 import SwiftUI
 
-/// Displays all available keyboard shortcuts grouped by category.
-///
-/// Opened from the Help menu via "Keyboard Shortcuts" or through
-/// the `Window` scene with identifier `"keyboard-shortcuts"`.
+/// Every keyboard shortcut, generated from `AppShortcut` so it always
+/// matches the menus. Opened from Help › Keyboard Shortcuts.
 struct KeyboardShortcutsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 header
 
-                ShortcutSection(title: "General", systemImage: "command", shortcuts: [
-                    Shortcut(keys: "\u{2318},", description: "Open Settings"),
-                    Shortcut(keys: "\u{2318}W", description: "Close Window"),
-                    Shortcut(keys: "\u{2318}Q", description: "Quit Cellar"),
-                ])
+                ShortcutSection(title: "General", systemImage: "command", shortcuts: Self.generalShortcuts)
 
-                ShortcutSection(title: "Packages", systemImage: "shippingbox", shortcuts: [
-                    Shortcut(keys: "\u{2318}R", description: "Refresh All"),
-                    Shortcut(keys: "\u{21E7}\u{2318}U", description: "Upgrade All"),
-                    Shortcut(keys: "\u{21E7}\u{2318}K", description: "Cleanup"),
-                ])
-
-                ShortcutSection(title: "Services", systemImage: "gear", shortcuts: [
-                    Shortcut(keys: "\u{2325}\u{2318}R", description: "Refresh Services"),
-                ])
-
-                ShortcutSection(title: "Navigation", systemImage: "sidebar.left", shortcuts: [
-                    Shortcut(keys: "\u{2318}K", description: "Quick Open"),
-                    Shortcut(keys: "\u{2318}1\u{2013}\u{2318}9", description: "Switch Sidebar Section"),
-                    Shortcut(keys: "\u{2318}F", description: "Search (when available)"),
-                ])
+                ForEach(AppShortcut.Category.allCases, id: \.self) { category in
+                    ShortcutSection(
+                        title: category.rawValue,
+                        systemImage: category.systemImage,
+                        shortcuts: shortcuts(in: category)
+                    )
+                }
             }
             .padding(Spacing.section)
         }
-        .frame(width: 420, height: 460)
+        .frame(width: 420, height: 560)
         .background(.background)
     }
-
-    // MARK: - Subviews
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Spacing.compact) {
@@ -46,19 +30,39 @@ struct KeyboardShortcutsView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Quick reference for all available shortcuts.")
+            Text("Commands act on the page and selection in the front window.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
     }
+
+    private func shortcuts(in category: AppShortcut.Category) -> [Shortcut] {
+        var shortcuts = AppShortcut.allCases
+            .filter { $0.category == category }
+            .map { Shortcut(keys: $0.symbols, description: $0.title) }
+        if category == .navigation {
+            shortcuts.append(Shortcut(keys: "\u{2318}1\u{2013}\u{2318}9", description: "Go to Sidebar Section"))
+        }
+        return shortcuts
+    }
+
+    /// System shortcuts every Mac app has.
+    private static let generalShortcuts = [
+        Shortcut(keys: "\u{2318},", description: "Settings"),
+        Shortcut(keys: "\u{2318}/", description: "Keyboard Shortcuts"),
+        Shortcut(keys: "\u{2318}F", description: "Search"),
+        Shortcut(keys: "\u{2318}W", description: "Close Window"),
+        Shortcut(keys: "\u{2318}Q", description: "Quit Cellar"),
+    ]
 }
 
 // MARK: - Shortcut Model
 
 private struct Shortcut: Identifiable {
-    let id = UUID()
     let keys: String
     let description: String
+
+    var id: String { description }
 }
 
 // MARK: - Shortcut Section

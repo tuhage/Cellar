@@ -9,15 +9,12 @@ import CellarCore
 final class ActivityNotificationService {
     static let shared = ActivityNotificationService()
 
-    /// Settings toggle; notifications are on by default.
-    static let enabledKey = "showNotifications"
-
     private let center = UNUserNotificationCenter.current()
 
     private init() {}
 
     var isEnabled: Bool {
-        UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
+        UserDefaults.standard.object(forKey: SettingsKey.showsNotifications) as? Bool ?? true
     }
 
     func authorizationStatus() async -> UNAuthorizationStatus {

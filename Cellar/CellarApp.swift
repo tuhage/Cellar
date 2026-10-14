@@ -7,6 +7,7 @@ import UserNotifications
 struct CellarApp: App {
     @State private var stores = AppStores()
     @State private var notificationDelegate = ActivityNotificationDelegate()
+    @AppStorage(SettingsKey.showsMenuBarExtra) private var showsMenuBarExtra = true
 
     private let notificationObserver = FinderSyncNotificationObserver()
 
@@ -43,9 +44,11 @@ struct CellarApp: App {
                 .environment(stores)
         }
 
-        MenuBarExtra("Cellar", systemImage: "mug") {
+        MenuBarExtra(isInserted: $showsMenuBarExtra) {
             MenuBarView()
                 .environment(stores)
+        } label: {
+            MenuBarIcon(packageStore: stores.packages, serviceStore: stores.services)
         }
         .menuBarExtraStyle(.menu)
     }

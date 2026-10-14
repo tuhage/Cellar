@@ -21,7 +21,6 @@ final class AppStores {
 
     /// Default seconds between service refreshes while Cellar is active.
     static let defaultServiceRefreshInterval: Double = 15
-    static let serviceRefreshIntervalKey = "refreshInterval"
     private static let maintenanceCheckInterval: Duration = .seconds(3_600)
 
     /// Pass an activity store only to seed previews.
@@ -78,7 +77,7 @@ final class AppStores {
     /// while Cellar is the active app — `brew services list` isn't free.
     private func pollServices() async {
         while !Task.isCancelled {
-            let stored = UserDefaults.standard.double(forKey: Self.serviceRefreshIntervalKey)
+            let stored = UserDefaults.standard.double(forKey: SettingsKey.serviceRefreshInterval)
             let interval = stored > 0 ? stored : Self.defaultServiceRefreshInterval
             try? await Task.sleep(for: .seconds(interval))
             guard !Task.isCancelled, NSApplication.shared.isActive else { continue }

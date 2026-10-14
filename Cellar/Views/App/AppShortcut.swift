@@ -52,6 +52,43 @@ enum AppShortcut: CaseIterable {
     }
 }
 
+// MARK: - Display
+
+extension AppShortcut {
+
+    enum Category: String, CaseIterable {
+        case navigation = "Navigation"
+        case packages = "Packages"
+        case services = "Services"
+
+        var systemImage: String {
+            switch self {
+            case .navigation: "sidebar.left"
+            case .packages: "shippingbox"
+            case .services: "gearshape.2"
+            }
+        }
+    }
+
+    var category: Category {
+        switch self {
+        case .quickOpen, .showActivity: .navigation
+        case .refresh, .checkForPackageUpdates, .upgradeAll, .upgradeSelection, .uninstallSelection, .cleanUp: .packages
+        case .toggleService, .restartService: .services
+        }
+    }
+
+    /// "⇧⌘U" — modifiers in the order macOS menus show them.
+    var symbols: String {
+        let modifierSymbols: [(EventModifiers, String)] = [
+            (.control, "\u{2303}"), (.option, "\u{2325}"), (.shift, "\u{21E7}"), (.command, "\u{2318}"),
+        ]
+        let prefix = modifierSymbols.filter { modifiers.contains($0.0) }.map(\.1).joined()
+        let keySymbol = key == .delete ? "\u{232B}" : String(key.character).uppercased()
+        return prefix + keySymbol
+    }
+}
+
 extension View {
     func shortcut(_ shortcut: AppShortcut) -> some View {
         keyboardShortcut(shortcut.key, modifiers: shortcut.modifiers)
