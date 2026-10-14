@@ -1,679 +1,267 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import CellarCore
+
+// MARK: - Requests
+
+/// Sheets the Brewfiles page presents for its rows, header and menus.
+enum BrewfileSheet: Identifiable {
+    case add(Brewfile.Kind)
+    case edit(Brewfile, text: String)
+    case cleanUp(Brewfile)
+    case activate(Brewfile)
+    case addPackages(Brewfile)
+    case addServices(Brewfile)
+
+    var id: String {
+        switch self {
+        case .add(let kind): "add-\(kind.rawValue)"
+        case .edit(let brewfile, _): "edit-\(brewfile.id)"
+        case .cleanUp(let brewfile): "cleanup-\(brewfile.id)"
+        case .activate(let brewfile): "activate-\(brewfile.id)"
+        case .addPackages(let brewfile): "packages-\(brewfile.id)"
+        case .addServices(let brewfile): "services-\(brewfile.id)"
+        }
+    }
+}
+
+/// Actions that replace or remove something, confirmed first.
+enum BrewfileConfirmation {
+    case export(Brewfile)
+    case trash(Brewfile)
+    case remove(Brewfile)
+    case removeEntry(BrewfileContent.Entry, from: Brewfile)
+
+    var title: String {
+        switch self {
+        case .export(let brewfile): "Replace \(brewfile.name) with the current setup?"
+        case .trash(let brewfile): "Move the Brewfile of \(brewfile.name) to the Trash?"
+        case .remove(let brewfile): "Remove \(brewfile.name) from the list?"
+        case .removeEntry(let entry, let brewfile): "Remove \(entry.name) from \(brewfile.name)?"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .export(let brewfile):
+            "\(brewfile.displayPath) was edited after the last export. Exporting replaces those edits; the current file is kept as \(brewfile.backupURL.lastPathComponent)."
+        case .trash(let brewfile):
+            "\(brewfile.displayPath) moves to the Trash, where you can restore it. Nothing is uninstalled."
+        case .remove(let brewfile):
+            brewfile.kind == .project
+                ? "The Brewfile stays in its folder. The project’s list of services is removed from Cellar."
+                : "The Brewfile stays at \(brewfile.displayPath)."
+        case .removeEntry(let entry, _):
+            "The line \(entry.rawLine) is deleted from the Brewfile. The package stays installed."
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .export: "Export and Replace"
+        case .trash: "Move to Trash"
+        case .remove: "Remove from List"
+        case .removeEntry: "Remove"
+        }
+    }
+}
 
 // MARK: - BrewfileView
 
-/// Section-based Brewfile management view with unified profile header,
-/// stats, quick actions, check results, and categorised package lists.
+/// Brewfiles for This Mac's setup and for project folders, side by side
+/// with the selected one's packages, services and actions.
 struct BrewfileView: View {
     @Environment(BrewfileStore.self) private var store
+    @Environment(PackageStore.self) private var packageStore
+    @Environment(ServiceStore.self) private var serviceStore
 
-    @State private var isAddingProfile = false
-    @State private var isEditingRaw = false
-    @State private var isConfirmingDeleteProfile = false
-    @State private var newProfileName = ""
-    @State private var newProfilePath = ""
-    @State private var newProfileMode: BrewfileCreationMode = .empty
-    @State private var isConfirmingCleanup = false
+    @State private var sheet: BrewfileSheet?
+    @State private var confirmation: BrewfileConfirmation?
+    @State private var folderToLocate: Brewfile?
     @State private var searchText = ""
 
-    private func filteredEntries(_ entries: [BrewfileContent.Entry]) -> [BrewfileContent.Entry] {
-        guard !searchText.isEmpty else { return entries }
-        return entries.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-    }
+    private static let listWidth: CGFloat = 250
 
     var body: some View {
-        Group {
-            if let profile = store.selectedProfile {
-                if store.brewfileExistsOnDisk {
-                    brewfileContent
-                } else {
-                    noBrewfileOnDiskView(profile)
-                }
-            } else {
-                emptyStateView
-            }
-        }
-        .navigationTitle("Brewfile")
-        .brewfileSearchable(
-            text: $searchText,
-            enabled: store.brewfileExistsOnDisk && !store.parsedContent.isEmpty
-        )
-        .toolbar { toolbarContent }
-        .sheet(isPresented: $isAddingProfile) { addProfileSheet }
-        .sheet(isPresented: $isEditingRaw) { rawEditorSheet }
-        .confirmationDialog(
-            "Delete \"\(store.selectedProfile?.name ?? "Profile")\"?",
-            isPresented: $isConfirmingDeleteProfile,
-            titleVisibility: .visible
-        ) {
-            deleteProfileDialogButtons
-        } message: {
-            if let profile = store.selectedProfile {
-                Text("The profile \"\(profile.name)\" will be removed. You can also delete the Brewfile at \(profile.path).")
-            }
-        }
-        .confirmationDialog(
-            "Cleanup Packages?",
-            isPresented: $isConfirmingCleanup,
-            titleVisibility: .visible
-        ) {
-            Button("Cleanup", role: .destructive) {
-                guard let profile = store.selectedProfile else { return }
-                Task { await store.cleanupBrewfile(for: profile) }
-            }
-        } message: {
-            Text("Remove all packages not listed in the current Brewfile? This cannot be undone.")
-        }
-        .task {
-            store.loadProfiles()
-            store.ensureDefaultProfile()
-            if store.selectedProfileId == nil, let first = store.profiles.first {
-                store.selectProfile(first.id)
-            }
-        }
-    }
-
-    // MARK: - Confirmation Dialog
-
-    @ViewBuilder
-    private var deleteProfileDialogButtons: some View {
-        Button("Delete Profile Only", role: .destructive) {
-            deleteSelectedProfileAndSelectFirst()
-        }
-
-        if store.brewfileExistsOnDisk {
-            Button("Delete Profile and Brewfile", role: .destructive) {
-                if let profile = store.selectedProfile {
-                    store.deleteBrewfile(for: profile)
-                }
-                deleteSelectedProfileAndSelectFirst()
-            }
-        }
-
-        Button("Cancel", role: .cancel) {}
-    }
-
-    // MARK: - Content
-
-    private var brewfileContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.section) {
-                profileHeader
-                if store.parsedContent.isEmpty {
-                    emptyBrewfileHero
-                } else {
-                    statsSection
-                    quickActionsSection
-                    if let result = store.checkResult {
-                        checkResultBanner(result)
-                    }
-                    packageListSections
-                }
-            }
-            .padding(Spacing.section)
-        }
-    }
-
-    // MARK: - Profile Header
-
-    private var profileHeader: some View {
-        HStack(alignment: .top, spacing: Spacing.sectionContent) {
-            Image(systemName: "doc.text.fill")
-                .font(.largeTitle)
-                .foregroundStyle(.blue)
-
-            VStack(alignment: .leading, spacing: Spacing.compact) {
-                if let profile = store.selectedProfile {
-                    Text(profile.name)
-                        .font(.headline)
-
-                    HStack(spacing: Spacing.related) {
-                        Text(profile.path)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-
-                        if let lastExported = profile.lastExported {
-                            Text("·")
-                            Text("Exported \(lastExported, format: .relative(presentation: .named))")
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                }
-
-                Text("A Brewfile lists all your Homebrew packages. Use it to back up your setup or migrate to another Mac.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if store.isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            }
-
-            profileMenu
-        }
-        .padding(Spacing.sectionContent)
-        .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: CornerRadius.card))
-    }
-
-    // MARK: - Profile Menu
-
-    private var profileMenu: some View {
-        Menu {
-            ForEach(store.profiles) { profile in
-                Button {
-                    store.selectProfile(profile.id)
-                } label: {
-                    if profile.id == store.selectedProfileId {
-                        Label(profile.name, systemImage: "checkmark")
-                    } else {
-                        Text(profile.name)
-                    }
-                }
-            }
-
+        HStack(spacing: 0) {
+            BrewfileListColumn(sheet: $sheet, confirmation: $confirmation)
+                .frame(width: Self.listWidth)
             Divider()
-
-            Button {
-                presentAddProfileSheet()
-            } label: {
-                Label("New Profile...", systemImage: "plus")
-            }
-
-            if store.selectedProfile != nil {
-                Divider()
-
-                Button(role: .destructive) {
-                    isConfirmingDeleteProfile = true
-                } label: {
-                    Label("Delete Profile", systemImage: "trash")
-                }
-            }
-        } label: {
-            Label("Profiles", systemImage: "chevron.up.chevron.down")
-                .font(.callout.weight(.medium))
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-    }
-
-    // MARK: - Stats Section
-
-    private var statsSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(title: "Contents", systemImage: "tray.full.fill", color: .secondary) {
-                StatusBadge(
-                    text: "\(store.parsedContent.totalItems) items",
-                    color: store.parsedContent.isEmpty ? .secondary : .blue
-                )
-            }
-
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.sectionContent), count: 3),
-                spacing: Spacing.sectionContent
-            ) {
-                StatCardView(
-                    title: "Taps",
-                    value: "\(store.parsedContent.taps.count)",
-                    systemImage: "spigot",
-                    color: .gray
-                )
-
-                StatCardView(
-                    title: "Formulae",
-                    value: "\(store.parsedContent.formulae.count)",
-                    systemImage: "terminal",
-                    color: .blue
-                )
-
-                StatCardView(
-                    title: "Casks",
-                    value: "\(store.parsedContent.casks.count)",
-                    systemImage: "macwindow",
-                    color: .purple
-                )
+        .safeAreaInset(edge: .top, spacing: 0) { banners }
+        .navigationTitle("Brewfiles")
+        .dataFreshness(store.lastChecked)
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Filter packages")
+        .toolbar { toolbar }
+        .sheet(item: $sheet, content: sheetContent)
+        .confirmationDialog(
+            confirmation?.title ?? "",
+            isPresented: isConfirming,
+            titleVisibility: .visible,
+            presenting: confirmation
+        ) { request in
+            Button(request.actionTitle, role: .destructive) { confirm(request) }
+        } message: { request in
+            Text(request.message)
+        }
+        .fileImporter(isPresented: isLocatingFolder, allowedContentTypes: [.folder]) { result in
+            if case .success(let url) = result, let brewfile = folderToLocate {
+                Task { await store.relocate(brewfile, to: url) }
             }
         }
-    }
-
-    // MARK: - Quick Actions Section
-
-    private var quickActionsSection: some View {
-        let isDisabled = store.isLoading || store.isPerformingAction || store.isChecking
-
-        return VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(title: "Actions", systemImage: "bolt.fill", color: .secondary)
-
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.sectionContent), count: 2),
-                spacing: Spacing.sectionContent
-            ) {
-                QuickActionButton(
-                    title: "Sync",
-                    subtitle: "Export current packages to Brewfile",
-                    systemImage: "arrow.triangle.2.circlepath",
-                    color: .blue,
-                    isDisabled: isDisabled,
-                    isProminent: true
-                ) {
-                    guard let profile = store.selectedProfile else { return }
-                    Task { await store.exportBrewfile(to: profile) }
-                }
-
-                QuickActionButton(
-                    title: "Install",
-                    subtitle: "Install all packages from Brewfile",
-                    systemImage: "square.and.arrow.down.fill",
-                    color: .green,
-                    isDisabled: isDisabled
-                ) {
-                    guard let profile = store.selectedProfile else { return }
-                    Task { await store.install(from: profile) }
-                }
-
-                QuickActionButton(
-                    title: "Check",
-                    subtitle: "Verify all packages are installed",
-                    systemImage: "checkmark.shield.fill",
-                    color: .orange,
-                    isDisabled: isDisabled
-                ) {
-                    guard let profile = store.selectedProfile else { return }
-                    Task { await store.checkBrewfile(for: profile) }
-                }
-
-                QuickActionButton(
-                    title: "Cleanup",
-                    subtitle: "Remove packages not in Brewfile",
-                    systemImage: "trash.circle.fill",
-                    color: .red,
-                    isDisabled: isDisabled
-                ) {
-                    isConfirmingCleanup = true
-                }
-            }
+        .task { store.loadLibraryIfNeeded() }
+        .task(id: StatusKey(brewfileID: store.selectedID, packagesUpdated: packageStore.lastUpdated)) {
+            await store.refreshStatus()
         }
-    }
-
-    // MARK: - Check Result Banner
-
-    private func checkResultBanner(_ result: String) -> some View {
-        let isSuccess = result.localizedCaseInsensitiveContains("satisfied")
-            || result.localizedCaseInsensitiveContains("dependencies are satisfied")
-        let bannerColor: Color = isSuccess ? .green : .orange
-
-        return HStack(spacing: Spacing.sectionContent) {
-            Image(systemName: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .font(.title2)
-                .foregroundStyle(bannerColor)
-
-            VStack(alignment: .leading, spacing: Spacing.textPair) {
-                Text(isSuccess ? "All Satisfied" : "Issues Found")
-                    .font(.headline)
-
-                Text(result)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button {
-                store.checkResult = nil
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await store.reloadIfChanged() }
         }
-        .padding(Spacing.sectionContent)
-        .background(bannerColor.opacity(0.08), in: RoundedRectangle(cornerRadius: CornerRadius.card))
+        .focusedSceneValue(\.pageRefresh, AsyncAction { await store.reloadAndCheck() })
     }
 
-    // MARK: - Package List Sections
+    /// Re-check status when the selection changes or the package list was
+    /// reloaded, such as after installing something on another page.
+    private struct StatusKey: Equatable {
+        let brewfileID: UUID?
+        let packagesUpdated: Date?
+    }
+
+    // MARK: - Detail
 
     @ViewBuilder
-    private var packageListSections: some View {
-        let taps = filteredEntries(store.parsedContent.taps)
-        let formulae = filteredEntries(store.parsedContent.formulae)
-        let casks = filteredEntries(store.parsedContent.casks)
-
-        if store.parsedContent.isEmpty {
-            emptyPackagesView
-        } else if taps.isEmpty && formulae.isEmpty && casks.isEmpty {
-            ContentUnavailableView.search(text: searchText)
+    private var detail: some View {
+        if let brewfile = store.selected {
+            BrewfileDetailView(
+                brewfile: brewfile,
+                searchText: searchText,
+                sheet: $sheet,
+                confirmation: $confirmation,
+                locateFolder: { folderToLocate = brewfile }
+            )
         } else {
-            if !taps.isEmpty {
-                packageSection(
-                    title: "Taps",
-                    systemImage: "spigot",
-                    color: .gray,
-                    entries: taps
-                )
-            }
-
-            if !formulae.isEmpty {
-                packageSection(
-                    title: "Formulae",
-                    systemImage: "terminal",
-                    color: .blue,
-                    entries: formulae
-                )
-            }
-
-            if !casks.isEmpty {
-                packageSection(
-                    title: "Casks",
-                    systemImage: "macwindow",
-                    color: .purple,
-                    entries: casks
-                )
-            }
-        }
-    }
-
-    private func packageSection(
-        title: String,
-        systemImage: String,
-        color: Color,
-        entries: [BrewfileContent.Entry]
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(title: title, systemImage: systemImage, color: color) {
-                StatusBadge(text: "\(entries.count)", color: color)
-            }
-
-            GroupBox {
-                VStack(spacing: 0) {
-                    DividedForEach(data: entries) { entry in
-                        HStack(spacing: Spacing.item) {
-                            Image(systemName: systemImage)
-                                .foregroundStyle(color)
-                                .frame(width: IconSize.iconColumn)
-
-                            Text(entry.name)
-                                .fontWeight(.medium)
-
-                            Spacer()
-                        }
-                        .listRowInset()
-                    }
-                }
-            }
-        }
-    }
-
-    private var emptyPackagesView: some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            SectionHeaderView(title: "Packages", systemImage: "shippingbox", color: .secondary)
-
-            ContentUnavailableView(
-                "No Packages",
+            EmptyStateView(
+                title: "No Brewfile Selected",
                 systemImage: "doc.text",
-                description: Text(
-                    store.brewfileExistsOnDisk
-                        ? "This Brewfile is empty. Use Sync to populate it from your current packages."
-                        : "No Brewfile found on disk. Use Sync to create one from your current packages."
-                )
+                description: "Select a Brewfile, or drop a project folder on the list."
             )
         }
     }
 
-    private var emptyBrewfileHero: some View {
-        VStack(spacing: Spacing.cardPadding) {
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 34, weight: .medium))
-                .foregroundStyle(.blue)
-                .frame(width: 64, height: 64)
-                .background(.blue.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.extraLarge))
+    // MARK: - Banners
 
-            VStack(spacing: Spacing.compact) {
-                Text("Start with your current setup")
-                    .font(.title2.weight(.semibold))
-                Text("Sync exports the packages, casks, and taps installed on this Mac into the selected Brewfile.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: WindowSize.mediumSheet)
-            }
-
-            HStack(spacing: Spacing.item) {
-                Button {
-                    guard let profile = store.selectedProfile else { return }
-                    Task { await store.exportBrewfile(to: profile) }
-                } label: {
-                    Label("Sync Current System", systemImage: "arrow.triangle.2.circlepath")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-
-                Button {
-                    isEditingRaw = true
-                } label: {
-                    Label("Edit Manually", systemImage: "pencil")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+    @ViewBuilder
+    private var banners: some View {
+        if let message = store.errorMessage {
+            NoticeBanner(tint: .red, systemImage: "exclamationmark.triangle.fill", title: message) {
+                Button("Dismiss") { store.errorMessage = nil }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 300)
-        .padding(Spacing.section)
-        .cardStyle(cornerRadius: CornerRadius.extraLarge)
-    }
-
-    // MARK: - No Brewfile on Disk
-
-    private func noBrewfileOnDiskView(_ profile: BrewfileProfile) -> some View {
-        ContentUnavailableView {
-            Label("No Brewfile", systemImage: "doc.text")
-        } description: {
-            Text("No Brewfile found at \(profile.path)")
-        } actions: {
-            Button("Generate from System") {
-                Task { await store.exportBrewfile(to: profile) }
+        if let brewfile = store.selected {
+            if let operation = store.runningOperation(for: brewfile) {
+                RunningOperationBar(operation: operation)
             }
-            .buttonStyle(.borderedProminent)
+            if !brewfile.pendingPackages.isEmpty {
+                NoticeBanner(
+                    tint: .orange,
+                    systemImage: "shippingbox",
+                    title: "\(brewfile.pendingPackages.count) packages from your project are waiting for its folder",
+                    message: "\(brewfile.pendingPackages.formatted(.list(type: .and))) will be added to the Brewfile once Cellar finds \(brewfile.folderURL.lastPathComponent)."
+                ) {
+                    Button("Locate Folder\u{2026}") { folderToLocate = brewfile }
+                }
+            }
         }
-    }
-
-    // MARK: - Empty State
-
-    private var emptyStateView: some View {
-        ContentUnavailableView(
-            "No Profile Selected",
-            systemImage: "doc.text",
-            description: Text("Create a Brewfile profile to get started.")
-        )
     }
 
     // MARK: - Toolbar
 
     @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .primaryAction) {
-            RefreshToolbarButton(isLoading: store.isLoading) {
-                store.loadProfiles()
-                if let profile = store.selectedProfile {
-                    store.loadBrewfileContent(for: profile)
-                }
-            }
-
-            Button {
-                isEditingRaw = true
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Button("Add Project Folder\u{2026}", systemImage: "folder.badge.plus") { sheet = .add(.project) }
+                Button("Add Mac Setup Brewfile\u{2026}", systemImage: "desktopcomputer") { sheet = .add(.mac) }
             } label: {
-                Label("Edit Raw", systemImage: "pencil")
+                Label("Add Brewfile", systemImage: "plus")
             }
-            .disabled(store.selectedProfile == nil || !store.brewfileExistsOnDisk)
-            .help("Edit raw Brewfile content")
-
-            Button {
-                presentAddProfileSheet()
-            } label: {
-                Label("New Profile", systemImage: "plus")
+            .help("Add a project folder or another Brewfile")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            RefreshToolbarButton(isLoading: store.isCheckingStatus) {
+                await store.reloadAndCheck()
             }
-            .help("Create a new Brewfile profile")
         }
     }
 
-    // MARK: - Raw Editor Sheet
+    // MARK: - Sheets
 
-    private var rawEditorSheet: some View {
-        @Bindable var store = store
-
-        return NavigationStack {
-            VStack(spacing: 0) {
-                TextEditor(text: $store.brewfileContent)
-                    .font(.system(.body, design: .monospaced))
-                    .scrollContentBackground(.hidden)
-                    .padding(Spacing.item)
-
-                Divider()
-
-                HStack {
-                    let lineCount = store.brewfileContent.components(separatedBy: "\n").count
-                    Text("\(lineCount) lines")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .badgeInset()
-                        .background(.fill.tertiary, in: Capsule())
-                    Spacer()
-                }
-                .padding(Spacing.item)
-            }
-            .navigationTitle("Edit Brewfile")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        if let profile = store.selectedProfile {
-                            store.loadBrewfileContent(for: profile)
-                        }
-                        isEditingRaw = false
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        if let profile = store.selectedProfile {
-                            store.saveBrewfileContent(for: profile)
-                        }
-                        isEditingRaw = false
-                    }
-                }
-            }
-        }
-        .frame(minWidth: WindowSize.mediumSheet, minHeight: WindowSize.mediumSheetHeight)
-    }
-
-    // MARK: - Add Profile Sheet
-
-    private var addProfileSheet: some View {
-        let trimmedName = newProfileName.trimmingCharacters(in: .whitespaces)
-        let trimmedPath = newProfilePath.trimmingCharacters(in: .whitespaces)
-        let isFormValid = !trimmedName.isEmpty && !trimmedPath.isEmpty
-
-        return VStack(spacing: Spacing.cardPadding) {
-            Text("New Profile")
-                .font(.headline)
-
-            Form {
-                TextField("Name", text: $newProfileName)
-
-                HStack {
-                    TextField("Location", text: $newProfilePath)
-                    Button("Browse...") {
-                        showFilePicker()
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: Spacing.item) {
-                    Text("Contents")
-                        .font(.subheadline.weight(.medium))
-
-                    Picker("Contents", selection: $newProfileMode) {
-                        ForEach(BrewfileCreationMode.allCases) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.radioGroup)
-                    .labelsHidden()
-
-                    Text(newProfileMode.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .formStyle(.grouped)
-
-            HStack {
-                Button("Cancel") {
-                    isAddingProfile = false
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Spacer()
-
-                Button("Create") {
-                    guard isFormValid else { return }
-                    store.createProfile(name: trimmedName, path: trimmedPath, mode: newProfileMode)
-                    isAddingProfile = false
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!isFormValid)
-            }
-        }
-        .padding()
-        .frame(width: WindowSize.narrowSheet)
-    }
-
-    // MARK: - Helpers
-
-    private func presentAddProfileSheet() {
-        newProfileName = ""
-        newProfilePath = defaultBrewfilePath()
-        newProfileMode = .empty
-        isAddingProfile = true
-    }
-
-    private func deleteSelectedProfileAndSelectFirst() {
-        guard let profile = store.selectedProfile else { return }
-        store.deleteProfile(profile)
-        if let first = store.profiles.first {
-            store.selectProfile(first.id)
-        }
-    }
-
-    private func defaultBrewfilePath() -> String {
-        "\(NSHomeDirectory())/Brewfile"
-    }
-
-    private func showFilePicker() {
-        let panel = NSOpenPanel()
-        panel.title = "Choose Brewfile Location"
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory())
-
-        if panel.runModal() == .OK, let url = panel.url {
-            if url.hasDirectoryPath {
-                newProfilePath = url.appendingPathComponent("Brewfile").path
-            } else {
-                newProfilePath = url.path
-            }
-        }
-    }
-}
-
-private extension View {
     @ViewBuilder
-    func brewfileSearchable(text: Binding<String>, enabled: Bool) -> some View {
-        if enabled {
-            searchable(text: text, placement: .toolbar, prompt: "Search packages")
-        } else {
-            self
+    private func sheetContent(_ sheet: BrewfileSheet) -> some View {
+        switch sheet {
+        case .add(let kind):
+            AddBrewfileSheet(kind: kind)
+        case .edit(let brewfile, let text):
+            BrewfileEditorSheet(brewfile: brewfile, text: text)
+        case .cleanUp(let brewfile):
+            BrewfileCleanupSheet(brewfile: brewfile)
+        case .activate(let brewfile):
+            ActivationPreviewSheet(project: brewfile)
+        case .addPackages(let brewfile):
+            packagePicker(for: brewfile)
+        case .addServices(let brewfile):
+            servicePicker(for: brewfile)
+        }
+    }
+
+    private func packagePicker(for brewfile: Brewfile) -> some View {
+        let listed = Set(store.content.entries(of: .brew).map(\.name))
+        let items = packageStore.formulae
+            .filter { !listed.contains($0.name) && !listed.contains($0.fullName) }
+            .map { ItemPickerSheet.Item(id: $0.fullName, detail: $0.desc) }
+        return ItemPickerSheet(
+            title: "Add Packages to \(brewfile.name)",
+            items: items,
+            emptyMessage: "All Installed Formulae Are Listed"
+        ) { names in
+            Task { await store.addPackages(names, to: brewfile) }
+        }
+    }
+
+    private func servicePicker(for brewfile: Brewfile) -> some View {
+        let items = serviceStore.services
+            .filter { !brewfile.services.contains($0.name) }
+            .map { ItemPickerSheet.Item(id: $0.name, detail: $0.status.label) }
+        return ItemPickerSheet(
+            title: "Add Services to \(brewfile.name)",
+            items: items,
+            emptyMessage: "No Other Services"
+        ) { names in
+            store.addServices(names, to: brewfile)
+        }
+    }
+
+    // MARK: - Confirmations
+
+    private var isConfirming: Binding<Bool> {
+        Binding(get: { confirmation != nil }, set: { if !$0 { confirmation = nil } })
+    }
+
+    private var isLocatingFolder: Binding<Bool> {
+        Binding(get: { folderToLocate != nil }, set: { if !$0 { folderToLocate = nil } })
+    }
+
+    private func confirm(_ request: BrewfileConfirmation) {
+        switch request {
+        case .export(let brewfile):
+            Task { await store.export(brewfile) }
+        case .trash(let brewfile):
+            store.moveToTrash(brewfile)
+        case .remove(let brewfile):
+            store.remove(brewfile)
+        case .removeEntry(let entry, let brewfile):
+            Task { await store.removeEntry(entry, from: brewfile) }
         }
     }
 }
@@ -685,5 +273,5 @@ private extension View {
         BrewfileView()
             .environment(AppStores())
     }
-    .frame(width: WindowSize.fullDetailWidth, height: WindowSize.fullDetailHeight)
+    .frame(width: WindowSize.fullDetailWidth + 300, height: WindowSize.fullDetailHeight)
 }

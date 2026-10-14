@@ -2,124 +2,146 @@ import Foundation
 
 // MARK: - BrewfileContent
 
-/// Parsed representation of a Brewfile's contents, categorised into
-/// taps, formulae, and casks.
+/// Parsed representation of a Brewfile: every `keyword "name"` entry, in
+/// file order. Entries Cellar has no dedicated group for are kept as
+/// `.other` instead of being dropped.
 public struct BrewfileContent: Sendable, Equatable {
 
     // MARK: Entry
 
     public struct Entry: Identifiable, Sendable, Equatable, Hashable {
-        public let id: String
+
+        /// The entry types `brew bundle` understands. Anything else lands in
+        /// `.other`, keeping its keyword.
+        public enum Kind: String, CaseIterable, Sendable {
+            case tap, brew, cask, mas, vscode, go, cargo, whalebrew, other
+        }
+
+        /// The Brewfile keyword, such as `brew` or `npm`.
+        public let keyword: String
         public let name: String
+        /// The line that declares this entry; empty when Cellar can't write
+        /// one (an item reported by brew under an unfamiliar heading).
         public let rawLine: String
 
-        public init(id: String, name: String, rawLine: String) {
-            self.id = id
+        public var id: String { "\(keyword):\(name)" }
+        public var kind: Kind { Kind(rawValue: keyword) ?? .other }
+
+        public init(keyword: String, name: String, rawLine: String) {
+            self.keyword = keyword
             self.name = name
             self.rawLine = rawLine
+        }
+
+        /// An entry with the line `brew bundle dump` would write for it.
+        public init(keyword: String, name: String) {
+            self.init(keyword: keyword, name: name, rawLine: "\(keyword) \"\(name)\"")
+        }
+
+        /// Whether this entry names `formula`, written short (`foo`) or
+        /// tap-qualified (`user/tap/foo`).
+        public func matches(_ formula: Formula) -> Bool {
+            kind == .brew && (name == formula.name || name == formula.fullName)
+        }
+
+        /// Whether this entry names `cask`, written short or tap-qualified.
+        public func matches(_ cask: Cask) -> Bool {
+            kind == .cask && (name == cask.token || name == cask.fullToken)
         }
     }
 
     // MARK: Data
 
-    public let taps: [Entry]
-    public let formulae: [Entry]
-    public let casks: [Entry]
+    public let entries: [Entry]
 
     // MARK: Computed
 
-    public var totalItems: Int { taps.count + formulae.count + casks.count }
-    public var isEmpty: Bool { totalItems == 0 }
+    public var isEmpty: Bool { entries.isEmpty }
+
+    public func entries(of kind: Entry.Kind) -> [Entry] {
+        entries.filter { $0.kind == kind }
+    }
+
+    public func contains(keyword: String, name: String) -> Bool {
+        entries.contains { $0.keyword == keyword && $0.name == name }
+    }
 
     // MARK: Init
 
-    public init(taps: [Entry], formulae: [Entry], casks: [Entry]) {
-        self.taps = taps
-        self.formulae = formulae
-        self.casks = casks
+    public init(entries: [Entry]) {
+        self.entries = entries
     }
 
-    // MARK: Empty
-
-    public static let empty = BrewfileContent(taps: [], formulae: [], casks: [])
+    public static let empty = BrewfileContent(entries: [])
 
     // MARK: Parse
 
-    /// Parses raw Brewfile text into categorised entries.
-    ///
-    /// Each non-empty, non-comment line is matched against its leading
-    /// keyword (`tap`, `brew`, `cask`) and the quoted package name is
-    /// extracted.
+    /// Parses Brewfile text. A line counts as an entry when it is a keyword
+    /// followed by a quoted name (`brew "wget", restart_service: true`);
+    /// comments, options such as `cask_args`, and Ruby control flow are skipped.
     public static func parse(from content: String) -> BrewfileContent {
-        var taps: [Entry] = []
-        var formulae: [Entry] = []
-        var casks: [Entry] = []
-
-        for line in content.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { continue }
-
-            let parts = trimmed.split(separator: " ", maxSplits: 1)
-            guard let keyword = parts.first else { continue }
-
-            let name = extractName(from: parts.count > 1 ? String(parts[1]) : "")
-
-            switch keyword {
-            case "tap":
-                taps.append(Entry(id: name, name: name, rawLine: trimmed))
-            case "brew":
-                formulae.append(Entry(id: name, name: name, rawLine: trimmed))
-            case "cask":
-                casks.append(Entry(id: name, name: name, rawLine: trimmed))
-            default:
-                break
-            }
-        }
-
-        return BrewfileContent(taps: taps, formulae: formulae, casks: casks)
+        BrewfileContent(entries: content.components(separatedBy: .newlines).compactMap(entry(from:)))
     }
 
-    // MARK: Private
+    private static func entry(from line: String) -> Entry? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.hasPrefix("#") else { return nil }
+        let parts = trimmed.split(separator: " ", maxSplits: 1)
+        guard parts.count == 2,
+              parts[0].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" }),
+              let name = quotedName(from: String(parts[1]))
+        else { return nil }
+        return Entry(keyword: String(parts[0]), name: name, rawLine: trimmed)
+    }
 
-    /// Strips surrounding quotes and any trailing options from a Brewfile
-    /// entry value, returning only the package name.
-    private static func extractName(from raw: String) -> String {
-        var value = raw.trimmingCharacters(in: .whitespaces)
+    /// The quoted value at the start of `raw`, without trailing options.
+    /// An unterminated quote keeps the rest of the line readable.
+    private static func quotedName(from raw: String) -> String? {
+        let value = raw.trimmingCharacters(in: .whitespaces)
+        guard let quote = value.first, quote == "\"" || quote == "'" else { return nil }
+        let contentStart = value.index(after: value.startIndex)
+        let contentEnd = value[contentStart...].firstIndex(of: quote) ?? value.endIndex
+        var name = String(value[contentStart..<contentEnd])
+        if contentEnd == value.endIndex, let comma = name.firstIndex(of: ",") {
+            name = String(name[..<comma])
+        }
+        name = name.trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? nil : name
+    }
 
-        // Read the matching closing quote after the opening quote. Looking for
-        // the first quote in the whole string would find the opening quote and
-        // create an invalid range for lines with trailing options.
-        if let quote = value.first, quote == "\"" || quote == "'" {
-            let contentStart = value.index(after: value.startIndex)
-            if let quoteEnd = value[contentStart...].firstIndex(of: quote) {
-                value = String(value[contentStart..<quoteEnd])
-            } else {
-                // Malformed lines are kept readable instead of crashing.
-                value = String(value.dropFirst())
+    // MARK: Editing
+
+    /// `text` with `lines` added at the end, keeping everything already there.
+    public static func appending(_ lines: [String], to text: String) -> String {
+        guard !lines.isEmpty else { return text }
+        let separator = text.isEmpty || text.hasSuffix("\n") ? "" : "\n"
+        return text + separator + lines.joined(separator: "\n") + "\n"
+    }
+
+    /// `text` without the lines that declare `entry`.
+    public static func removing(_ entry: Entry, from text: String) -> String {
+        text.components(separatedBy: "\n")
+            .filter { line in
+                let parsed = self.entry(from: line)
+                return parsed?.keyword != entry.keyword || parsed?.name != entry.name
             }
-        }
-
-        // Strip trailing comma-separated options (e.g. `"wget", restart_service: true`)
-        if let commaIndex = value.firstIndex(of: ",") {
-            value = String(value[value.startIndex..<commaIndex])
-        }
-
-        return value.trimmingCharacters(in: .whitespaces)
+            .joined(separator: "\n")
     }
 
     // MARK: Preview
 
     public static var preview: BrewfileContent {
         parse(from: """
-        tap "homebrew/core"
-        tap "homebrew/cask"
+        tap "homebrew/services"
         brew "wget"
         brew "git"
         brew "node"
         brew "python@3.12"
         cask "visual-studio-code"
         cask "firefox"
-        cask "iterm2"
+        mas "Xcode", id: 497799835
+        vscode "ms-python.python"
+        npm "pnpm"
         """)
     }
 }
