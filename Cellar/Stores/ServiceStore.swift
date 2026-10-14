@@ -6,8 +6,8 @@ import CellarCore
 
 /// Manages the state for Homebrew services.
 ///
-/// Coordinates loading, filtering by status, and start/stop/restart
-/// operations. Views bind to this store for the services list UI.
+/// Loads the services list, remembers which services the user hid, and runs
+/// service actions through the `ActivityStore`.
 @Observable
 @MainActor
 final class ServiceStore: LoadableStore {
@@ -34,23 +34,17 @@ final class ServiceStore: LoadableStore {
     let activityStore: ActivityStore
     private static let cache = CachePolicy(fileName: "cache-services.json")
 
-    // MARK: Filter State
+    // MARK: Hidden Services
 
-    private static let showsUnusedKey = "com.tuhage.Cellar.services.showsUnused"
     private static let showsHiddenKey = "com.tuhage.Cellar.services.showsHidden"
     private static let hiddenServicesKey = "com.tuhage.Cellar.services.hiddenNames"
 
-    /// Whether to show services with `.none` status (never started, formula metadata only).
-    var showsUnusedServices: Bool {
-        didSet { UserDefaults.standard.set(showsUnusedServices, forKey: Self.showsUnusedKey) }
-    }
-
-    /// Whether to show services the user has manually hidden.
+    /// Whether to show services the user has hidden.
     var showsHiddenServices: Bool {
         didSet { UserDefaults.standard.set(showsHiddenServices, forKey: Self.showsHiddenKey) }
     }
 
-    /// Names the user has manually hidden via context menu.
+    /// Names the user has hidden via the context menu.
     private(set) var hiddenServiceNames: Set<String> {
         didSet {
             let array = Array(hiddenServiceNames).sorted()
@@ -64,29 +58,36 @@ final class ServiceStore: LoadableStore {
         services.filter(\.isRunning)
     }
 
-    var stoppedServices: [BrewServiceItem] {
-        services.filter { !$0.isRunning }
-    }
-
     var runningCount: Int {
         runningServices.count
     }
 
-    /// Filtered list for the view — respects unused and hidden filters.
-    var visibleServices: [BrewServiceItem] {
-        services.filter { service in
-            if service.status == .none && !showsUnusedServices { return false }
-            if hiddenServiceNames.contains(service.name) && !showsHiddenServices { return false }
-            return true
-        }
+    var failedCount: Int {
+        services.count(where: \.isError)
     }
 
-    var unusedCount: Int {
-        services.filter { $0.status == .none }.count
+    /// The list without the services the user hid, unless they asked to see them.
+    var visibleServices: [BrewServiceItem] {
+        guard !showsHiddenServices else { return services }
+        return services.filter { !hiddenServiceNames.contains($0.name) }
     }
 
     var hiddenCount: Int {
-        services.filter { hiddenServiceNames.contains($0.name) }.count
+        services.count { hiddenServiceNames.contains($0.name) }
+    }
+
+    var selectedService: BrewServiceItem? {
+        guard let selectedServiceId else { return nil }
+        return services.first { $0.id == selectedServiceId }
+    }
+
+    /// When the service's current process started, if it is running.
+    func startDate(of service: BrewServiceItem) -> Date? {
+        processStartDates[service.name]
+    }
+
+    func isHidden(_ service: BrewServiceItem) -> Bool {
+        hiddenServiceNames.contains(service.name)
     }
 
     // MARK: Init
@@ -94,10 +95,8 @@ final class ServiceStore: LoadableStore {
     init(activityStore: ActivityStore) {
         self.activityStore = activityStore
         let defaults = UserDefaults.standard
-        self.showsUnusedServices = defaults.bool(forKey: Self.showsUnusedKey)
         self.showsHiddenServices = defaults.bool(forKey: Self.showsHiddenKey)
-        let hiddenArray = defaults.stringArray(forKey: Self.hiddenServicesKey) ?? []
-        self.hiddenServiceNames = Set(hiddenArray)
+        self.hiddenServiceNames = Set(defaults.stringArray(forKey: Self.hiddenServicesKey) ?? [])
     }
 
     // MARK: Hide / Unhide
@@ -114,7 +113,7 @@ final class ServiceStore: LoadableStore {
         hiddenServiceNames.removeAll()
     }
 
-    // MARK: Actions
+    // MARK: Loading
 
     /// Loads all Homebrew services.
     func load(forceRefresh: Bool = false) async {
@@ -146,41 +145,81 @@ final class ServiceStore: LoadableStore {
         }
     }
 
-    /// Restarts each service in turn; root services prompt for a password.
-    func restart(_ services: [BrewServiceItem]) async {
-        for service in services {
-            await restart(service)
-        }
-    }
+    // MARK: Actions
 
-    /// Services registered under `root` are managed with elevated privileges.
+    /// Services registered under `root` ask for an administrator password.
     func start(_ service: BrewServiceItem) async {
-        await run(.serviceStart(name: service.name)) {
-            try await service.start(privileged: service.requiresRoot)
+        await perform(.serviceStart(name: service.name)) {
+            try await service.start()
         }
     }
 
-    func stop(_ service: BrewServiceItem) async {
-        await run(.serviceStop(name: service.name)) {
-            try await service.stop(privileged: service.requiresRoot)
+    /// Starts the service for this session without registering it at login.
+    func runOnce(_ service: BrewServiceItem) async {
+        await perform(.serviceRun(name: service.name)) {
+            try await service.runOnce()
+        }
+    }
+
+    /// Stops the service; with `keepRegistered` it still starts at next login.
+    func stop(_ service: BrewServiceItem, keepRegistered: Bool = false) async {
+        await perform(.serviceStop(name: service.name)) {
+            try await service.stop(keepRegistered: keepRegistered)
         }
     }
 
     func restart(_ service: BrewServiceItem) async {
-        await run(.serviceRestart(name: service.name)) {
-            try await service.restart(privileged: service.requiresRoot)
+        await perform(.serviceRestart(name: service.name)) {
+            try await service.restart()
         }
     }
 
-    func kill(_ service: BrewServiceItem) async {
-        await run(.serviceForceQuit(name: service.name)) {
-            try await service.kill()
+    /// Restarts the services together. Root services share one password
+    /// prompt instead of asking once per service.
+    func restart(_ services: [BrewServiceItem]) async {
+        let idle = services.filter { !activityStore.isActive(.package($0.name)) }
+        let rootServices = idle.filter(\.requiresRoot)
+        let rootRestart = rootServices.isEmpty ? nil : Task {
+            try await BrewServiceItem.restartAsRoot(rootServices)
+        }
+
+        await withTaskGroup(of: Void.self) { group in
+            for service in idle {
+                group.addTask {
+                    await self.restart(service, sharing: rootRestart)
+                }
+            }
+        }
+        await load(forceRefresh: true)
+    }
+
+    /// One service's part of a batch restart, tracked as its own activity.
+    /// Root services wait for the shared privileged restart.
+    private func restart(_ service: BrewServiceItem, sharing rootRestart: Task<Void, Error>?) async {
+        // Retrying reruns the restart alone; the shared one has finished.
+        let retry = ActivityStore.Retry.custom { _ in await self.restart(service) }
+        await perform(.serviceRestart(name: service.name), reload: false, retry: retry) {
+            guard service.requiresRoot, let rootRestart else {
+                return try await service.restart()
+            }
+            try await withTaskCancellationHandler {
+                try await rootRestart.value
+            } onCancel: {
+                rootRestart.cancel()
+            }
+        }
+    }
+
+    /// Kills the process with SIGKILL, for a service that won't stop.
+    func forceQuit(_ service: BrewServiceItem) async {
+        await perform(.serviceForceQuit(name: service.name)) {
+            try await service.forceQuit()
         }
     }
 
     /// Uninstalls the formula backing a service.
     func uninstall(_ service: BrewServiceItem, force: Bool = false) async {
-        await run(.uninstall(name: service.name, isCask: false)) {
+        await perform(.uninstall(name: service.name, isCask: false)) {
             try await BrewService.shared.uninstall(service.name, force: force)
         }
     }
@@ -188,10 +227,17 @@ final class ServiceStore: LoadableStore {
     // MARK: Private
 
     /// Runs a service action as an activity, then reloads the list.
-    private func run(_ kind: BrewOperation.Kind, _ action: @escaping @MainActor () async throws -> Void) async {
-        await activityStore.perform(kind) { _ in
+    private func perform(
+        _ kind: BrewOperation.Kind,
+        reload: Bool = true,
+        retry: ActivityStore.Retry = .rerun,
+        _ action: @escaping @MainActor () async throws -> Void
+    ) async {
+        await activityStore.perform(kind, retry: retry) { _ in
             try await action()
-            await self.load(forceRefresh: true)
+            if reload {
+                await self.load(forceRefresh: true)
+            }
         }
     }
 

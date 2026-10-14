@@ -9,7 +9,7 @@ struct MenuBarView: View {
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(MaintenanceStore.self) private var maintenanceStore
-    @Environment(ResourceStore.self) private var resourceStore
+    @Environment(ServiceMetricsStore.self) private var metrics
     @Environment(ActivityStore.self) private var activityStore
     @Environment(\.refreshAll) private var refreshAll
     @Environment(\.openWindow) private var openWindow
@@ -70,15 +70,17 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var resourcesSection: some View {
-        if !resourceStore.usages.isEmpty {
-            Section("Service Resources") {
-                Label("\(formattedCPU(resourceStore.totalCPU)) CPU", systemImage: "cpu")
-                Label(
-                    "\(Measurement(value: resourceStore.totalMemoryMB, unit: UnitInformationStorage.megabytes).formatted(.byteCount(style: .memory))) Memory",
-                    systemImage: "memorychip"
-                )
+        Section("Service Resources") {
+            if metrics.usages.isEmpty {
+                Text("Measuring\u{2026}")
+            } else {
+                Label("\(ResourceUsage.formattedCPU(metrics.totalCPU)) CPU", systemImage: "cpu")
+                Label("\(ResourceUsage.formattedMemory(metrics.totalMemoryBytes)) Memory", systemImage: "memorychip")
             }
-            .disabled(true)
+        }
+        .disabled(true)
+        .task(id: serviceStore.runningCount) {
+            await metrics.refresh(for: serviceStore.services)
         }
     }
 
@@ -156,10 +158,6 @@ struct MenuBarView: View {
             openWindow(id: SceneID.main)
         }
         NSApplication.shared.activate()
-    }
-
-    private func formattedCPU(_ percent: Double) -> String {
-        (percent / 100).formatted(.percent.precision(.fractionLength(1)))
     }
 }
 

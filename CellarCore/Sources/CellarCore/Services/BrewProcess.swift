@@ -11,16 +11,35 @@ public protocol BrewProcessProtocol: Sendable {
     /// report) to stderr, so long operations want both.
     func stream(_ arguments: [String], includingStandardError: Bool) -> AsyncThrowingStream<String, Error>
 
-    /// Runs `brew` as root via the macOS admin authentication prompt
-    /// (Touch ID / password). Used for services registered under `root`.
-    func runPrivileged(_ arguments: [String]) async throws -> ProcessOutput
+    /// Runs commands as root under one macOS admin authentication prompt
+    /// (Touch ID / password). Every command runs even if an earlier one
+    /// failed; the result fails if any did. Used for services registered
+    /// under `root`.
+    func runPrivileged(_ commands: [PrivilegedCommand]) async throws -> ProcessOutput
+}
+
+/// A command for `BrewProcessProtocol.runPrivileged(_:)`.
+public enum PrivilegedCommand: Sendable, Hashable {
+    /// `brew` with these arguments.
+    case brew([String])
+    /// A system tool, such as `/bin/kill`, with its arguments.
+    case tool(path: String, arguments: [String])
 }
 
 public extension BrewProcessProtocol {
-    /// Default routes to the unprivileged path so test doubles need not
-    /// implement privileged execution.
+    /// Runs one `brew` command as root.
     func runPrivileged(_ arguments: [String]) async throws -> ProcessOutput {
-        try await run(arguments)
+        try await runPrivileged([.brew(arguments)])
+    }
+
+    /// Default runs the `brew` commands unprivileged and skips tools, so
+    /// test doubles need not implement privileged execution.
+    func runPrivileged(_ commands: [PrivilegedCommand]) async throws -> ProcessOutput {
+        var output = ProcessOutput(stdout: "", stderr: "", exitCode: 0)
+        for case .brew(let arguments) in commands {
+            output = try await run(arguments)
+        }
+        return output
     }
 
     /// Default ignores stderr so test doubles need only implement `stream(_:)`.
@@ -60,8 +79,8 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         )
     }
 
-    public func runPrivileged(_ arguments: [String]) async throws -> ProcessOutput {
-        let shellCommand = Self.privilegedShellCommand(brewPath: brewPath, arguments: arguments)
+    public func runPrivileged(_ commands: [PrivilegedCommand]) async throws -> ProcessOutput {
+        let shellCommand = Self.privilegedShellScript(commands, brewPath: brewPath)
         let appleScript = "do shell script \(Self.appleScriptQuoted(shellCommand)) with administrator privileges"
 
         let output = try await Self.execute(
@@ -120,7 +139,7 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
     /// Executes a process while draining stdout and stderr concurrently.
     /// Cancellation terminates the underlying process instead of only
     /// cancelling the Swift task that is waiting for it.
-    private static func execute(
+    static func execute(
         executableURL: URL,
         arguments: [String],
         environment: [String: String]?
@@ -277,12 +296,20 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
 
     // MARK: - Privileged Command Building
 
-    /// Builds the `/bin/sh` command that `do shell script` runs as root.
+    /// Builds the `/bin/sh` script that `do shell script` runs as root: every
+    /// command runs, and the script exits with the last failure's status.
     /// Each component is single-quoted so service names and paths are safe.
-    private static func privilegedShellCommand(brewPath: String, arguments: [String]) -> String {
-        let parts = [brewPath] + arguments
-        let quoted = parts.map(shellQuoted).joined(separator: " ")
-        return "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 \(quoted)"
+    static func privilegedShellScript(_ commands: [PrivilegedCommand], brewPath: String) -> String {
+        let lines = commands.map { command in
+            switch command {
+            case .brew(let arguments):
+                "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 "
+                    + ([brewPath] + arguments).map(shellQuoted).joined(separator: " ")
+            case .tool(let path, let arguments):
+                ([path] + arguments).map(shellQuoted).joined(separator: " ")
+            }
+        }
+        return (["s=0"] + lines.map { "\($0) || s=$?" } + ["exit $s"]).joined(separator: "; ")
     }
 
     /// Wraps a string in single quotes for `/bin/sh`, escaping embedded quotes.

@@ -80,28 +80,6 @@ public nonisolated final class BrewService: Sendable {
         process.stream(["update"], includingStandardError: true)
     }
 
-    // MARK: - Services
-
-    public func listServicesData() async throws -> Data {
-        try await runJSON(["services", "list", "--json"])
-    }
-
-    public func startService(_ name: String, privileged: Bool = false) async throws {
-        try await runChecked(["services", "start", name], privileged: privileged)
-    }
-
-    public func stopService(_ name: String, privileged: Bool = false) async throws {
-        try await runChecked(["services", "stop", name], privileged: privileged)
-    }
-
-    public func restartService(_ name: String, privileged: Bool = false) async throws {
-        try await runChecked(["services", "restart", name], privileged: privileged)
-    }
-
-    public func killService(_ name: String) async throws {
-        try await runChecked(["services", "kill", name])
-    }
-
     // MARK: - Generic Stream
 
     public func streamCommand(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
@@ -153,6 +131,16 @@ public nonisolated final class BrewService: Sendable {
         let output = privileged
             ? try await process.runPrivileged(arguments)
             : try await process.run(arguments)
+        return try Self.checked(output)
+    }
+
+    /// Runs several commands as root under one authentication prompt.
+    @discardableResult
+    func runPrivilegedChecked(_ commands: [PrivilegedCommand]) async throws -> ProcessOutput {
+        try Self.checked(await process.runPrivileged(commands))
+    }
+
+    private static func checked(_ output: ProcessOutput) throws -> ProcessOutput {
         guard output.exitCode == 0 else {
             throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
         }
