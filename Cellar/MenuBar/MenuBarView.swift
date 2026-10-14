@@ -91,7 +91,11 @@ struct MenuBarView: View {
         Section("Updates") {
             if let operation = packageStore.upgradeAllOperation, operation.isRunning {
                 Text(upgradeProgressTitle(operation))
-                Button("Cancel Upgrade") { packageStore.cancelUpgradeAll() }
+                Button("Stop Upgrading\u{2026}") {
+                    if BatchCancellation.confirmWithAlert() {
+                        activityStore.cancel(operation.id)
+                    }
+                }
             } else if packageStore.totalOutdated == 0 {
                 Text("Everything Up to Date")
             } else {

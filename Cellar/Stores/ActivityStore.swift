@@ -152,7 +152,7 @@ final class ActivityStore {
 
     /// The batch operation (such as Upgrade All) that is running, if any.
     var runningBatchOperation: BrewOperation? {
-        operations.first { $0.isRunning && !$0.steps.isEmpty }
+        operations.first { $0.isRunning && $0.isBatch }
     }
 
     /// The package's step inside a running batch operation, if any — lets a

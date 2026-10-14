@@ -10,8 +10,6 @@ struct OperationProgressView: View {
     /// is only called out once it lasts long enough to look like a hang.
     private static let quietThreshold: TimeInterval = 180
 
-    private var isBatch: Bool { !operation.steps.isEmpty }
-
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.compact) {
             HStack(alignment: .firstTextBaseline, spacing: Spacing.item) {
@@ -20,7 +18,7 @@ struct OperationProgressView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: Spacing.item)
-                if isBatch {
+                if operation.isBatch {
                     Text(countLabel)
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
@@ -44,7 +42,7 @@ struct OperationProgressView: View {
             Text("Cancelling\u{2026}")
         } else if let step = operation.currentStep {
             Text("Upgrading \(Text(step.name).fontWeight(.semibold))")
-        } else if isBatch, operation.finishedStepCount == operation.steps.count {
+        } else if operation.isBatch, operation.finishedStepCount == operation.steps.count {
             Text("Refreshing package list\u{2026}")
         } else {
             Text(operation.kind.displayTitle)
@@ -60,7 +58,7 @@ struct OperationProgressView: View {
 
     @ViewBuilder
     private var progressBar: some View {
-        if isBatch {
+        if operation.isBatch {
             ProgressView(
                 value: Double(operation.finishedStepCount),
                 total: Double(max(operation.steps.count, 1))
@@ -79,7 +77,7 @@ struct OperationProgressView: View {
         if let step = operation.currentStep, let startedAt = step.startedAt {
             return (startedAt, "\(step.currentVersion) → \(step.targetVersion)")
         }
-        return isBatch ? nil : (operation.startedAt, nil)
+        return operation.isBatch ? nil : (operation.startedAt, nil)
     }
 
     @ViewBuilder
@@ -133,8 +131,6 @@ struct OperationProgressView: View {
 struct RunningOperationBar: View {
     let operation: BrewOperation
 
-    @Environment(ActivityStore.self) private var activityStore
-
     var body: some View {
         NoticeBanner(tint: .accentColor, systemImage: operation.kind.symbolName) {
             OperationProgressView(operation: operation)
@@ -145,10 +141,7 @@ struct RunningOperationBar: View {
             }
             .help("Show brew’s output in Activity")
 
-            Button("Cancel") {
-                activityStore.cancel(operation.id)
-            }
-            .disabled(!activityStore.canCancel(operation.id))
+            CancelOperationButton(operation: operation)
         }
     }
 }

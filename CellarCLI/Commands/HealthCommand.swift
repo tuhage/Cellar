@@ -7,20 +7,29 @@ enum HealthCommand {
         print("Running \(TerminalOutput.info("brew doctor"))...")
         print("")
 
-        let output = try await BrewService.shared.doctor()
-
-        if output.contains("Your system is ready to brew") {
-            TerminalOutput.printSuccess("Your system is ready to brew.")
+        let report = DoctorReport(output: try await BrewService.shared.doctor())
+        guard !report.findings.isEmpty else {
+            TerminalOutput.printSuccess(report.summary)
             return
         }
 
-        for line in output.split(separator: "\n", omittingEmptySubsequences: false) {
-            let text = String(line)
-            if text.hasPrefix("Warning:") || text.hasPrefix("Error:") {
-                print(TerminalOutput.warning(text))
-            } else {
-                print(text)
+        print(TerminalOutput.warning(report.summary))
+        for finding in report.findings {
+            print("")
+            print(TerminalOutput.bold("\u{26A0} \(finding.title)"))
+            for block in finding.blocks {
+                switch block {
+                case .text(let text): print(indented(text, by: 2))
+                case .command(let command): print(indented(TerminalOutput.info(command), by: 4))
+                }
             }
         }
+    }
+
+    private static func indented(_ text: String, by count: Int) -> String {
+        let indent = String(repeating: " ", count: count)
+        return text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { indent + $0 }
+            .joined(separator: "\n")
     }
 }

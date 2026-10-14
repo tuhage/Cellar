@@ -42,19 +42,12 @@ public nonisolated final class BrewService: Sendable {
         return parseLines(output.stdout)
     }
 
-    // MARK: - Install / Uninstall / Upgrade
+    // MARK: - Install / Upgrade
 
     /// `--formula` / `--cask` is always explicit: without it brew resolves a
     /// bare name like `maestro` to a same-named cask instead of the formula.
     public func install(_ name: String, isCask: Bool = false) -> AsyncThrowingStream<String, Error> {
         process.stream(["install", isCask ? "--cask" : "--formula", name], includingStandardError: true)
-    }
-
-    public func uninstall(_ name: String, force: Bool = false) async throws {
-        var args = ["uninstall"]
-        if force { args.append("--ignore-dependencies") }
-        args.append(name)
-        try await runChecked(args)
     }
 
     public func upgrade(_ name: String, isCask: Bool = false) -> AsyncThrowingStream<String, Error> {

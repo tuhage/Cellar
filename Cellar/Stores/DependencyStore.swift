@@ -78,9 +78,15 @@ final class DependencyStore: LoadableStore {
         return node.matches(query, in: searchScope)
     }
 
-    /// The graph lists formulae and casks alike.
+    /// The installed formula or cask named `name` — the graph lists both
+    /// alike.
+    func package(named name: String) -> PackageType? {
+        packageStore.package(PackageID(kind: .formula, name: name))
+            ?? packageStore.package(PackageID(kind: .cask, name: name))
+    }
+
     func isCask(_ name: String) -> Bool {
-        packageStore.casks.contains { $0.token == name }
+        package(named: name)?.kind == .cask
     }
 
     // MARK: Actions
@@ -99,22 +105,6 @@ final class DependencyStore: LoadableStore {
 
     func select(_ name: String) {
         selectedNodeName = name
-    }
-
-    /// Uninstalls the formula or cask through `PackageStore`, then re-reads
-    /// the dependencies it leaves behind.
-    func uninstall(_ name: String) async {
-        if let formula = packageStore.formulae.first(where: { $0.name == name }) {
-            await packageStore.uninstall(formula)
-        } else if let cask = packageStore.casks.first(where: { $0.token == name }) {
-            await packageStore.uninstall(cask)
-        } else {
-            return
-        }
-        await load(forceRefresh: true)
-        if selectedNodeName == name, graph?.node(named: name) == nil {
-            selectedNodeName = nil
-        }
     }
 }
 

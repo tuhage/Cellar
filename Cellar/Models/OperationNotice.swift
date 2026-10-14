@@ -36,7 +36,7 @@ struct OperationNotice: Identifiable, Equatable {
         case .succeeded, .running:
             outcome = .success
             title = operation.kind.completionTitle
-            message = operation.steps.isEmpty ? nil : "\(operation.succeededStepCount) of \(operation.steps.count) upgraded."
+            message = operation.isBatch ? "\(operation.succeededStepCount) of \(operation.steps.count) upgraded." : nil
         case .failed(let reason):
             outcome = .failure
             title = "\(operation.kind.displayTitle) failed"
@@ -44,7 +44,9 @@ struct OperationNotice: Identifiable, Equatable {
         case .cancelled:
             outcome = .cancelled
             title = "\(operation.kind.displayTitle) cancelled"
-            message = operation.steps.isEmpty ? nil : "\(operation.succeededStepCount) of \(operation.steps.count) upgraded before cancelling."
+            message = operation.isBatch
+                ? "\(operation.succeededStepCount) of \(operation.steps.count) upgraded before cancelling."
+                : nil
         }
     }
 

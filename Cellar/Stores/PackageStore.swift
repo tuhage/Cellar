@@ -359,11 +359,6 @@ final class PackageStore: LoadableStore {
         startUpgradeBatch(outdatedPackages.filter { failedStepIDs.contains($0.upgradeStep.id) && $0.canUpgrade })
     }
 
-    func cancelUpgradeAll() {
-        guard let upgradeAllOperationID else { return }
-        activityStore.cancel(upgradeAllOperationID)
-    }
-
     private func startUpgradeBatch(_ packages: [PackageType]) {
         // Packages busy with another operation would collide with brew's lock.
         let packages = packages.filter { !isBusy($0) }

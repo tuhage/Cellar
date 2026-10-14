@@ -45,6 +45,8 @@ struct ServiceActionButtons: View {
 
 extension View {
     /// Asks before running the destructive service action in `pending`.
+    /// Uninstall uses the package pages' confirmation, which also warns
+    /// about formulae that still need the service's formula.
     func confirmingServiceAction(_ pending: Binding<PendingServiceAction?>) -> some View {
         modifier(ServiceActionConfirmation(pending: pending))
     }
@@ -52,59 +54,58 @@ extension View {
 
 private struct ServiceActionConfirmation: ViewModifier {
     @Binding var pending: PendingServiceAction?
+    @State private var uninstallRequest: UninstallRequest?
+
     @Environment(ServiceStore.self) private var store
+    @Environment(PackageStore.self) private var packageStore
+
+    private var pendingForceQuit: Binding<PendingServiceAction?> {
+        Binding(
+            get: { pending?.action == .forceQuit ? pending : nil },
+            set: { pending = $0 }
+        )
+    }
 
     func body(content: Content) -> some View {
-        content.confirmationDialog(
-            pending.map { "\($0.action.confirmationVerb) \($0.service.name)?" } ?? "",
-            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
-            titleVisibility: .visible,
-            presenting: pending
-        ) { pending in
-            buttons(for: pending)
-        } message: { pending in
-            Text(message(for: pending))
-        }
+        content
+            .confirmationDialog(
+                pending.map { "Force quit \($0.service.name)?" } ?? "",
+                isPresented: pendingForceQuit.isPresent(),
+                titleVisibility: .visible,
+                presenting: pending
+            ) { pending in
+                forceQuitButtons(for: pending.service)
+            } message: { pending in
+                Text(forceQuitMessage(for: pending.service))
+            }
+            .uninstallConfirmation($uninstallRequest)
+            .onChange(of: pending?.id) {
+                guard let pending, pending.action == .uninstall else { return }
+                self.pending = nil
+                let formula = packageStore.package(PackageID(kind: .formula, name: pending.service.name))
+                uninstallRequest = formula.map { UninstallRequest(packages: [$0]) }
+            }
     }
 
     @ViewBuilder
-    private func buttons(for pending: PendingServiceAction) -> some View {
-        let service = pending.service
-        switch pending.action {
-        case .forceQuit:
-            Button("Force Quit", role: .destructive) {
-                Task { await store.forceQuit(service) }
+    private func forceQuitButtons(for service: BrewServiceItem) -> some View {
+        Button("Force Quit", role: .destructive) {
+            Task { await store.forceQuit(service) }
+        }
+        if service.keepsAlive {
+            Button("Stop Instead") {
+                Task { await store.stop(service) }
             }
-            if service.keepsAlive {
-                Button("Stop Instead") {
-                    Task { await store.stop(service) }
-                }
-            }
-        case .uninstall:
-            Button("Uninstall", role: .destructive) {
-                Task { await store.uninstall(service) }
-            }
-            Button("Uninstall Ignoring Dependencies", role: .destructive) {
-                Task { await store.uninstall(service, force: true) }
-            }
-        default:
-            EmptyView()
         }
         Button("Cancel", role: .cancel) {}
     }
 
-    private func message(for pending: PendingServiceAction) -> String {
-        let service = pending.service
+    private func forceQuitMessage(for service: BrewServiceItem) -> String {
         let password = service.requiresRoot ? " You’ll be asked for your administrator password." : ""
-        switch pending.action {
-        case .forceQuit:
-            let relaunch = service.keepsAlive
-                ? " launchd will start it again right away because it’s set to keep running; use Stop to stop it for good."
-                : ""
-            return "\(service.name) is killed immediately, without a chance to save data or clean up.\(relaunch)\(password)"
-        default:
-            return "This stops \(service.name) and removes the formula from Homebrew. Its data and logs are kept.\(password)"
-        }
+        let relaunch = service.keepsAlive
+            ? " launchd will start it again right away because it’s set to keep running; use Stop to stop it for good."
+            : ""
+        return "\(service.name) is killed immediately, without a chance to save data or clean up.\(relaunch)\(password)"
     }
 }
 

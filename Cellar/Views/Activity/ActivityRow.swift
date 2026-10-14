@@ -8,7 +8,6 @@ struct ActivityRow: View {
     @Environment(ActivityStore.self) private var store
     @State private var isOutputExpanded = false
     @State private var isStepsExpanded = false
-    @State private var isConfirmingCancel = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.item) {
@@ -24,7 +23,7 @@ struct ActivityRow: View {
                     .textSelection(.enabled)
             }
 
-            if !operation.steps.isEmpty {
+            if operation.isBatch {
                 stepsDisclosure
             }
             if !operation.log.isEmpty {
@@ -36,16 +35,6 @@ struct ActivityRow: View {
         }
         .padding(.vertical, Spacing.item)
         .contextMenu { contextMenu }
-        .confirmationDialog(
-            "Cancel \(operation.kind.displayTitle)?",
-            isPresented: $isConfirmingCancel
-        ) {
-            Button("Stop After Current Package", role: .destructive) {
-                store.cancel(operation.id)
-            }
-        } message: {
-            Text("Packages already upgraded stay upgraded.")
-        }
     }
 
     // MARK: - Header
@@ -69,18 +58,11 @@ struct ActivityRow: View {
             Spacer(minLength: Spacing.item)
 
             if operation.isRunning {
-                Button(role: .cancel) {
-                    if operation.steps.isEmpty {
-                        store.cancel(operation.id)
-                    } else {
-                        isConfirmingCancel = true
-                    }
-                } label: {
+                CancelOperationButton(operation: operation) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .disabled(!store.canCancel(operation.id))
                 .help("Cancel")
                 .accessibilityLabel("Cancel \(operation.kind.displayTitle)")
             }

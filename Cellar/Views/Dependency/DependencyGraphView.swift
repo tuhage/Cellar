@@ -13,7 +13,7 @@ struct DependencyGraphView: View {
     @FocusedValue(\.windowCommands) private var windowCommands
 
     @AppStorage("dependencyInspectorPresented") private var isInspectorPresented = true
-    @State private var packageToUninstall: DependencyNode?
+    @State private var uninstallRequest: UninstallRequest?
 
     var body: some View {
         @Bindable var store = store
@@ -35,21 +35,7 @@ struct DependencyGraphView: View {
             }
             .task(id: store.packageStore.lastUpdated) { await store.load() }
             .focusedSceneValue(\.pageRefresh, AsyncAction { await store.load(forceRefresh: true) })
-            .confirmationDialog(
-                "Uninstall \(packageToUninstall?.name ?? "")?",
-                isPresented: Binding(
-                    get: { packageToUninstall != nil },
-                    set: { if !$0 { packageToUninstall = nil } }
-                ),
-                presenting: packageToUninstall
-            ) { node in
-                Button("Uninstall", role: .destructive) {
-                    Task { await store.uninstall(node.name) }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: { node in
-                Text(uninstallMessage(for: node, in: graph))
-            }
+            .uninstallConfirmation($uninstallRequest)
     }
 
     // MARK: - Content
@@ -184,19 +170,12 @@ struct DependencyGraphView: View {
 
         Divider()
 
-        if let blocker = node.uninstallBlocker {
-            Button(role: .destructive) {} label: {
-                Label("Can’t Uninstall — \(blocker)", systemImage: "trash")
-            }
-            .disabled(true)
-        } else {
-            Button(role: .destructive) {
-                packageToUninstall = node
-            } label: {
-                Label("Uninstall\u{2026}", systemImage: "trash")
-            }
-            .disabled(activityStore.isActive(.package(node.name)))
+        Button(role: .destructive) {
+            requestUninstall(node.name)
+        } label: {
+            Label("Uninstall\u{2026}", systemImage: "trash")
         }
+        .disabled(!canUninstall(node.name))
     }
 
     // MARK: - Inspector
@@ -208,8 +187,8 @@ struct DependencyGraphView: View {
                 node: node,
                 graph: graph,
                 isCask: store.isCask(name),
-                isBusy: activityStore.isActive(.package(name)),
-                uninstall: { packageToUninstall = node }
+                canUninstall: canUninstall(name),
+                uninstall: { requestUninstall(name) }
             )
         } else {
             ContentUnavailableView(
@@ -222,11 +201,14 @@ struct DependencyGraphView: View {
 
     // MARK: - Uninstall
 
-    private func uninstallMessage(for node: DependencyNode, in graph: DependencyGraph?) -> String {
-        let freed = graph?.dependenciesFreed(byRemoving: node.name) ?? []
-        let removal = "\(node.name) will be removed from your Mac."
-        guard !freed.isEmpty else { return removal }
-        return removal + " Afterwards, Remove Unused can uninstall \(freed.briefList()), which nothing else needs."
+    private func canUninstall(_ name: String) -> Bool {
+        store.package(named: name) != nil && !activityStore.isActive(.package(name))
+    }
+
+    /// Uninstalls through the package pages' confirmation, which lists the
+    /// packages that still need it.
+    private func requestUninstall(_ name: String) {
+        uninstallRequest = store.package(named: name).map { UninstallRequest(packages: [$0]) }
     }
 }
 

@@ -67,7 +67,7 @@ final class BrewfileStore {
     let services: ServiceStore
     let taps: TapStore
     private let persistence = PersistenceService()
-    let brew = BrewService.shared
+    private let brew = BrewService.shared
 
     init(activityStore: ActivityStore, packages: PackageStore, services: ServiceStore, taps: TapStore) {
         self.activityStore = activityStore

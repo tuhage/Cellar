@@ -217,13 +217,6 @@ final class ServiceStore: LoadableStore {
         }
     }
 
-    /// Uninstalls the formula backing a service.
-    func uninstall(_ service: BrewServiceItem, force: Bool = false) async {
-        await perform(.uninstall(name: service.name, isCask: false)) {
-            try await BrewService.shared.uninstall(service.name, force: force)
-        }
-    }
-
     // MARK: Private
 
     /// Runs a service action as an activity, then reloads the list.

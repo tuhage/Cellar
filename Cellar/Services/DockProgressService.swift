@@ -14,7 +14,7 @@ final class DockProgressService {
     /// Pass the running batch operation, or `nil` to restore the plain icon.
     func update(for operation: BrewOperation?) {
         let tile = NSApp.dockTile
-        guard let operation, operation.isRunning, !operation.steps.isEmpty else {
+        guard let operation, operation.isRunning, operation.isBatch else {
             guard shownProgress != nil else { return }
             tile.contentView = nil
             tile.badgeLabel = nil

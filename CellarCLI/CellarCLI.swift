@@ -17,13 +17,13 @@ struct CellarCLI {
                 try await StatusCommand.run()
             case "start":
                 let name = try requireArgument(from: arguments, for: "start")
-                try await StartCommand.run(serviceName: name)
+                try await ServiceCommand.run(.start, serviceName: name)
             case "stop":
                 let name = try requireArgument(from: arguments, for: "stop")
-                try await StopCommand.run(serviceName: name)
+                try await ServiceCommand.run(.stop, serviceName: name)
             case "restart":
                 let name = try requireArgument(from: arguments, for: "restart")
-                try await RestartCommand.run(serviceName: name)
+                try await ServiceCommand.run(.restart, serviceName: name)
             case "search":
                 let query = try requireArgument(from: arguments, for: "search")
                 try await SearchCommand.run(query: query)
@@ -67,6 +67,7 @@ struct CellarCLI {
 
 enum CLIError: LocalizedError {
     case missingArgument(command: String)
+    case unknownService(String)
 
     var errorDescription: String? {
         switch self {
@@ -76,6 +77,8 @@ enum CLIError: LocalizedError {
             default: "<service>"
             }
             return "Missing argument. Usage: cellar \(command) \(argument)"
+        case .unknownService(let name):
+            return "No service named \(name). Run cellar status to see your services."
         }
     }
 }

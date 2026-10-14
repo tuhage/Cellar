@@ -7,7 +7,8 @@ struct DependencyInspector: View {
     let node: DependencyNode
     let graph: DependencyGraph
     let isCask: Bool
-    let isBusy: Bool
+    /// Installed and not busy with another operation.
+    let canUninstall: Bool
     let uninstall: () -> Void
 
     @Environment(DependencyStore.self) private var store
@@ -38,8 +39,8 @@ struct DependencyInspector: View {
                 Button(role: .destructive, action: uninstall) {
                     Label("Uninstall\u{2026}", systemImage: "trash")
                 }
-                .disabled(node.uninstallBlocker != nil || isBusy)
-                .help(node.uninstallBlocker ?? "Uninstall \(node.name)")
+                .disabled(!canUninstall)
+                .help("Uninstall \(node.name)")
             }
             .controlSize(.small)
         }
@@ -93,7 +94,7 @@ struct DependencyInspector: View {
             }
         } else {
             Section {
-                Text("Homebrew won’t uninstall it while these packages need it:")
+                Text("These packages need it and may stop working without it:")
                     .foregroundStyle(.secondary)
                 ForEach(node.dependents, id: \.self) { name in
                     packageLink(name)
@@ -154,19 +155,6 @@ struct DependencyInspector: View {
     }
 }
 
-// MARK: - Uninstall
-
-extension DependencyNode {
-    /// Why it can't be uninstalled, or `nil` when it can.
-    var uninstallBlocker: String? {
-        switch dependents.count {
-        case 0: nil
-        case 1: "Needed by \(dependents[0])"
-        default: "Needed by \(dependents.count) packages"
-        }
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
@@ -177,7 +165,7 @@ extension DependencyNode {
         node: graph.node(named: "gettext")!,
         graph: graph,
         isCask: false,
-        isBusy: false,
+        canUninstall: true,
         uninstall: {}
     )
     .environment(stores)

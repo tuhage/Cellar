@@ -54,6 +54,11 @@ struct BrewOperation: Identifiable, Equatable {
         return false
     }
 
+    /// Runs several packages one after another, such as Upgrade All.
+    var isBatch: Bool {
+        !steps.isEmpty
+    }
+
     /// "Installing wget" while running, "Installed wget" once it succeeded.
     var title: String {
         status == .succeeded ? kind.completionTitle : kind.displayTitle

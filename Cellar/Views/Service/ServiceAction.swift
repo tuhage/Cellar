@@ -35,11 +35,6 @@ enum ServiceAction: CaseIterable, Identifiable {
         }
     }
 
-    /// "Force quit" in the confirmation "Force quit redis?".
-    var confirmationVerb: String {
-        self == .forceQuit ? "Force quit" : "Uninstall"
-    }
-
     var systemImage: String {
         switch self {
         case .start: "play.circle"
@@ -76,6 +71,8 @@ enum ServiceAction: CaseIterable, Identifiable {
         }
     }
 
+    /// Runs the action. Uninstall isn't run here: it goes through the
+    /// package pages' `UninstallRequest`, see `confirmingServiceAction(_:)`.
     @MainActor
     func perform(on service: BrewServiceItem, store: ServiceStore) async {
         switch self {
@@ -85,7 +82,7 @@ enum ServiceAction: CaseIterable, Identifiable {
         case .stopKeepingRegistration: await store.stop(service, keepRegistered: true)
         case .restart: await store.restart(service)
         case .forceQuit: await store.forceQuit(service)
-        case .uninstall: await store.uninstall(service)
+        case .uninstall: break
         }
     }
 }

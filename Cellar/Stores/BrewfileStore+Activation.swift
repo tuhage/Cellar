@@ -100,23 +100,25 @@ extension BrewfileStore {
 
     // MARK: Private
 
-    /// Services registered under `root` need an admin prompt.
-    private func requiresRoot(_ name: String) -> Bool {
-        services.services.first { $0.name == name }?.requiresRoot ?? false
+    /// The listed service, or one built from the name for a service brew
+    /// doesn't list yet; `BrewServiceItem` asks for a password for root ones.
+    private func service(named name: String) -> BrewServiceItem {
+        services.services.first { $0.name == name }
+            ?? BrewServiceItem(name: name, status: .none, user: nil, file: nil, exitCode: nil, pid: nil, registered: nil)
     }
 
     private func startService(_ name: String, registerAtLogin: Bool, in activity: ActivityContext) async throws {
         activity.log(registerAtLogin ? "Starting \(name)" : "Running \(name) for this session")
         if registerAtLogin {
-            try await brew.startService(name, privileged: requiresRoot(name))
+            try await service(named: name).start()
         } else {
-            try await brew.runService(name, privileged: requiresRoot(name))
+            try await service(named: name).runOnce()
         }
     }
 
     private func stopService(_ name: String, in activity: ActivityContext) async throws {
         activity.log("Stopping \(name)")
-        try await brew.stopService(name, privileged: requiresRoot(name))
+        try await service(named: name).stop()
     }
 
     /// Best-effort restore of the services touched before a failure.

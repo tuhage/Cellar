@@ -35,7 +35,13 @@ final class AppStores {
         maintenance.loadReports()
         Self.removeObsoleteCaches()
 
-        activity.onFinish = { [notices] operation in notices.announce(operation) }
+        activity.onFinish = { [notices, services] operation in
+            notices.announce(operation)
+            // Removing a formula removes its service, wherever it was uninstalled.
+            if case .uninstall(_, isCask: false) = operation.kind, operation.status == .succeeded {
+                Task { await services.load(forceRefresh: true) }
+            }
+        }
         activity.onChange = { [activity] in
             DockProgressService.shared.update(for: activity.runningBatchOperation)
         }

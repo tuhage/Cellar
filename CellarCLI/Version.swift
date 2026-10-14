@@ -1,5 +1,9 @@
-/// Single source of truth for the CLI version.
-/// Keep this in sync with the project's MARKETING_VERSION.
+import Foundation
+
 enum AppVersion {
-    static let current = "1.5.9"
+    /// The CLI target embeds a generated Info.plist in its binary, so this
+    /// is the project's MARKETING_VERSION — the same one the app shows.
+    static var current: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+    }
 }
