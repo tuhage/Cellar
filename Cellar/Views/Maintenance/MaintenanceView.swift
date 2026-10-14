@@ -2,6 +2,7 @@ import SwiftUI
 import CellarCore
 
 struct MaintenanceView: View {
+    @Environment(\.openSettings) private var openSettings
     @Environment(MaintenanceStore.self) private var store
 
     @State private var searchText = ""
@@ -162,8 +163,9 @@ struct MaintenanceView: View {
                 status: store.schedule.healthCheckStatus(),
                 lastRun: store.schedule.lastHealthCheck
             )
-            SettingsLink {
-                Text("Change in Settings\u{2026}")
+            Button("Change in Settings\u{2026}") {
+                SettingsTab.select(.maintenance)
+                openSettings()
             }
         } header: {
             Text("Schedule")
