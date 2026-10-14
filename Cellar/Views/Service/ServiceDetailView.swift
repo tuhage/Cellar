@@ -102,8 +102,8 @@ struct ServiceDetailView: View {
                     Text("\(runningOperation.title)\u{2026}")
                         .foregroundStyle(.secondary)
                 }
-            } else if let lastFailure, case .failed(let reason) = lastFailure.status {
-                failureNotice(title: lastFailure.title, reason: reason)
+            } else if let lastFailure, let failure = lastFailure.failure {
+                failureNotice(title: lastFailure.title, reason: failure.issue?.title ?? failure.reason)
             }
         }
     }

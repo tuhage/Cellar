@@ -73,7 +73,9 @@ struct PackageActivityLabel: View {
     }
 
     private var help: String {
-        if case .batchStep(.failed(let reason)) = activity { return reason }
+        if case .batchStep(.failed(let failure)) = activity {
+            return [failure.reason, failure.issue?.title].compactMap(\.self).joined(separator: "\n")
+        }
         return activity.label
     }
 }
@@ -136,7 +138,7 @@ struct PackageBadges: View {
         PackageStatusView(package: .cask(.preview))
         PackageActivityLabel(activity: .operation(.upgrade(name: "wget", isCask: false)))
         PackageActivityLabel(activity: .batchStep(.pending))
-        PackageActivityLabel(activity: .batchStep(.failed(reason: "Download failed")))
+        PackageActivityLabel(activity: .batchStep(.failed(.init(reason: "Download failed", issue: .offline))))
     }
     .padding()
     .environment(AppStores())

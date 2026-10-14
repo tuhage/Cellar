@@ -380,7 +380,7 @@ final class PackageStore: LoadableStore {
             activity.setStep(stepID, .succeeded)
             return true
         } catch where !isOperationCancellation(error) {
-            activity.setStep(stepID, .failed(reason: error.briefDescription))
+            activity.setStep(stepID, .failed(BrewOperation.Failure(error)))
             return false
         }
     }

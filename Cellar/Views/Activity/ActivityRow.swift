@@ -15,12 +15,18 @@ struct ActivityRow: View {
 
             if operation.isRunning {
                 OperationProgressView(operation: operation)
-            } else if case .failed(let reason) = operation.status {
-                Text(reason)
+            } else if let failure = operation.failure {
+                Text(failure.reason)
                     .font(.caption)
                     .foregroundStyle(.red)
                     .lineLimit(3)
                     .textSelection(.enabled)
+            }
+
+            if !operation.isRunning {
+                ForEach(operation.issues, id: \.self) { issue in
+                    BrewIssueView(issue: issue)
+                }
             }
 
             if operation.isBatch {
@@ -146,8 +152,8 @@ struct ActivityRow: View {
 
     @ViewBuilder
     private var contextMenu: some View {
-        if case .failed(let reason) = operation.status {
-            Button("Copy Error") { NSPasteboard.copy(reason) }
+        if let failure = operation.failure {
+            Button("Copy Error") { NSPasteboard.copy(failure.reason) }
         }
         if store.canRetry(operation.id) {
             Button("Retry") { Task { await store.retry(operation.id) } }

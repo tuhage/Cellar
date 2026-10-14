@@ -50,8 +50,7 @@ struct BrewOperation: Identifiable, Equatable {
     }
 
     var isFailed: Bool {
-        if case .failed = status { return true }
-        return false
+        failure != nil
     }
 
     /// Runs several packages one after another, such as Upgrade All.
@@ -83,8 +82,38 @@ extension BrewOperation {
     enum Status: Equatable {
         case running
         case succeeded
-        case failed(reason: String)
+        case failed(Failure)
         case cancelled
+    }
+
+    /// Why an operation or step failed: brew's one-line error, and the
+    /// recognized issue behind it with what the user can do about it.
+    struct Failure: Equatable {
+        let reason: String
+        let issue: BrewIssue?
+
+        init(reason: String, issue: BrewIssue? = nil) {
+            self.reason = reason
+            self.issue = issue
+        }
+
+        init(_ error: Error) {
+            self.init(reason: error.briefDescription, issue: BrewIssue.detect(in: error))
+        }
+    }
+
+    /// The failure of the operation itself, if it failed.
+    var failure: Failure? {
+        if case .failed(let failure) = status { return failure }
+        return nil
+    }
+
+    /// Recognized issues behind the operation's failure and its failed
+    /// steps, each once, so the fix is shown where the failure is.
+    var issues: [BrewIssue] {
+        let all = ([failure] + failedSteps.map(\.failure)).compactMap { $0?.issue }
+        var seen = Set<BrewIssue>()
+        return all.filter { seen.insert($0).inserted }
     }
 }
 
@@ -241,6 +270,11 @@ extension BrewOperation {
             )
         }
 
+        var failure: Failure? {
+            if case .failed(let failure) = status { return failure }
+            return nil
+        }
+
         static func id(name: String, isCask: Bool) -> String {
             "\(isCask ? "cask" : "formula"):\(name)"
         }
@@ -250,7 +284,7 @@ extension BrewOperation {
         case pending
         case running
         case succeeded
-        case failed(reason: String)
+        case failed(Failure)
         /// Never ran, or was interrupted, because the batch was cancelled.
         case cancelled
 
@@ -275,10 +309,7 @@ extension BrewOperation {
     }
 
     var failedSteps: [Step] {
-        steps.filter {
-            if case .failed = $0.status { return true }
-            return false
-        }
+        steps.filter { $0.failure != nil }
     }
 
     /// Position of the running step, 1-based ("3 of 8").

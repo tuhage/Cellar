@@ -48,8 +48,8 @@ final class ActivityLogService {
 
     /// Records the outcome and closes the file.
     func end(_ id: UUID, status: BrewOperation.Status) {
-        if case .failed(let reason) = status {
-            append(id, "== \(status.label) — \(reason)")
+        if case .failed(let failure) = status {
+            append(id, "== \(status.label) — \(failure.reason)")
         } else {
             append(id, "== \(status.label)")
         }

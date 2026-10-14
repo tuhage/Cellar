@@ -1,4 +1,5 @@
 import Foundation
+import CellarCore
 
 /// What to tell the user about a finished operation, in a toast or a
 /// system notification.
@@ -16,9 +17,12 @@ struct OperationNotice: Identifiable, Equatable {
         case .succeeded, .running:
             title = operation.kind.completionTitle
             message = operation.isBatch ? "\(operation.succeededStepCount) of \(operation.steps.count) upgraded." : nil
-        case .failed(let reason):
+        case .failed(let failure):
             title = "\(operation.kind.displayTitle) failed"
-            message = reason
+            // The recognized issue says what to do; Activity shows the fix.
+            message = [failure.reason, operation.issues.first?.title]
+                .compactMap(\.self)
+                .joined(separator: "\n")
         case .cancelled:
             title = "\(operation.kind.displayTitle) cancelled"
             message = operation.isBatch

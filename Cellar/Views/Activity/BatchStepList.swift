@@ -36,8 +36,8 @@ private struct BatchStepRow: View {
                         .lineLimit(1)
                 }
 
-                if case .failed(let reason) = step.status {
-                    Text(reason)
+                if let failure = step.failure {
+                    Text(failure.reason)
                         .font(.caption2)
                         .foregroundStyle(.red)
                         .textSelection(.enabled)

@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import CellarCore
 
 /// Sample operations for SwiftUI previews.
 extension BrewOperation {
@@ -13,7 +14,10 @@ extension BrewOperation {
             Step(name: "tailscale", isCask: false, currentVersion: "1.102.2", targetVersion: "1.104.1"),
         ]
         steps[0].status = .succeeded
-        steps[1].status = .failed(reason: "Cask 'maestro' is not installed.")
+        steps[1].status = .failed(Failure(
+            reason: "Your Command Line Tools are too outdated.",
+            issue: .outdatedCommandLineTools
+        ))
         steps[2].status = .running
         steps[2].startedAt = Date().addingTimeInterval(-42)
         return BrewOperation(
@@ -36,7 +40,7 @@ extension BrewOperation {
             ),
             BrewOperation(
                 kind: .uninstall(name: "openssl@3", isCask: false),
-                status: .failed(reason: "Refusing to uninstall openssl@3 because it is required by curl"),
+                status: .failed(Failure(reason: "Refusing to uninstall openssl@3 because it is required by curl")),
                 completedAt: Date()
             ),
         ]

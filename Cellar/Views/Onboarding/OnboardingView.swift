@@ -137,23 +137,14 @@ struct OnboardingView: View {
         }
     }
 
-    /// Opens the installer as a `.command` file, which Terminal runs —
-    /// no Apple Events permission needed.
     private func openInstallerInTerminal() {
         errorMessage = nil
-        let script = FileManager.default.temporaryDirectory.appending(path: "Install Homebrew.command")
         do {
-            try "#!/bin/bash\n\(Self.installCommand)\n".write(to: script, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+            try TerminalLauncher.run(Self.installCommand, title: "Install Homebrew")
+            isWaitingForInstall = true
         } catch {
-            errorMessage = "Couldn’t prepare the installer: \(error.localizedDescription)"
-            return
+            errorMessage = error.localizedDescription
         }
-        guard NSWorkspace.shared.open(script) else {
-            errorMessage = "Couldn’t open Terminal. Copy the command and run it yourself."
-            return
-        }
-        isWaitingForInstall = true
     }
 
     private func locateBrew() {

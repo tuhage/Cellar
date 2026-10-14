@@ -239,7 +239,7 @@ final class ActivityStore {
         if operations[index].isCancelling || error.map(isOperationCancellation) == true {
             status = .cancelled
         } else if let error {
-            status = .failed(reason: error.briefDescription)
+            status = .failed(BrewOperation.Failure(error))
             logService.append(id, error.localizedDescription)
         } else {
             status = .succeeded
@@ -303,7 +303,7 @@ final class ActivityStore {
         case .pending: "\(prefix) queued"
         case .running: "\(prefix) \(step.currentVersion) → \(step.targetVersion) started"
         case .succeeded: "\(prefix) upgraded"
-        case .failed(let reason): "\(prefix) failed — \(reason)"
+        case .failed(let failure): "\(prefix) failed — \(failure.reason)"
         case .cancelled: "\(prefix) not upgraded (cancelled)"
         }
     }
