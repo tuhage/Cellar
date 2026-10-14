@@ -57,7 +57,4 @@ final class UpdateStore {
         (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.0"
     }
 
-    var currentBuild: String {
-        (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "0"
-    }
 }

@@ -16,18 +16,10 @@ public nonisolated final class BrewService: Sendable {
         try await runJSON(["info", "--json=v2", "--installed", "--formula"])
     }
 
-    public func formulaInfoData(_ name: String) async throws -> Data {
-        try await runJSON(["info", "--json=v2", name])
-    }
-
     // MARK: - Cask
 
     public func listCasksData() async throws -> Data {
         try await runJSON(["info", "--json=v2", "--installed", "--cask"])
-    }
-
-    public func caskInfoData(_ name: String) async throws -> Data {
-        try await runJSON(["info", "--cask", "--json=v2", name])
     }
 
     // MARK: - Search
@@ -71,19 +63,6 @@ public nonisolated final class BrewService: Sendable {
     /// auto-update disabled, so this is what makes "outdated" current.
     public func update() -> AsyncThrowingStream<String, Error> {
         process.stream(["update"], includingStandardError: true)
-    }
-
-    // MARK: - Generic Stream
-
-    public func streamCommand(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
-        process.stream(arguments)
-    }
-
-    // MARK: - Health
-
-    public func missing() async throws -> String {
-        let output = try await process.run(["missing"])
-        return output.stdout
     }
 
     // MARK: - Pin

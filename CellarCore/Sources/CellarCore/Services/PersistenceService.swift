@@ -11,10 +11,6 @@ public struct CacheEntry<T: Codable>: Codable, Sendable where T: Sendable {
         self.data = data
         self.timestamp = timestamp
     }
-
-    public func isValid(maxAge: TimeInterval) -> Bool {
-        Date().timeIntervalSince(timestamp) < maxAge
-    }
 }
 
 // MARK: - PersistenceService
@@ -65,18 +61,6 @@ public nonisolated final class PersistenceService: Sendable {
 
     // MARK: - Cache
 
-    /// Loads cached data and returns it along with freshness status.
-    /// Returns `nil` if no cache exists or if decoding fails.
-    public func loadCached<T: Codable & Sendable>(_ type: T.Type, from fileName: String, maxAge: TimeInterval) -> (data: T, isFresh: Bool)? {
-        do {
-            let entry = try load(CacheEntry<T>.self, from: fileName)
-            return (data: entry.data, isFresh: entry.isValid(maxAge: maxAge))
-        } catch {
-            Log.persistence.debug("Cache miss for '\(fileName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
-            return nil
-        }
-    }
-
     /// Loads a cache entry with its timestamp, or `nil` when there is none.
     public func loadCacheEntry<T: Codable & Sendable>(_ type: T.Type, from fileName: String) -> CacheEntry<T>? {
         try? load(CacheEntry<T>.self, from: fileName)
@@ -90,30 +74,6 @@ public nonisolated final class PersistenceService: Sendable {
         } catch {
             Log.persistence.error("Failed to write cache '\(fileName, privacy: .public)': \(error.localizedDescription, privacy: .public)")
         }
-    }
-
-    /// Checks whether a fresh fetch is needed, restoring cached data when the
-    /// in-memory collection is empty.
-    ///
-    /// - Parameters:
-    ///   - current: The in-memory data. If empty, the cache is restored into it.
-    ///   - fileName: The cache file to read from.
-    ///   - maxAge: Maximum age before the cache is considered stale.
-    ///   - forceRefresh: When `true`, always indicates a fetch is needed.
-    /// - Returns: A tuple of the (possibly restored) data and whether a fresh
-    ///   fetch is still needed.
-    public func restoreIfNeeded<T: Codable & Sendable>(
-        current: [T],
-        from fileName: String,
-        maxAge: TimeInterval,
-        forceRefresh: Bool
-    ) -> (restored: [T], needsFetch: Bool) {
-        guard let cached = loadCached([T].self, from: fileName, maxAge: maxAge) else {
-            return (current, true)
-        }
-        let restored = current.isEmpty ? cached.data : current
-        let needsFetch = forceRefresh || !cached.isFresh
-        return (restored, needsFetch)
     }
 
     // MARK: - Delete

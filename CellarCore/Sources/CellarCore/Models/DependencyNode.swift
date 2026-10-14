@@ -178,14 +178,6 @@ public struct DependencyGraph: Sendable {
         !isRequested(node.name) && !node.dependents.contains(where: isRequested)
     }
 
-    public var requestedNodes: [DependencyNode] {
-        nodes.filter { isRequested($0.name) }
-    }
-
-    public var dependencyNodes: [DependencyNode] {
-        nodes.filter { !isRequested($0.name) }
-    }
-
     /// What `brew autoremove` would uninstall.
     public var removableNodes: [DependencyNode] {
         nodes.filter(isRemovable)

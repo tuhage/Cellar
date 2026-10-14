@@ -49,7 +49,7 @@ struct DependencyGraphTests {
         #expect(graph.isRequested("wget"))
         #expect(graph.isRequested("firefox"))
         #expect(!graph.isRequested("openssl@3"))
-        #expect(graph.requestedNodes.map(\.name) == ["firefox", "gh", "wget"])
+        #expect(graph.nodes.filter { graph.isRequested($0.name) }.map(\.name) == ["firefox", "gh", "wget"])
     }
 
     @Test

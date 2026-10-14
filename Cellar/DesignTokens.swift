@@ -30,19 +30,19 @@ nonisolated enum Spacing {
 // MARK: - CornerRadius
 
 nonisolated enum CornerRadius {
-    /// 3 pt — Progress bar segments
+    /// 3 pt — Disk usage bar segments
     static let progressBar: CGFloat = 3
-    /// 4 pt — CPU bar, clip shapes
+    /// 4 pt — Keyboard key hints
     static let minimal: CGFloat = 4
     /// 6 pt — Chips, dependency tags, small icon backgrounds
     static let small: CGFloat = 6
-    /// 8 pt — Stat card icon background, shortcut key boxes
+    /// 8 pt — Icon backgrounds, shortcut key boxes, log boxes
     static let medium: CGFloat = 8
-    /// 10 pt — Quick action buttons, banners, profile headers
+    /// 10 pt — Quick action buttons, floating surfaces, Brewfile headers
     static let card: CGFloat = 10
-    /// 12 pt — Stat cards, disk overview cards
+    /// 12 pt — Cards (`cardStyle` default)
     static let large: CGFloat = 12
-    /// 16 pt — Modal overlays
+    /// 16 pt — Quick Open, app icon
     static let extraLarge: CGFloat = 16
 }
 
@@ -51,19 +51,13 @@ nonisolated enum CornerRadius {
 nonisolated enum IconSize {
     /// 8 pt — Status dots (Circle)
     static let statusDot: CGFloat = 8
-    /// 10 pt — Larger status indicators
-    static let indicator: CGFloat = 10
-    /// 14 pt — Animated glow overlay
-    static let dotGlow: CGFloat = 14
     /// 20 pt — List row icon column width
     static let iconColumn: CGFloat = 20
-    /// 28 pt — Quick action, dependency node icons
+    /// 28 pt — Quick action, activity and inspector header icons
     static let smallIcon: CGFloat = 28
-    /// 36 pt — Stat card icons
+    /// 36 pt — Stat card and Updates summary icons
     static let mediumIcon: CGFloat = 36
-    /// 40 pt — Disk overview icons
-    static let largeIcon: CGFloat = 40
-    /// 44 pt — Detail view header icons
+    /// 44 pt — Service and Brewfile header icons
     static let headerIcon: CGFloat = 44
 }
 
@@ -98,7 +92,7 @@ extension View {
             .padding(.vertical, Spacing.textPair)
     }
 
-    /// Card background with subtle shadow and thin border
+    /// Card background: a faint tint and a thin border
     func cardStyle(cornerRadius: CGFloat = CornerRadius.large) -> some View {
         self
             .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -107,51 +101,26 @@ extension View {
                     .strokeBorder(.primary.opacity(0.09), lineWidth: 0.5)
             )
     }
-
-    /// Elevated card background with stronger shadow — used for hover states
-    func elevatedCardStyle(cornerRadius: CGFloat = CornerRadius.large) -> some View {
-        self
-            .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
-            )
-            .shadow(color: Shadow.elevatedColor, radius: Shadow.elevatedBlur, y: Shadow.elevatedY)
-    }
 }
 
 // MARK: - Shadow
 
 nonisolated enum Shadow {
-    /// Card shadow: blur 8, y 2, 6% opacity
-    static let cardBlur: CGFloat = 8
-    static let cardY: CGFloat = 2
-    static let cardColor: Color = .black.opacity(0.06)
-
-    /// Elevated shadow: blur 16, y 4, 10% opacity
+    /// Elevated shadow: blur 16, y 4, 10% opacity — the app icon in About
     static let elevatedBlur: CGFloat = 16
     static let elevatedY: CGFloat = 4
     static let elevatedColor: Color = .black.opacity(0.10)
-
-    /// Subtle shadow: blur 4, y 1, 4% opacity
-    static let subtleBlur: CGFloat = 4
-    static let subtleY: CGFloat = 1
-    static let subtleColor: Color = .black.opacity(0.04)
 }
 
 // MARK: - AnimationToken
 
 nonisolated enum AnimationToken {
-    /// Interactive spring: 0.3s, bounce 0.15 — buttons, hovers
-    static let interactive: Animation = .spring(duration: 0.3, bounce: 0.15)
     /// Smooth spring: 0.4s — layout transitions
     static let smooth: Animation = .spring(duration: 0.4)
     /// Snap spring: 0.2s, bounce 0.2 — quick pops, numeric transitions
     static let snap: Animation = .spring(duration: 0.2, bounce: 0.2)
     /// Gentle ease: 0.3s — fades, opacity changes
     static let gentle: Animation = .easeInOut(duration: 0.3)
-    /// Stagger delay between items
-    static let staggerDelay: Double = 0.05
 }
 
 // MARK: - Opacity
@@ -174,17 +143,15 @@ nonisolated enum Opacity {
 // MARK: - WindowSize
 
 nonisolated enum WindowSize {
-    /// 400 pt — Add item sheet width (add service, add package sheets)
-    static let addItemSheet: CGFloat = 400
-    /// 420 pt — Narrow sheet/content column (add profile sheet, add project sheet)
+    /// 420 pt — Narrow sheets (Add Tap, project activation)
     static let narrowSheet: CGFloat = 420
-    /// 500 pt — Medium sheet minimum width (profile manager)
+    /// 500 pt — Medium sheets (add Brewfile, item pickers, removal previews)
     static let mediumSheet: CGFloat = 500
-    /// 400 pt — Medium sheet minimum height (profile manager)
+    /// 400 pt — Medium sheet minimum height
     static let mediumSheetHeight: CGFloat = 400
-    /// 700 pt — Full detail sheet width (previews, large sheets)
+    /// 700 pt — Large sheet width (Brewfile editor)
     static let fullDetailWidth: CGFloat = 700
-    /// 600 pt — Full detail sheet height (previews, large sheets)
+    /// 600 pt — Large sheet height (removal previews)
     static let fullDetailHeight: CGFloat = 600
 }
 

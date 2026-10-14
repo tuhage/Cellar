@@ -40,7 +40,6 @@ struct UpgradePlanTests {
         ))
 
         #expect(plan.additionalItems.map(\.name) == ["gradle-completion"])
-        #expect(plan.totalDownloadBytes == 186_400_000 + 157_700_000 + 17_300)
     }
 
     @Test("upgradePlan_parse_ignoresWarningsAndDuplicates")

@@ -20,12 +20,6 @@ public struct UpgradePlan: Codable, Hashable, Sendable {
         items.filter { !$0.isRequested }
     }
 
-    /// Sum of the bottle sizes brew reported. Already-downloaded bottles are
-    /// included, so this is an upper bound.
-    public var totalDownloadBytes: Int64 {
-        items.compactMap(\.downloadBytes).reduce(0, +)
-    }
-
     // MARK: Factory Methods
 
     /// Asks brew what upgrading these packages would involve. Pass formula

@@ -95,12 +95,6 @@ final class PackageStore: LoadableStore {
         outdatedFormulae.count + outdatedCasks.count
     }
 
-    /// Outdated formulae Upgrade All will touch. Pinned ones are skipped
-    /// because brew refuses to upgrade them.
-    var upgradableFormulae: [Formula] {
-        outdatedFormulae.filter { !$0.pinned }
-    }
-
     /// Whether Upgrade All has something to do and no Homebrew-wide
     /// operation (another upgrade, `brew update`, cleanup) is in the way.
     var canUpgradeAll: Bool {

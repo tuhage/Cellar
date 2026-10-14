@@ -3,12 +3,9 @@ import Foundation
 
 struct MockBrewProcess: BrewProcessProtocol {
     var stubbedOutput: ProcessOutput = ProcessOutput(stdout: "", stderr: "", exitCode: 0)
-    var shouldThrow: Bool = false
-    var thrownError: Error = BrewError.brewNotFound
 
     func run(_ arguments: [String]) async throws -> ProcessOutput {
-        if shouldThrow { throw thrownError }
-        return stubbedOutput
+        stubbedOutput
     }
 
     func stream(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {

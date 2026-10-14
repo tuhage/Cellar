@@ -158,16 +158,9 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         }
     }
 
-    /// Search for formulae by query. Returns stub `Formula` values with names only,
-    /// since `brew search` returns newline-separated names (not full JSON).
-    public static func search(for query: String) async throws -> [Formula] {
-        let names = try await BrewService.shared.searchFormulae(query)
-        return names.map { Formula.stub(name: $0) }
-    }
-
-    /// Like `search(for:)`, with description and version for the first
-    /// `detailLimit` matches; the rest stay stubs. Falls back to stubs when
-    /// brew can't describe them.
+    /// Formulae matching `query`. `brew search` returns names only, so the
+    /// first `detailLimit` matches are described with `brew info`; the rest
+    /// stay stubs, as do all when brew can't describe them.
     public static func search(for query: String, detailLimit: Int) async throws -> [Formula] {
         let names = try await BrewService.shared.searchFormulae(query)
         let details = (try? await info(named: Array(names.prefix(detailLimit)))) ?? []

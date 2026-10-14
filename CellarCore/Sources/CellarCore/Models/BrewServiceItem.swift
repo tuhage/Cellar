@@ -63,7 +63,6 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
 
     public var isRunning: Bool { status == .started }
     public var isError: Bool { status == .error }
-    public var isStopped: Bool { status == .stopped || status == .none }
 
     /// Whether this service is registered under `root` (a system LaunchDaemon).
     /// Such services must be managed with elevated privileges.

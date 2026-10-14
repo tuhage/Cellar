@@ -137,16 +137,9 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
         }
     }
 
-    /// Search for casks by query. Returns stub `Cask` values with tokens only,
-    /// since `brew search` returns newline-separated names (not full JSON).
-    public static func search(for query: String) async throws -> [Cask] {
-        let tokens = try await BrewService.shared.searchCasks(query)
-        return tokens.map { Cask.stub(token: $0) }
-    }
-
-    /// Like `search(for:)`, with name, description and version for the
-    /// first `detailLimit` matches; the rest stay stubs. Falls back to stubs
-    /// when brew can't describe them.
+    /// Casks matching `query`. `brew search` returns tokens only, so the
+    /// first `detailLimit` matches are described with `brew info`; the rest
+    /// stay stubs, as do all when brew can't describe them.
     public static func search(for query: String, detailLimit: Int) async throws -> [Cask] {
         let tokens = try await BrewService.shared.searchCasks(query)
         let details = (try? await info(named: Array(tokens.prefix(detailLimit)))) ?? []

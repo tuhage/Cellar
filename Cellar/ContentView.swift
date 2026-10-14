@@ -142,9 +142,9 @@ private struct DetailView: View {
         case .dashboard:
             DashboardView()
         case .formulae:
-            FormulaListView()
+            PackageListPage(kind: .formula)
         case .casks:
-            CaskListView()
+            PackageListPage(kind: .cask)
         case .services:
             ServiceListView()
         case .outdated:

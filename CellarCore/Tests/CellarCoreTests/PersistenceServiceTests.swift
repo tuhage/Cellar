@@ -44,40 +44,23 @@ struct PersistenceServiceTests {
         #expect(result == [])
     }
 
-    @Test("persistenceService_saveToCache_andLoadCached_returnsData")
-    func persistenceService_saveToCache_andLoadCached_returnsData() throws {
+    @Test("persistenceService_saveToCache_andLoadCacheEntry_returnsDataWithTimestamp")
+    func persistenceService_saveToCache_andLoadCacheEntry_returnsDataWithTimestamp() throws {
         let (service, _) = try makeTempService()
         let value = ["redis", "postgresql@16"]
+        let before = Date()
 
         service.saveToCache(value, to: "cache.json")
-        let cached = service.loadCached([String].self, from: "cache.json", maxAge: 3600)
+        let entry = service.loadCacheEntry([String].self, from: "cache.json")
 
-        #expect(cached != nil)
-        #expect(cached?.data == value)
-        #expect(cached?.isFresh == true)
+        #expect(entry?.data == value)
+        #expect(entry.map { $0.timestamp >= before } == true)
     }
 
-    @Test("persistenceService_loadCached_returnsNilWhenFileAbsent")
-    func persistenceService_loadCached_returnsNilWhenFileAbsent() throws {
+    @Test("persistenceService_loadCacheEntry_returnsNilWhenFileAbsent")
+    func persistenceService_loadCacheEntry_returnsNilWhenFileAbsent() throws {
         let (service, _) = try makeTempService()
 
-        let cached = service.loadCached([String].self, from: "no-cache.json", maxAge: 3600)
-
-        #expect(cached == nil)
-    }
-
-    @Test("persistenceService_loadCached_isFreshFalseWhenStale")
-    func persistenceService_loadCached_isFreshFalseWhenStale() throws {
-        let (service, tempDir) = try makeTempService()
-        let oldTimestamp = Date(timeIntervalSinceNow: -7200)
-        let entry = CacheEntry(data: ["stale"], timestamp: oldTimestamp)
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(entry)
-        try data.write(to: tempDir.appendingPathComponent("stale.json"))
-
-        let cached = service.loadCached([String].self, from: "stale.json", maxAge: 3600)
-
-        #expect(cached != nil)
-        #expect(cached?.isFresh == false)
+        #expect(service.loadCacheEntry([String].self, from: "no-cache.json") == nil)
     }
 }
