@@ -95,12 +95,23 @@ struct ServiceTests {
     func brewProcess_privilegedShellScript_runsEveryCommandAndKeepsFailure() {
         let script = BrewProcess.privilegedShellScript(
             [.brew(["services", "restart", "it's"]), .tool(path: "/bin/kill", arguments: ["-KILL", "42"])],
-            brewPath: "/opt/homebrew/bin/brew"
+            brewPath: "/opt/homebrew/bin/brew",
+            home: "/Users/someone"
         )
 
         #expect(script == "s=0; "
-            + "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 '/opt/homebrew/bin/brew' 'services' 'restart' 'it'\\''s' || s=$?; "
+            + "HOME='/Users/someone' HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 '/opt/homebrew/bin/brew' 'services' 'restart' 'it'\\''s' || s=$?; "
             + "'/bin/kill' '-KILL' '42' || s=$?; exit $s")
+    }
+
+    @Test("brewProcess_appleScriptErrorMessage_unwrapsTheScriptsMessage")
+    func brewProcess_appleScriptErrorMessage_unwrapsTheScriptsMessage() {
+        let stderr = "0:183: execution error: Error: $HOME must be set to run brew. (1)\n"
+
+        #expect(BrewProcess.appleScriptErrorMessage(stderr) == "Error: $HOME must be set to run brew.")
+        #expect(BrewError.processFailure(exitCode: 1, stderr: BrewProcess.appleScriptErrorMessage(stderr)).summary
+            == "$HOME must be set to run brew.")
+        #expect(BrewProcess.appleScriptErrorMessage("something else") == "something else")
     }
 
     // MARK: Info

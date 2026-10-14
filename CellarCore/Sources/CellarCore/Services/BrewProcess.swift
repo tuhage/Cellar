@@ -80,7 +80,7 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
     }
 
     public func runPrivileged(_ commands: [PrivilegedCommand]) async throws -> ProcessOutput {
-        let shellCommand = Self.privilegedShellScript(commands, brewPath: brewPath)
+        let shellCommand = Self.privilegedShellScript(commands, brewPath: brewPath, home: NSHomeDirectory())
         let appleScript = "do shell script \(Self.appleScriptQuoted(shellCommand)) with administrator privileges"
 
         let output = try await Self.execute(
@@ -95,7 +95,7 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
                 || output.stderr.localizedCaseInsensitiveContains("User canceled") {
                 throw BrewError.cancelled
             }
-            throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
+            throw BrewError.processFailure(exitCode: output.exitCode, stderr: Self.appleScriptErrorMessage(output.stderr))
         }
 
         return output
@@ -299,17 +299,28 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
     /// Builds the `/bin/sh` script that `do shell script` runs as root: every
     /// command runs, and the script exits with the last failure's status.
     /// Each component is single-quoted so service names and paths are safe.
-    static func privilegedShellScript(_ commands: [PrivilegedCommand], brewPath: String) -> String {
+    ///
+    /// `do shell script` starts without `HOME`, which brew requires; brew gets
+    /// the user's, as `sudo brew services` in Terminal would.
+    static func privilegedShellScript(_ commands: [PrivilegedCommand], brewPath: String, home: String) -> String {
         let lines = commands.map { command in
             switch command {
             case .brew(let arguments):
-                "HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 "
+                "HOME=\(shellQuoted(home)) HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 "
                     + ([brewPath] + arguments).map(shellQuoted).joined(separator: " ")
             case .tool(let path, let arguments):
                 ([path] + arguments).map(shellQuoted).joined(separator: " ")
             }
         }
         return (["s=0"] + lines.map { "\($0) || s=$?" } + ["exit $s"]).joined(separator: "; ")
+    }
+
+    /// The script's own message from osascript's "0:183: execution error:
+    /// Error: … (1)" wrapper.
+    static func appleScriptErrorMessage(_ stderr: String) -> String {
+        let pattern = /^\d+:\d+: execution error: (?<message>[\s\S]*?)(?: \(-?\d+\))?\s*$/
+        guard let match = stderr.firstMatch(of: pattern) else { return stderr }
+        return String(match.message)
     }
 
     /// Wraps a string in single quotes for `/bin/sh`, escaping embedded quotes.
