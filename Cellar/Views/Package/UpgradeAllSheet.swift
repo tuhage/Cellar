@@ -1,9 +1,10 @@
 import SwiftUI
 import CellarCore
 
-/// Confirms Upgrade All with what brew will actually do: every package,
-/// those pulled in as dependencies, the download size, and running services
-/// that will need a restart.
+/// Confirms Upgrade All with what brew will actually do: every package —
+/// each can be left out — those pulled in as dependencies, the download
+/// size, pinned formulae that are skipped, and running services that will
+/// need a restart.
 struct UpgradeAllSheet: View {
     @Environment(PackageStore.self) private var store
     @Environment(ServiceStore.self) private var serviceStore
@@ -11,6 +12,17 @@ struct UpgradeAllSheet: View {
 
     @State private var plan: UpgradePlan?
     @State private var planError: String?
+    /// Packages the user unchecked.
+    @State private var excluded: Set<PackageID> = []
+
+    /// Every package Upgrade All can touch; pinned formulae can't be.
+    private var candidates: [PackageType] {
+        store.outdatedPackages.filter(\.canUpgrade)
+    }
+
+    private var selected: [PackageType] {
+        candidates.filter { !excluded.contains($0.id) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -33,8 +45,9 @@ struct UpgradeAllSheet: View {
             Image(systemName: "arrow.up.circle.fill")
                 .font(.title)
                 .foregroundStyle(.orange)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Spacing.textPair) {
-                Text("Upgrade \(packageCount) \(packageCount == 1 ? "Package" : "Packages")")
+                Text("Upgrade \(selected.count) \(selected.count == 1 ? "Package" : "Packages")")
                     .font(.headline)
                 Text("Packages upgrade one at a time; you can follow and cancel each step.")
                     .font(.caption)
@@ -47,24 +60,29 @@ struct UpgradeAllSheet: View {
 
     private var packageList: some View {
         List {
-            Section("Packages") {
-                ForEach(store.upgradableFormulae) { formula in
-                    PlanRow(
-                        name: formula.name,
-                        currentVersion: formula.version,
-                        targetVersion: formula.latestVersion ?? "latest",
-                        size: plannedItem(named: formula.fullName)?.downloadBytes,
-                        isPlanLoading: plan == nil && planError == nil
-                    )
+            Section {
+                ForEach(candidates) { package in
+                    Toggle(isOn: inclusion(of: package)) {
+                        PlanRow(
+                            kind: package.kind,
+                            name: package.name,
+                            currentVersion: package.version,
+                            targetVersion: package.latestVersion,
+                            size: plannedItem(for: package)?.downloadBytes,
+                            isPlanLoading: plan == nil && planError == nil
+                        )
+                    }
+                    .toggleStyle(.checkbox)
                 }
-                ForEach(store.outdatedCasks) { cask in
-                    PlanRow(
-                        name: cask.displayName,
-                        currentVersion: cask.installed ?? cask.version,
-                        targetVersion: cask.version,
-                        size: plannedItem(named: cask.fullToken.isEmpty ? cask.token : cask.fullToken)?.downloadBytes,
-                        isPlanLoading: plan == nil && planError == nil
-                    )
+            } header: {
+                HStack {
+                    Text("Packages")
+                    Spacer()
+                    Button(excluded.isEmpty ? "Select None" : "Select All") {
+                        excluded = excluded.isEmpty ? Set(candidates.map(\.id)) : []
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
                 }
             }
 
@@ -72,6 +90,7 @@ struct UpgradeAllSheet: View {
                 Section {
                     ForEach(additional) { item in
                         PlanRow(
+                            kind: item.isCask ? .cask : .formula,
                             name: item.shortName,
                             currentVersion: item.currentVersion,
                             targetVersion: item.targetVersion,
@@ -88,18 +107,32 @@ struct UpgradeAllSheet: View {
         }
     }
 
+    private func inclusion(of package: PackageType) -> Binding<Bool> {
+        Binding(
+            get: { !excluded.contains(package.id) },
+            set: { isIncluded in
+                if isIncluded {
+                    excluded.remove(package.id)
+                } else {
+                    excluded.insert(package.id)
+                }
+            }
+        )
+    }
+
     // MARK: - Footer
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: Spacing.sectionContent) {
             VStack(alignment: .leading, spacing: Spacing.compact) {
                 downloadSummary
-                if store.pinnedOutdatedCount > 0 {
-                    let pinned = store.pinnedOutdatedCount
+                let pinned = store.pinnedOutdatedFormulae.map(\.name)
+                if !pinned.isEmpty {
                     Label(
-                        "\(pinned) pinned \(pinned == 1 ? "formula is" : "formulae are") skipped.",
+                        "Pinned, so skipped: \(pinned.formatted(.list(type: .and))). Unpin on the Updates page to include \(pinned.count == 1 ? "it" : "them").",
                         systemImage: "pin"
                     )
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 if !affectedServices.isEmpty {
                     Label(
@@ -120,28 +153,29 @@ struct UpgradeAllSheet: View {
                 .keyboardShortcut(.cancelAction)
 
                 Button("Upgrade") {
-                    store.upgradeAll()
+                    let packages = selected
+                    Task { await store.upgrade(packages) }
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
                 .tint(.orange)
-                .disabled(packageCount == 0 || store.isCheckingForUpdates || store.isUpgradingAll)
+                .disabled(selected.isEmpty || store.isCheckingForUpdates || store.isUpgradingAll)
             }
         }
     }
 
     @ViewBuilder
     private var downloadSummary: some View {
-        if let plan {
-            if plan.totalDownloadBytes > 0 {
+        if plan != nil {
+            if downloadBytes > 0 {
                 Label(
-                    "Up to \(plan.totalDownloadBytes.formatted(.byteCount(style: .file))) to download.",
+                    "Up to \(downloadBytes.formatted(.byteCount(style: .file))) to download.",
                     systemImage: "arrow.down.circle"
                 )
             }
         } else if let planError {
-            Label("Couldn't preview the download: \(planError)", systemImage: "exclamationmark.triangle")
+            Label("Couldn’t preview the download: \(planError)", systemImage: "exclamationmark.triangle")
                 .lineLimit(2)
         } else {
             Label {
@@ -155,44 +189,52 @@ struct UpgradeAllSheet: View {
 
     // MARK: - Data
 
-    private var packageCount: Int {
-        store.upgradableFormulae.count + store.outdatedCasks.count
+    /// The checked packages' downloads plus the dependencies they pull in.
+    private var downloadBytes: Int64 {
+        let requested = selected.compactMap { plannedItem(for: $0)?.downloadBytes }
+        let additional = plan?.additionalItems.compactMap(\.downloadBytes) ?? []
+        return (requested + additional).reduce(0, +)
     }
 
     /// Running services whose formula is about to be upgraded.
     private var affectedServices: [String] {
-        let names = Set(store.upgradableFormulae.map(\.name))
-            .union(plan?.items.filter { !$0.isCask }.map(\.shortName) ?? [])
+        let names = Set(selected.filter { $0.kind == .formula }.map(\.identifier))
+            .union(plan?.additionalItems.filter { !$0.isCask }.map(\.shortName) ?? [])
         return serviceStore.services
             .filter { $0.isRunning && names.contains($0.name) }
             .map(\.name)
     }
 
-    private func plannedItem(named name: String) -> UpgradePlan.Item? {
-        plan?.items.first { $0.name == name }
+    private func plannedItem(for package: PackageType) -> UpgradePlan.Item? {
+        plan?.items.first { $0.name == Self.planName(of: package) }
     }
 
-    private func loadPlan() async {
-        do {
-            plan = try await UpgradePlan.dryRun(
-                formulae: store.upgradableFormulae.map(\.fullName),
-                casks: store.outdatedCasks.map { $0.fullToken.isEmpty ? $0.token : $0.fullToken }
-            )
-        } catch {
-            guard !isOperationCancellation(error) else { return }
-            planError = (error as? BrewError).flatMap(Self.briefMessage) ?? error.localizedDescription
+    /// The name brew prints in its dry run — the fully qualified one.
+    private static func planName(of package: PackageType) -> String {
+        switch package {
+        case .formula(let formula): formula.fullName
+        case .cask(let cask): cask.qualifiedToken
         }
     }
 
-    private static func briefMessage(_ error: BrewError) -> String? {
-        guard case .processFailure(_, let stderr) = error else { return nil }
-        return stderr.split(whereSeparator: \.isNewline).last.map(String.init)
+    private func loadPlan() async {
+        let packages = candidates
+        do {
+            plan = try await UpgradePlan.dryRun(
+                formulae: packages.filter { $0.kind == .formula }.map(Self.planName),
+                casks: packages.filter { $0.kind == .cask }.map(Self.planName)
+            )
+        } catch {
+            guard !isOperationCancellation(error) else { return }
+            planError = error.briefDescription
+        }
     }
 }
 
 // MARK: - Row
 
 private struct PlanRow: View {
+    let kind: PackageKind
     let name: String
     let currentVersion: String
     let targetVersion: String
@@ -201,6 +243,11 @@ private struct PlanRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.item) {
+            Image(systemName: kind.systemImage)
+                .foregroundStyle(.secondary)
+                .frame(width: IconSize.iconColumn)
+                .help(kind == .formula ? "Formula" : "Cask")
+                .accessibilityLabel(kind == .formula ? "Formula" : "Cask")
             Text(name)
                 .fontWeight(.medium)
                 .lineLimit(1)

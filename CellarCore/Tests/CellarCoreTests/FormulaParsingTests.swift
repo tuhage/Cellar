@@ -91,6 +91,68 @@ struct FormulaParsingTests {
         #expect(formula.needsAttention == true)
     }
 
+    @Test("formula_decode_parsesCaveatsAndRoundTrips")
+    func formula_decode_parsesCaveatsAndRoundTrips() throws {
+        let json = """
+        { "name": "node", "full_name": "node", "versions": { "stable": "25.0.0" },
+          "caveats": "Single Executable Application is disabled.",
+          "installed": [{ "version": "25.0.0", "time": 1791918049 }] }
+        """
+        let formula = try JSONDecoder().decode(Formula.self, from: Data(json.utf8))
+        let decoded = try JSONDecoder().decode(Formula.self, from: JSONEncoder().encode(formula))
+
+        #expect(formula.caveats == "Single Executable Application is disabled.")
+        #expect(decoded == formula)
+    }
+
+    @Test("formula_dependents_findsInstalledFormulaeNeedingIt")
+    func formula_dependents_findsInstalledFormulaeNeedingIt() {
+        let openssl = Formula.stub(name: "openssl@3")
+        let curl = Self.formula("curl", runtimeDependencies: ["openssl@3", "libssh2"])
+        let wget = Self.formula("wget", runtimeDependencies: ["openssl@3"])
+        let jq = Self.formula("jq", runtimeDependencies: ["oniguruma"])
+
+        #expect(openssl.dependents(in: [curl, wget, jq]).map(\.name) == ["curl", "wget"])
+        #expect(jq.dependents(in: [curl, wget, jq]).isEmpty)
+    }
+
+    @Test("formula_installCommandAndKeg_useFullNameAndInstalledVersion")
+    func formula_installCommandAndKeg_useFullNameAndInstalledVersion() throws {
+        let formula = Formula.preview
+
+        #expect(formula.installCommand == "brew install openssl@3")
+        let keg = try #require(formula.kegURL)
+        #expect(keg.path().hasSuffix("/Cellar/openssl@3/3.6.0/"))
+        #expect(Formula.stub(name: "wget").kegURL == nil)
+    }
+
+    @Test("searchResultOrdering_keepsBrewOrderAndStubsUndescribedNames")
+    func searchResultOrdering_keepsBrewOrderAndStubsUndescribedNames() {
+        let details = [Self.formula("wget2"), Self.formula("wget")]
+
+        let results = SearchResultOrdering.ordered(
+            ["wget", "someone/tap/wgetpaste", "wget2"],
+            details: details,
+            keys: { [$0.name, $0.fullName] },
+            stub: Formula.stub(name:)
+        )
+
+        #expect(results.map(\.name) == ["wget", "someone/tap/wgetpaste", "wget2"])
+        #expect(results.map(\.isInstalled) == [true, false, true])
+    }
+
+    private static func formula(_ name: String, runtimeDependencies: [String] = []) -> Formula {
+        Formula(
+            name: name, fullName: name, desc: nil, license: nil, homepage: nil, version: "1.0",
+            deprecated: false, disabled: false, outdated: false, pinned: false,
+            dependencies: runtimeDependencies, buildDependencies: [],
+            installedOnRequest: true, installedAsDependency: false, installedVersion: "1.0",
+            isInstalled: true, installTime: nil,
+            runtimeDependencies: runtimeDependencies.map { RuntimeDependency(fullName: $0, version: "1.0") },
+            isKegOnly: false
+        )
+    }
+
     @Test("formula_stub_isNotInstalled")
     func formula_stub_isNotInstalled() {
         let formula = Formula.stub(name: "wget")

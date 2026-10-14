@@ -138,4 +138,26 @@ struct BrewServiceTests {
         #expect(response.casks?.count == 1)
         #expect(response.casks?.first?.token == "firefox")
     }
+
+    @Test("brewService_packageCommands_passKindFlagsAndOptions")
+    func brewService_packageCommands_passKindFlagsAndOptions() async throws {
+        let process = RecordingBrewProcess()
+        let service = BrewService(process: process)
+
+        for try await _ in service.reinstall("wget", isCask: false) {}
+        for try await _ in service.upgradeGreedy(cask: "firefox") {}
+        try await service.uninstall(formula: "openssl@3", ignoringDependents: true)
+        try await service.uninstall(cask: "firefox", zap: true)
+        _ = try await service.infoData(["wget", "jq"], isCask: false)
+
+        #expect(process.streamedArguments == [
+            ["reinstall", "--formula", "wget"],
+            ["upgrade", "--cask", "--greedy", "firefox"],
+        ])
+        #expect(process.runArguments == [
+            ["uninstall", "--formula", "--ignore-dependencies", "openssl@3"],
+            ["uninstall", "--cask", "--zap", "firefox"],
+            ["info", "--json=v2", "--formula", "wget", "jq"],
+        ])
+    }
 }

@@ -28,8 +28,25 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
     public let installTime: Date?
     public let runtimeDependencies: [RuntimeDependency]
     public let isKegOnly: Bool
+    /// Setup notes brew prints after installing, such as how to start a
+    /// service or add the formula to `PATH`.
+    public let caveats: String?
 
     public var id: String { name }
+
+    /// The command that installs this formula, for sharing.
+    public var installCommand: String { "brew install \(fullName)" }
+
+    /// The parent of the `bin` folder holding `brew`.
+    private static let homebrewPrefix = URL(fileURLWithPath: BrewProcess.resolveBrewPath())
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+
+    /// The installed keg, such as `/opt/homebrew/Cellar/wget/1.25.0`.
+    public var kegURL: URL? {
+        guard let installedVersion else { return nil }
+        return Self.homebrewPrefix.appending(path: "Cellar/\(name)/\(installedVersion)", directoryHint: .isDirectory)
+    }
 
     /// Whether this formula requires user attention (outdated, deprecated, or disabled).
     public var needsAttention: Bool { outdated || deprecated || disabled }
@@ -56,7 +73,8 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         installTime: Date?,
         runtimeDependencies: [RuntimeDependency],
         isKegOnly: Bool,
-        latestVersion: String? = nil
+        latestVersion: String? = nil,
+        caveats: String? = nil
     ) {
         self.name = name
         self.fullName = fullName
@@ -78,6 +96,7 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         self.runtimeDependencies = runtimeDependencies
         self.isKegOnly = isKegOnly
         self.latestVersion = latestVersion
+        self.caveats = caveats
     }
 
     // MARK: Actions
@@ -102,8 +121,22 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         for try await _ in upgradeOutput() {}
     }
 
+    /// Streams `brew reinstall` output line by line.
+    public func reinstallOutput() -> AsyncThrowingStream<String, Error> {
+        BrewService.shared.reinstall(fullName, isCask: false)
+    }
+
+    /// - Parameter force: Uninstall even though other formulae depend on it.
     public func uninstall(force: Bool = false) async throws {
-        try await BrewService.shared.uninstall(name, force: force)
+        try await BrewService.shared.uninstall(formula: name, ignoringDependents: force)
+    }
+
+    /// Installed formulae that need this one at runtime — brew refuses to
+    /// uninstall it while any are installed.
+    public func dependents(in installed: [Formula]) -> [Formula] {
+        installed.filter { other in
+            other.runtimeDependencies.contains { $0.fullName == fullName || $0.fullName == name }
+        }
     }
 
     public func pin() async throws {
@@ -130,6 +163,22 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
     public static func search(for query: String) async throws -> [Formula] {
         let names = try await BrewService.shared.searchFormulae(query)
         return names.map { Formula.stub(name: $0) }
+    }
+
+    /// Like `search(for:)`, with description and version for the first
+    /// `detailLimit` matches; the rest stay stubs. Falls back to stubs when
+    /// brew can't describe them.
+    public static func search(for query: String, detailLimit: Int) async throws -> [Formula] {
+        let names = try await BrewService.shared.searchFormulae(query)
+        let details = (try? await info(named: Array(names.prefix(detailLimit)))) ?? []
+        return SearchResultOrdering.ordered(names, details: details, keys: { [$0.name, $0.fullName] }, stub: stub(name:))
+    }
+
+    /// Full details of the named formulae, installed or not.
+    public static func info(named names: [String]) async throws -> [Formula] {
+        guard !names.isEmpty else { return [] }
+        let data = try await BrewService.shared.infoData(names, isCask: false)
+        return try JSONDecoder().decode(BrewJSONResponse.self, from: data).formulae
     }
 
     // MARK: Preview
@@ -198,6 +247,7 @@ extension Formula {
         case installed
         case linkedKeg = "linked_keg"
         case isKegOnly = "keg_only"
+        case caveats
     }
 
     private enum VersionsKeys: String, CodingKey {
@@ -219,6 +269,7 @@ extension Formula {
         self.dependencies = try container.decodeIfPresent([String].self, forKey: .dependencies) ?? []
         self.buildDependencies = try container.decodeIfPresent([String].self, forKey: .buildDependencies) ?? []
         self.isKegOnly = try container.decodeIfPresent(Bool.self, forKey: .isKegOnly) ?? false
+        self.caveats = try container.decodeIfPresent(String.self, forKey: .caveats)
 
         // Parse the "versions" object for the stable version
         let stableVersion: String?
@@ -267,6 +318,7 @@ extension Formula {
         try container.encode(dependencies, forKey: .dependencies)
         try container.encode(buildDependencies, forKey: .buildDependencies)
         try container.encode(isKegOnly, forKey: .isKegOnly)
+        try container.encodeIfPresent(caveats, forKey: .caveats)
 
         // Encode versions
         var versionsContainer = container.nestedContainer(keyedBy: VersionsKeys.self, forKey: .versions)
