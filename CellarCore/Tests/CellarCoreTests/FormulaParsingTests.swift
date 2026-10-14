@@ -33,6 +33,25 @@ struct FormulaParsingTests {
         #expect(formula.version == "17.11_1")
     }
 
+    @Test("formula_decode_withRevision_targetsRevisedVersion")
+    func formula_decode_withRevision_targetsRevisedVersion() throws {
+        let json = """
+        {
+          "name": "ada-url",
+          "full_name": "ada-url",
+          "versions": { "stable": "4.0.0" },
+          "revision": 1,
+          "outdated": true,
+          "linked_keg": "4.0.0",
+          "installed": [{ "version": "4.0.0" }]
+        }
+        """
+        let formula = try JSONDecoder().decode(Formula.self, from: Data(json.utf8))
+
+        #expect(formula.version == "4.0.0")
+        #expect(formula.latestVersion == "4.0.0_1")
+    }
+
     /// brew lists old kegs first when `brew cleanup` hasn't removed them.
     private static func multiKegJSON(linkedKeg: String) -> String {
         """

@@ -13,7 +13,9 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
     public let homepage: String?
     public let version: String
     /// The current stable version reported by Homebrew. For installed formulae,
-    /// `version` remains the installed version while this stores the upgrade target.
+    /// `version` remains the installed version while this stores the upgrade
+    /// target, with brew's rebuild revision (`4.0.0_1`) so it differs from an
+    /// installed `4.0.0` that only needs a rebuild.
     public let latestVersion: String?
     public let deprecated: Bool
     public let disabled: Bool
@@ -241,6 +243,7 @@ extension Formula {
         case linkedKeg = "linked_keg"
         case isKegOnly = "keg_only"
         case caveats
+        case revision
     }
 
     private enum VersionsKeys: String, CodingKey {
@@ -276,9 +279,10 @@ extension Formula {
         let installedEntries = try container.decodeIfPresent([InstalledEntry].self, forKey: .installed) ?? []
         let linkedKeg = try container.decodeIfPresent(String.self, forKey: .linkedKeg)
         if let entry = InstalledEntry.current(in: installedEntries, linkedKeg: linkedKeg) {
+            let revision = try container.decodeIfPresent(Int.self, forKey: .revision) ?? 0
             self.installedVersion = entry.version
             self.version = entry.version
-            self.latestVersion = stableVersion
+            self.latestVersion = stableVersion.map { revision > 0 ? "\($0)_\(revision)" : $0 }
             self.installedOnRequest = entry.installedOnRequest
             self.installedAsDependency = entry.installedAsDependency
             self.isInstalled = true
