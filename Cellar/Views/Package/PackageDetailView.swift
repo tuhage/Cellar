@@ -1,422 +1,378 @@
 import SwiftUI
 import CellarCore
 
-// MARK: - PackageType
-
-enum PackageType: Hashable, Sendable {
-    case formula(Formula)
-    case cask(Cask)
-
-    var name: String {
-        switch self {
-        case .formula(let formula): formula.name
-        case .cask(let cask): cask.displayName
-        }
-    }
-
-    var identifier: String {
-        switch self {
-        case .formula(let formula): formula.name
-        case .cask(let cask): cask.token
-        }
-    }
-
-    var version: String {
-        switch self {
-        case .formula(let formula): formula.version
-        case .cask(let cask): cask.installed ?? cask.version
-        }
-    }
-
-    var description: String? {
-        switch self {
-        case .formula(let formula): formula.desc
-        case .cask(let cask): cask.desc
-        }
-    }
-
-    var homepage: String? {
-        switch self {
-        case .formula(let formula): formula.homepage
-        case .cask(let cask): cask.homepage
-        }
-    }
-
-    var isOutdated: Bool {
-        switch self {
-        case .formula(let formula): formula.outdated
-        case .cask(let cask): cask.outdated
-        }
-    }
-
-    var isDeprecated: Bool {
-        switch self {
-        case .formula(let formula): formula.deprecated
-        case .cask(let cask): cask.deprecated
-        }
-    }
-}
-
-// MARK: - PackageDetailView
-
+/// The inspector of the package pages: what a package is, its state and
+/// setup notes, its dependencies, and the actions for it.
 struct PackageDetailView: View {
     let package: PackageType
 
     @Environment(PackageStore.self) private var store
-    @State private var isPerformingAction = false
-    @State private var actionError: String?
-    @State private var isConfirmingUninstall = false
+    @Environment(ActivityStore.self) private var activityStore
+    @AppStorage("selectedSidebarItem") private var sidebarSelection = SidebarItem.dashboard.rawValue
+    @State private var uninstallRequest: UninstallRequest?
+    /// Details for a search result that arrived with a name only.
+    @State private var fetchedDetails: PackageType?
 
-    private var packageIcon: String {
-        switch package {
-        case .formula: "terminal"
-        case .cask: "macwindow"
-        }
+    /// Once installed, the package itself is current again.
+    private var shown: PackageType {
+        package.isNameOnly ? fetchedDetails ?? package : package
     }
 
-    private var packageColor: Color {
-        switch package {
-        case .formula: .blue
-        case .cask: .purple
-        }
-    }
+    private var isBusy: Bool { store.isBusy(shown) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
-                headerSection
-                actionsSection
-                infoSection
+                header
+                actions
+                if let caveats = shown.caveats {
+                    caveatsSection(caveats)
+                }
+                infoGrid
                     .padding(Spacing.cardPadding)
                     .cardStyle()
-                if !badges.isEmpty {
-                    badgeSection
-                        .transition(.opacity)
-                }
-                if case .formula(let formula) = package, !formula.dependencies.isEmpty {
-                    dependenciesSection(formula.dependencies)
-                        .transition(.opacity)
-                }
-                if case .formula(let formula) = package, !formula.runtimeDependencies.isEmpty {
-                    runtimeDependenciesSection(formula.runtimeDependencies)
-                        .transition(.opacity)
+                if case .formula(let formula) = shown {
+                    dependencySections(formula)
                 }
             }
-            .padding(Spacing.section)
+            .padding(Spacing.cardPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle(package.name)
-        .alert("Error", isPresented: .init(
-            get: { actionError != nil },
-            set: { if !$0 { actionError = nil } }
-        )) {
-            Button("OK") { actionError = nil }
-        } message: {
-            Text(actionError ?? "")
-        }
-        .confirmationDialog(
-            "Uninstall \(package.name)?",
-            isPresented: $isConfirmingUninstall,
-            titleVisibility: .visible
-        ) {
-            Button("Uninstall", role: .destructive) {
-                performAction {
-                    switch package {
-                    case .formula(let formula): await store.uninstall(formula)
-                    case .cask(let cask): await store.uninstall(cask)
-                    }
-                }
-            }
-        } message: {
-            Text("This removes \(package.name) and its associated Homebrew files.")
-        }
+        .uninstallConfirmation($uninstallRequest)
+        .task { await fetchDetailsIfNeeded() }
     }
 
     // MARK: - Header
 
-    private var headerSection: some View {
-        HStack(alignment: .top, spacing: Spacing.detailElement) {
-            Image(systemName: packageIcon)
-                .font(.title2)
-                .foregroundStyle(packageColor)
-                .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
-                .background(packageColor.opacity(Opacity.iconBackground), in: Circle())
-                .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
+    private var header: some View {
+        HStack(alignment: .top, spacing: Spacing.sectionContent) {
+            Image(systemName: shown.kind.systemImage)
+                .font(.title3)
+                .foregroundStyle(tint)
+                .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
+                .background(tint.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.small))
+                .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: Spacing.related) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(package.name)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-
-                    Text(package.version)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .fontDesign(.monospaced)
-                }
-
-                if let description = package.description {
+            VStack(alignment: .leading, spacing: Spacing.compact) {
+                Text(shown.name)
+                    .font(.title2.weight(.semibold))
+                    .textSelection(.enabled)
+                if let description = shown.description {
                     Text(description)
-                        .font(.body)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                PackageBadges(package: shown)
             }
+        }
+    }
+
+    private var tint: Color {
+        shown.kind == .formula ? .blue : .purple
+    }
+
+    // MARK: - Actions
+
+    private var actions: some View {
+        VStack(alignment: .leading, spacing: Spacing.item) {
+            primaryButton
+
+            HStack(spacing: Spacing.item) {
+                if case .formula(let formula) = shown, formula.isInstalled {
+                    Button {
+                        Task { await store.setPinned(!formula.pinned, for: [formula]) }
+                    } label: {
+                        Label(formula.pinned ? "Unpin" : "Pin", systemImage: formula.pinned ? "pin.slash" : "pin")
+                    }
+                    .help(formula.pinned ? "Let upgrades include \(formula.name) again" : "Keep \(formula.name) at \(formula.version) during upgrades")
+                    .disabled(isBusy)
+                }
+
+                if shown.isInstalled {
+                    uninstallButton
+                        .disabled(isBusy)
+                }
+
+                Menu {
+                    PackageMoreMenuItems(package: shown)
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                }
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("More actions")
+            }
+        }
+    }
+
+    /// Install or upgrade, or what is happening to the package right now.
+    @ViewBuilder
+    private var primaryButton: some View {
+        if isBusy, let activity = PackageActivity(shown, activityStore: activityStore) {
+            Button {} label: {
+                Label {
+                    Text(activity.label)
+                } icon: {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(true)
+        } else if let primary = PackagePrimaryAction(package: shown, store: store) {
+            Button {
+                Task { await primary.perform() }
+            } label: {
+                Label(primary.title, systemImage: primary.systemImage)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(shown.isInstalled ? .orange : .accentColor)
+            .help(primary.help)
+        }
+    }
+
+    /// Casks also offer removing the app's data from the button's menu.
+    @ViewBuilder
+    private var uninstallButton: some View {
+        let label = Label("Uninstall\u{2026}", systemImage: "trash")
+        let uninstall = { uninstallRequest = UninstallRequest(packages: [shown]) }
+        if shown.kind == .cask {
+            Menu {
+                Button("Uninstall and Remove App Data\u{2026}", role: .destructive) {
+                    uninstallRequest = UninstallRequest(packages: [shown], removesAppData: true)
+                }
+            } label: {
+                label
+            } primaryAction: {
+                uninstall()
+            }
+            .fixedSize()
+        } else {
+            Button(role: .destructive, action: uninstall) { label }
+        }
+    }
+
+    // MARK: - Caveats
+
+    private func caveatsSection(_ caveats: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.item) {
+            Label("Caveats", systemImage: "info.circle")
+                .font(.headline)
+            Text(caveats)
+                .font(.callout.monospaced())
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Spacing.sectionContent)
+                .cardStyle(cornerRadius: CornerRadius.card)
         }
     }
 
     // MARK: - Info
 
-    private var infoSection: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Spacing.cardPadding, verticalSpacing: Spacing.row) {
-            GridRow {
-                Text("Identifier")
-                    .foregroundStyle(.secondary)
-                    .gridColumnAlignment(.trailing)
-                Text(package.identifier)
-                    .textSelection(.enabled)
+    private var infoGrid: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Spacing.sectionContent, verticalSpacing: Spacing.item) {
+            infoRow("Identifier") {
+                Text(shown.identifier)
                     .fontDesign(.monospaced)
-            }
-
-            GridRow {
-                Text("Version")
-                    .foregroundStyle(.secondary)
-                Text(package.version)
                     .textSelection(.enabled)
-                    .fontDesign(.monospaced)
             }
-
-            if case .formula(let formula) = package,
-               formula.outdated,
-               let latestVersion = formula.latestVersion {
-                GridRow {
-                    Text("Latest")
-                        .foregroundStyle(.secondary)
-                    Text(latestVersion)
+            infoRow(shown.isInstalled ? "Installed" : "Version") {
+                Text(shown.version)
+                    .fontDesign(.monospaced)
+                    .textSelection(.enabled)
+            }
+            if shown.isOutdated {
+                infoRow("Latest") {
+                    Text(shown.latestVersion)
                         .fontDesign(.monospaced)
                         .foregroundStyle(.orange)
                 }
             }
-
-            if let homepage = package.homepage, let url = URL(string: homepage) {
-                GridRow {
-                    Text("Homepage")
-                        .foregroundStyle(.secondary)
-                    Link(homepage, destination: url)
-                        .lineLimit(1)
-                        .tint(.blue)
+            if let homepage = shown.homepageURL {
+                infoRow("Homepage") {
+                    Link(homepage.host() ?? homepage.absoluteString, destination: homepage)
+                        .help(homepage.absoluteString)
                 }
             }
-
-            if case .formula(let formula) = package {
-                GridRow {
-                    Text("License")
-                        .foregroundStyle(.secondary)
-                    Text(formula.license ?? "Unknown")
-                }
-
-                if let installTime = formula.installTime {
-                    GridRow {
-                        Text("Installed")
-                            .foregroundStyle(.secondary)
-                        Text(installTime, style: .date)
-                    }
-                }
-
-                GridRow {
-                    Text("Installed by")
-                        .foregroundStyle(.secondary)
-                    Text(formula.installedOnRequest ? "Request" : "Dependency")
-                }
-            }
-
-            if case .cask(let cask) = package {
-                GridRow {
-                    Text("Auto Updates")
-                        .foregroundStyle(.secondary)
-                    Text(cask.autoUpdates ? "Yes" : "No")
-                }
+            switch shown {
+            case .formula(let formula): formulaRows(formula)
+            case .cask(let cask): caskRows(cask)
             }
         }
-        .font(.body)
     }
 
-    // MARK: - Badges
-
-    private var badges: [(text: String, color: Color, icon: String)] {
-        var result: [(text: String, color: Color, icon: String)] = []
-        if package.isOutdated {
-            result.append(("Outdated", .orange, "arrow.triangle.2.circlepath"))
+    @ViewBuilder
+    private func formulaRows(_ formula: Formula) -> some View {
+        if let license = formula.license {
+            infoRow("License") { Text(license) }
         }
-        if package.isDeprecated {
-            result.append(("Deprecated", .red, "exclamationmark.triangle"))
-        }
-        if case .formula(let formula) = package {
-            if formula.pinned {
-                result.append(("Pinned", .blue, "pin.fill"))
+        if formula.isInstalled {
+            if let installTime = formula.installTime {
+                infoRow("Installed On") { Text(installTime, style: .date) }
             }
-            if formula.isKegOnly {
-                result.append(("Keg-only", .purple, "shippingbox"))
-            }
-            if formula.disabled {
-                result.append(("Disabled", .gray, "xmark.circle"))
+            infoRow("Installed By") {
+                Text(formula.installedOnRequest ? "You" : "Another formula, as a dependency")
             }
         }
-        return result
     }
 
-    private var badgeSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.item) {
-            Text("Status")
-                .font(.headline)
-
-            HStack(spacing: Spacing.item) {
-                ForEach(badges, id: \.text) { badge in
-                    StatusBadge(text: badge.text, color: badge.color, icon: badge.icon)
-                }
+    @ViewBuilder
+    private func caskRows(_ cask: Cask) -> some View {
+        infoRow("Auto Updates") {
+            Text(cask.autoUpdates ? "Yes — the app updates itself" : "No")
+        }
+        if let appURL = cask.appURL {
+            infoRow("App") {
+                Text(appURL.path(percentEncoded: false))
+                    .textSelection(.enabled)
             }
+        }
+    }
+
+    private func infoRow(_ title: String, @ViewBuilder value: () -> some View) -> some View {
+        GridRow {
+            Text(title)
+                .foregroundStyle(.secondary)
+                .gridColumnAlignment(.trailing)
+            value()
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     // MARK: - Dependencies
 
-    private func dependenciesSection(_ dependencies: [String]) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.item) {
-            Text("Dependencies")
-                .font(.headline)
+    @ViewBuilder
+    private func dependencySections(_ formula: Formula) -> some View {
+        if !formula.dependencies.isEmpty {
+            DependencyChips(title: "Dependencies", items: formula.dependencies.map { ($0, nil) }, select: showFormula)
+        }
+        let dependents = store.dependents(of: formula)
+        if !dependents.isEmpty {
+            DependencyChips(title: "Used By", items: dependents.map { ($0.name, nil) }, select: showFormula)
+        }
+        if !formula.runtimeDependencies.isEmpty {
+            DependencyChips(
+                title: "All Runtime Dependencies",
+                items: formula.runtimeDependencies.map { ($0.fullName, $0.version) },
+                startsExpanded: false,
+                select: showFormula
+            )
+        }
+    }
 
+    /// The installed formula a chip names, selected on the Formulae page —
+    /// or `nil` when it isn't installed.
+    private func showFormula(named name: String) -> (() -> Void)? {
+        guard let formula = store.formulae.first(where: { $0.name == name || $0.fullName == name }) else {
+            return nil
+        }
+        return {
+            store.formulaList.select(PackageID(kind: .formula, name: formula.name))
+            sidebarSelection = SidebarItem.formulae.rawValue
+        }
+    }
+
+    // MARK: - Data
+
+    /// Search results past the first few have only a name; ask brew for the rest.
+    private func fetchDetailsIfNeeded() async {
+        guard package.isNameOnly else { return }
+        switch package {
+        case .formula(let formula):
+            fetchedDetails = try? await Formula.info(named: [formula.name]).first.map(PackageType.formula)
+        case .cask(let cask):
+            fetchedDetails = try? await Cask.info(named: [cask.token]).first.map(PackageType.cask)
+        }
+    }
+}
+
+// MARK: - DependencyChips
+
+/// Formula names as chips that open the formula; long lists fold away.
+private struct DependencyChips: View {
+    let title: String
+    /// Name and optional version.
+    let items: [(name: String, version: String?)]
+    /// How the chip for a name opens it; `nil` for formulae not installed.
+    let select: (String) -> (() -> Void)?
+
+    @State private var isExpanded: Bool
+
+    /// Lists longer than this start folded.
+    private static let foldThreshold = 12
+
+    init(
+        title: String,
+        items: [(name: String, version: String?)],
+        startsExpanded: Bool = true,
+        select: @escaping (String) -> (() -> Void)?
+    ) {
+        self.title = title
+        self.items = items
+        self.select = select
+        _isExpanded = State(initialValue: startsExpanded && items.count <= Self.foldThreshold)
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
             FlowLayout(spacing: Spacing.related) {
-                ForEach(dependencies, id: \.self) { dep in
-                    Text(dep)
-                        .font(.callout)
-                        .fontDesign(.monospaced)
-                        .chipInset()
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: CornerRadius.small)
-                                .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
-                        )
-                        .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
+                ForEach(items, id: \.name) { item in
+                    chip(item)
                 }
             }
-        }
-    }
-
-    private func runtimeDependenciesSection(_ dependencies: [RuntimeDependency]) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.item) {
-            Text("Runtime Dependencies")
+            .padding(.top, Spacing.item)
+        } label: {
+            Text("\(title) (\(items.count))")
                 .font(.headline)
-
-            FlowLayout(spacing: Spacing.related) {
-                ForEach(dependencies, id: \.fullName) { dep in
-                    HStack(spacing: Spacing.compact) {
-                        Text(dep.fullName)
-                            .fontWeight(.medium)
-                        Text(dep.version)
-                            .foregroundStyle(.secondary)
-                    }
-                    .font(.callout)
-                    .fontDesign(.monospaced)
-                    .chipInset()
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: CornerRadius.small)
-                            .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
-                    )
-                    .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
-                }
-            }
         }
     }
 
-    // MARK: - Actions
-
-    private var actionsSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sectionContent) {
-            Text("Actions")
-                .font(.headline)
-
-            HStack(spacing: Spacing.sectionContent) {
-                if package.isOutdated {
-                    Button {
-                        performAction {
-                            switch package {
-                                case .formula(let f): await store.upgrade(f)
-                                case .cask(let c): await store.upgrade(c)
-                                }
-                        }
-                    } label: {
-                        Label("Upgrade", systemImage: "arrow.up.circle")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-
-                if case .formula(let formula) = package {
-                    if formula.pinned {
-                        Button {
-                            performAction {
-                                await store.unpin(formula)
-                            }
-                        } label: {
-                            Label("Unpin", systemImage: "pin.slash")
-                        }
-                        .buttonStyle(.bordered)
-                    } else {
-                        Button {
-                            performAction {
-                                await store.pin(formula)
-                            }
-                        } label: {
-                            Label("Pin", systemImage: "pin")
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-
-                Button(role: .destructive) {
-                    isConfirmingUninstall = true
-                } label: {
-                    Label("Uninstall", systemImage: "trash")
-                }
-                .buttonStyle(.bordered)
-                .tint(.red)
-            }
-            .disabled(isPerformingAction)
-
-            if isPerformingAction {
-                ProgressView()
-                    .controlSize(.small)
+    @ViewBuilder
+    private func chip(_ item: (name: String, version: String?)) -> some View {
+        let label = HStack(spacing: Spacing.compact) {
+            Text(item.name)
+            if let version = item.version {
+                Text(version)
+                    .foregroundStyle(.secondary)
             }
         }
-    }
+        .font(.callout.monospaced())
+        .chipInset()
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
 
-    // MARK: - Helpers
-
-    private func performAction(_ action: @escaping () async -> Void) {
-        isPerformingAction = true
-        Task {
-            await action()
-            isPerformingAction = false
-            if let error = store.errorMessage {
-                actionError = error
-            }
+        if let open = select(item.name) {
+            Button(action: open) { label }
+                .buttonStyle(.plain)
+                .help("Show \(item.name)")
+        } else {
+            label
+                .foregroundStyle(.secondary)
+                .help("\(item.name) isn’t installed")
         }
     }
 }
 
 // MARK: - Preview
 
-#Preview("Formula Detail") {
-    NavigationStack {
-        PackageDetailView(package: .formula(Formula.preview))
-            .environment(AppStores())
-    }
-    .frame(width: 600, height: 700)
+#Preview("Formula") {
+    PackageDetailView(package: .formula(.preview))
+        .environment(AppStores())
+        .frame(width: 380, height: 700)
 }
 
-#Preview("Cask Detail") {
-    NavigationStack {
-        PackageDetailView(package: .cask(Cask.preview))
-            .environment(AppStores())
-    }
-    .frame(width: 600, height: 700)
+#Preview("Cask") {
+    PackageDetailView(package: .cask(.preview))
+        .environment(AppStores())
+        .frame(width: 380, height: 700)
+}
+
+#Preview("Not Installed") {
+    PackageDetailView(package: .formula(.stub(name: "wget")))
+        .environment(AppStores())
+        .frame(width: 380, height: 500)
 }

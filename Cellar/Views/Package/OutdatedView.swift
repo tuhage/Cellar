@@ -1,60 +1,80 @@
 import SwiftUI
 import CellarCore
 
+/// The Updates page: outdated packages, how fresh that list is, and
+/// upgrading them one by one or all at once.
 struct OutdatedView: View {
     @Environment(PackageStore.self) private var store
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(ActivityStore.self) private var activityStore
 
     @State private var searchText = ""
+    @State private var selection: Set<PackageID> = []
+    @State private var uninstallRequest: UninstallRequest?
+    @AppStorage(PackageInspector.visibilityKey) private var showsInspector = true
 
-    private var filteredFormulae: [Formula] {
-        guard !searchText.isEmpty else { return store.outdatedFormulae }
-        return store.outdatedFormulae.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    private var query: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var filteredCasks: [Cask] {
-        guard !searchText.isEmpty else { return store.outdatedCasks }
-        return store.outdatedCasks.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+    private var shownPackages: [PackageType] {
+        let packages = store.outdatedPackages
+        return query.isEmpty ? packages : packages.filter { $0.matches(query) }
+    }
+
+    private var selectedPackage: PackageType? {
+        guard selection.count == 1, let id = selection.first else { return nil }
+        return store.package(id)
     }
 
     var body: some View {
-        Group {
-            if (store.isLoading && store.formulae.isEmpty && store.casks.isEmpty)
-                || (store.isCheckingForUpdates && store.totalOutdated == 0) {
-                LoadingView(message: "Checking for Updates\u{2026}")
-            } else if let errorMessage = store.errorMessage,
-                      store.formulae.isEmpty && store.casks.isEmpty {
-                ErrorView(message: errorMessage) {
-                    Task { await store.loadAll() }
-                }
-            } else if store.outdatedFormulae.isEmpty && store.outdatedCasks.isEmpty {
-                EmptyStateView(
-                    title: "Everything Up to Date",
-                    systemImage: "checkmark.circle",
-                    description: lastCheckDescription,
-                    actionTitle: "Check Again"
-                ) {
-                    Task { await store.checkForUpdates() }
-                }
-            } else {
-                outdatedList
+        content
+            .safeAreaInset(edge: .top, spacing: 0) {
+                restartBanner
             }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            restartBanner
-        }
-        .navigationTitle("Outdated")
-        .searchable(text: $searchText, placement: .toolbar, prompt: "Search outdated packages")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                RefreshToolbarButton(isLoading: store.isLoading || store.isCheckingForUpdates) {
-                    await store.checkForUpdates()
+            .loadErrorBanner(for: store) { await store.loadAll(forceRefresh: true) }
+            .navigationTitle("Updates")
+            .dataFreshness(store.lastUpdated)
+            .searchable(text: $searchText, prompt: "Search updates")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    RefreshToolbarButton(
+                        title: "Check for Updates",
+                        systemImage: "arrow.triangle.2.circlepath",
+                        help: "Check for Updates — asks Homebrew for the latest versions (brew update)",
+                        isLoading: store.isLoading || store.isCheckingForUpdates
+                    ) {
+                        await store.checkForUpdates()
+                    }
                 }
             }
-        }
-        .task {
-            await store.loadAll()
+            .packageSelection(selectedPackage, uninstallRequest: $uninstallRequest)
+            .focusedSceneValue(\.pageRefresh, AsyncAction { await store.checkForUpdates() })
+            .task {
+                await store.loadAll()
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if (store.isLoading && store.lastUpdated == nil)
+            || (store.isCheckingForUpdates && store.totalOutdated == 0) {
+            LoadingView(message: "Checking for Updates\u{2026}")
+        } else if let errorMessage = store.errorMessage, store.lastUpdated == nil {
+            ErrorView(message: errorMessage) {
+                Task { await store.loadAll(forceRefresh: true) }
+            }
+        } else if store.totalOutdated == 0 {
+            EmptyStateView(
+                title: "Everything Up to Date",
+                systemImage: "checkmark.circle",
+                description: lastCheckDescription,
+                actionTitle: "Check Again"
+            ) {
+                Task { await store.checkForUpdates() }
+            }
+        } else {
+            outdatedList
         }
     }
 
@@ -70,13 +90,9 @@ struct OutdatedView: View {
 
     // MARK: - Restart Banner
 
-    private var servicesNeedingRestart: [BrewServiceItem] {
-        serviceStore.servicesNeedingRestart(formulae: store.formulae)
-    }
-
     @ViewBuilder
     private var restartBanner: some View {
-        let services = servicesNeedingRestart
+        let services = serviceStore.servicesNeedingRestart(formulae: store.formulae)
         if !services.isEmpty {
             RestartServicesBanner(
                 services: services,
@@ -103,63 +119,56 @@ struct OutdatedView: View {
                 }
             }
 
-            List {
-                if !filteredFormulae.isEmpty {
-                    Section {
-                        ForEach(filteredFormulae) { formula in
-                            OutdatedPackageRow(
-                                name: formula.name,
-                                packageName: formula.name,
-                                isCask: false,
-                                isPinned: formula.pinned,
-                                description: formula.desc,
-                                currentVersion: formula.version,
-                                targetVersion: formula.latestVersion ?? "latest",
-                                isBatchRunning: store.isUpgradingAll
-                            ) {
-                                Task { await store.upgrade(formula) }
+            List(selection: $selection) {
+                ForEach(PackageKind.allCases, id: \.self) { kind in
+                    let packages = shownPackages.filter { $0.kind == kind }
+                    if !packages.isEmpty {
+                        Section {
+                            ForEach(packages) { package in
+                                OutdatedPackageRow(package: package)
                             }
+                        } header: {
+                            CountedSectionHeader(title: kind.title, systemImage: kind.systemImage, count: packages.count)
                         }
-                    } header: {
-                        CountedSectionHeader(title: "Formulae", systemImage: "terminal", count: filteredFormulae.count)
                     }
                 }
-
-                if !filteredCasks.isEmpty {
-                    Section {
-                        ForEach(filteredCasks) { cask in
-                            OutdatedPackageRow(
-                                name: cask.displayName,
-                                packageName: cask.token,
-                                isCask: true,
-                                isPinned: false,
-                                description: cask.desc,
-                                currentVersion: cask.installed ?? cask.version,
-                                targetVersion: cask.version,
-                                isBatchRunning: store.isUpgradingAll
-                            ) {
-                                Task { await store.upgrade(cask) }
-                            }
-                        }
-                    } header: {
-                        CountedSectionHeader(title: "Casks", systemImage: "macwindow", count: filteredCasks.count)
-                    }
+            }
+            .contextMenu(forSelectionType: PackageID.self) { ids in
+                PackageMenu(packages: ids.compactMap(store.package), showDetails: { showDetails(ids) }) {
+                    uninstallRequest = $0
+                }
+            } primaryAction: { ids in
+                showDetails(ids)
+            }
+            .overlay {
+                if shownPackages.isEmpty {
+                    ContentUnavailableView.search(text: query)
                 }
             }
         }
         .animation(AnimationToken.smooth, value: store.isUpgradingAll)
     }
 
+    /// Double-click or Return: show the clicked package in the inspector.
+    private func showDetails(_ ids: Set<PackageID>) {
+        guard let id = ids.first else { return }
+        selection = [id]
+        showsInspector = true
+    }
+
+    // MARK: - Summary
+
     private var updateSummary: some View {
         HStack(spacing: Spacing.sectionContent) {
             Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(.orange)
                 .frame(width: IconSize.mediumIcon, height: IconSize.mediumIcon)
                 .background(.orange.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.medium))
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Spacing.textPair) {
-                Text("\(store.totalOutdated) updates available")
+                Text(summaryTitle)
                     .font(.headline)
                 if store.isCheckingForUpdates {
                     Label {
@@ -182,15 +191,27 @@ struct OutdatedView: View {
             Button {
                 store.isUpgradePreviewPresented = true
             } label: {
-                Label("Upgrade All", systemImage: "arrow.up.circle.fill")
+                Label("Upgrade All\u{2026}", systemImage: "arrow.up.circle.fill")
             }
             .buttonStyle(.borderedProminent)
             .tint(.orange)
-            .disabled(store.isUpgradingAll || store.isCheckingForUpdates)
+            .help("Choose which packages to upgrade, with download sizes")
+            .disabled(
+                store.isUpgradingAll || store.isCheckingForUpdates
+                    || store.outdatedPackages.allSatisfy { !$0.canUpgrade }
+            )
         }
         .padding(.horizontal, Spacing.cardPadding)
         .padding(.vertical, Spacing.row)
-        .background(.orange.opacity(0.045))
+        .background(.orange.opacity(Opacity.bannerBackground))
+    }
+
+    /// "5 updates · 2 pinned".
+    private var summaryTitle: String {
+        let total = store.totalOutdated
+        let updates = "\(total) \(total == 1 ? "update" : "updates")"
+        let pinned = store.pinnedOutdatedCount
+        return pinned > 0 ? "\(updates) · \(pinned) pinned" : updates
     }
 
     // MARK: - Failed Batch
@@ -220,44 +241,26 @@ struct OutdatedView: View {
 // MARK: - Outdated Package Row
 
 private struct OutdatedPackageRow: View {
-    let name: String
-    /// Formula name or cask token, as used by brew and activity tracking.
-    let packageName: String
-    let isCask: Bool
-    let isPinned: Bool
-    let description: String?
-    let currentVersion: String
-    let targetVersion: String
-    let isBatchRunning: Bool
-    let upgradeAction: () -> Void
+    let package: PackageType
 
+    @Environment(PackageStore.self) private var store
     @Environment(ActivityStore.self) private var activityStore
-    @State private var isHovered = false
-
-    private var isUpgrading: Bool {
-        activityStore.isActive(.package(packageName))
-    }
-
-    private var batchStep: BrewOperation.Step? {
-        activityStore.runningBatchStep(name: packageName, isCask: isCask)
-    }
 
     var body: some View {
-        HStack {
+        HStack(spacing: Spacing.sectionContent) {
             VStack(alignment: .leading, spacing: Spacing.textPair) {
                 HStack(spacing: Spacing.compact) {
-                    Text(name)
+                    Text(package.name)
                         .fontWeight(.medium)
-                    if isPinned {
+                    if package.isPinned {
                         Image(systemName: "pin.fill")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                            .help("Pinned — Upgrade All skips this formula")
+                            .help("Pinned — upgrades skip this formula")
                             .accessibilityLabel("Pinned")
                     }
                 }
-
-                if let description {
+                if let description = package.description {
                     Text(description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -267,65 +270,51 @@ private struct OutdatedPackageRow: View {
 
             Spacer()
 
-            HStack(spacing: Spacing.compact) {
-                Text(currentVersion)
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.secondary)
+            versions
 
-                Image(systemName: "arrow.right")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-
-                Text(targetVersion)
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.orange)
-            }
-
-            if let batchStep {
-                batchStatus(batchStep.status)
+            if let activity = PackageActivity(package, activityStore: activityStore) {
+                PackageActivityLabel(activity: activity)
+                    .frame(minWidth: 96, alignment: .leading)
             } else {
                 upgradeButton
             }
         }
         .padding(.vertical, Spacing.compact)
-        .contentShape(Rectangle())
-        .onHover { isHovered = $0 }
     }
 
-    private var upgradeButton: some View {
-        Button {
-            upgradeAction()
-        } label: {
-            if isUpgrading {
-                ProgressView()
-                    .controlSize(.small)
-            } else if isHovered {
-                Label("Upgrade", systemImage: "arrow.up.circle")
-            } else {
-                Image(systemName: "arrow.up.circle")
-            }
-        }
-        .buttonStyle(.bordered)
-        .tint(.orange)
-        .controlSize(.small)
-        .disabled(isUpgrading || isBatchRunning)
-    }
-
-    /// Where this package stands inside a running Upgrade All.
-    private func batchStatus(_ status: BrewOperation.StepStatus) -> some View {
+    private var versions: some View {
         HStack(spacing: Spacing.compact) {
-            StepStatusIcon(status: status)
-            Text(status.label)
-                .font(.caption)
-                .foregroundStyle(status == .pending ? AnyShapeStyle(.secondary) : AnyShapeStyle(status.color))
+            Text(package.version)
+                .foregroundStyle(.secondary)
+            Image(systemName: "arrow.right")
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .accessibilityLabel("to")
+            Text(package.latestVersion)
+                .foregroundStyle(.orange)
         }
-        .frame(minWidth: 96, alignment: .leading)
-        .help(statusHelp(status))
+        .font(.callout.monospaced())
+        .accessibilityElement(children: .combine)
     }
 
-    private func statusHelp(_ status: BrewOperation.StepStatus) -> String {
-        if case .failed(let reason) = status { return reason }
-        return status.label
+    /// Icon-only so the row doesn't shift; a pinned formula offers
+    /// Unpin and Upgrade, since brew won't upgrade it while pinned.
+    @ViewBuilder
+    private var upgradeButton: some View {
+        if let primary = PackagePrimaryAction(package: package, store: store) {
+            Button {
+                Task { await primary.perform() }
+            } label: {
+                Label(primary.help, systemImage: primary.systemImage)
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.bordered)
+            .tint(.orange)
+            .controlSize(.small)
+            .help(primary.help)
+            .accessibilityLabel(primary.help)
+            .disabled(store.isUpgradingAll)
+        }
     }
 }
 

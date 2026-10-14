@@ -1,0 +1,45 @@
+{
+  "formulae": [],
+  "casks": [
+    {
+      "token": "firefox",
+      "full_token": "firefox",
+      "name": ["Mozilla Firefox"],
+      "version": "147.0.2",
+      "installed": "147.0.2",
+      "caveats": null,
+      "artifacts": [
+        { "uninstall": [{ "quit": "org.mozilla.firefox" }] },
+        { "app": ["Firefox.app"], "target": "/Applications/Firefox.app" },
+        { "command_wrapper": ["firefox", { "executable": "/Applications/Firefox.app/Contents/MacOS/firefox" }], "target": "/opt/homebrew/bin/firefox" },
+        {
+          "zap": [{
+            "trash": ["~/Library/Application Support/Firefox", "~/Library/Caches/Firefox"],
+            "rmdir": ["~/Library/Application Support/Mozilla"]
+          }]
+        }
+      ]
+    },
+    {
+      "token": "legacy-app",
+      "full_token": "someone/tap/legacy-app",
+      "name": ["Legacy"],
+      "version": "1.0",
+      "installed": null,
+      "caveats": "Legacy requires a restart after installing.\n",
+      "artifacts": [
+        { "app": ["Legacy.app", { "target": "Legacy Renamed.app" }] },
+        { "zap": [{ "trash": "~/Library/Preferences/com.example.legacy.plist", "delete": ["/Library/Legacy"] }] }
+      ]
+    },
+    {
+      "token": "cli-only",
+      "full_token": "cli-only",
+      "name": [],
+      "version": "2.0",
+      "artifacts": [
+        { "binary": ["/opt/homebrew/share/cli-only/bin/tool"], "target": "/opt/homebrew/bin/tool" }
+      ]
+    }
+  ]
+}

@@ -22,19 +22,13 @@ final class PackageStore: LoadableStore {
     var isLoading = false
     var errorMessage: String?
     var lastUpdated: Date?
-    var formulaSearchQuery = ""
-    var caskSearchQuery = ""
-    var selectedFormulaId: String?
-    var selectedCaskId: String?
     /// Set to show the Upgrade All preview from anywhere in the app.
     var isUpgradePreviewPresented = false
 
-    // MARK: Remote Search
-
-    var searchResultFormulae: [Formula] = []
-    var searchResultCasks: [Cask] = []
-    var isSearchingFormulae = false
-    var isSearchingCasks = false
+    /// Selection and Homebrew search of the Formulae page.
+    let formulaList = PackageListState()
+    /// Selection and Homebrew search of the Casks page.
+    let caskList = PackageListState()
 
     // MARK: Dependencies
 
@@ -45,25 +39,59 @@ final class PackageStore: LoadableStore {
         self.activityStore = activityStore
     }
 
-    // MARK: Computed
+    // MARK: Lists
 
-    var filteredFormulae: [Formula] {
-        guard !formulaSearchQuery.isEmpty else { return formulae }
-        return formulae.filter { formula in
-            formula.name.localizedCaseInsensitiveContains(formulaSearchQuery)
-                || formula.fullName.localizedCaseInsensitiveContains(formulaSearchQuery)
-                || (formula.desc?.localizedCaseInsensitiveContains(formulaSearchQuery) ?? false)
+    func list(_ kind: PackageKind) -> PackageListState {
+        switch kind {
+        case .formula: formulaList
+        case .cask: caskList
         }
     }
 
-    var filteredCasks: [Cask] {
-        guard !caskSearchQuery.isEmpty else { return casks }
-        return casks.filter { cask in
-            cask.token.localizedCaseInsensitiveContains(caskSearchQuery)
-                || cask.displayName.localizedCaseInsensitiveContains(caskSearchQuery)
-                || (cask.desc?.localizedCaseInsensitiveContains(caskSearchQuery) ?? false)
+    /// Installed packages of one kind, in brew's order.
+    func packages(_ kind: PackageKind) -> [PackageType] {
+        switch kind {
+        case .formula: formulae.map(PackageType.formula)
+        case .cask: casks.map(PackageType.cask)
         }
     }
+
+    /// The installed package with this ID, if any.
+    func package(_ id: PackageID) -> PackageType? {
+        switch id.kind {
+        case .formula: formulae.first { $0.name == id.name }.map(PackageType.formula)
+        case .cask: casks.first { $0.token == id.name }.map(PackageType.cask)
+        }
+    }
+
+    /// The installed package with this ID, or else the search result of
+    /// its page with it.
+    func packageOrSearchResult(_ id: PackageID) -> PackageType? {
+        package(id) ?? list(id.kind).searchResults.first { $0.id == id }
+    }
+
+    /// Whether an operation — including a queued batch step — keeps the
+    /// package busy. Use it to disable actions.
+    func isBusy(_ package: PackageType) -> Bool {
+        activityStore.isActive(.package(package.identifier))
+    }
+
+    // MARK: Selection
+
+    /// The formula shown in the Formulae inspector. Setting it selects only
+    /// that formula — used to navigate to a package from elsewhere.
+    var selectedFormulaId: String? {
+        get { formulaList.singleSelection?.name }
+        set { formulaList.select(newValue.map { PackageID(kind: .formula, name: $0) }) }
+    }
+
+    /// The cask shown in the Casks inspector; see `selectedFormulaId`.
+    var selectedCaskId: String? {
+        get { caskList.singleSelection?.name }
+        set { caskList.select(newValue.map { PackageID(kind: .cask, name: $0) }) }
+    }
+
+    // MARK: Outdated
 
     var outdatedFormulae: [Formula] {
         formulae.filter(\.outdated)
@@ -73,18 +101,32 @@ final class PackageStore: LoadableStore {
         casks.filter(\.outdated)
     }
 
+    /// Outdated formulae, then outdated casks.
+    var outdatedPackages: [PackageType] {
+        outdatedFormulae.map(PackageType.formula) + outdatedCasks.map(PackageType.cask)
+    }
+
     var totalOutdated: Int {
         outdatedFormulae.count + outdatedCasks.count
     }
 
-    var availableFormulae: [Formula] {
-        let installedNames = Set(formulae.map(\.name))
-        return searchResultFormulae.filter { !installedNames.contains($0.name) }
+    /// Outdated formulae Upgrade All will touch. Pinned ones are skipped
+    /// because brew refuses to upgrade them.
+    var upgradableFormulae: [Formula] {
+        outdatedFormulae.filter { !$0.pinned }
     }
 
-    var availableCasks: [Cask] {
-        let installedTokens = Set(casks.map(\.token))
-        return searchResultCasks.filter { !installedTokens.contains($0.token) }
+    var pinnedOutdatedFormulae: [Formula] {
+        outdatedFormulae.filter(\.pinned)
+    }
+
+    var pinnedOutdatedCount: Int {
+        pinnedOutdatedFormulae.count
+    }
+
+    /// Installed formulae that need `formula` at runtime.
+    func dependents(of formula: Formula) -> [Formula] {
+        formula.dependents(in: formulae)
     }
 
     // MARK: Loading
@@ -106,17 +148,44 @@ final class PackageStore: LoadableStore {
         }
     }
 
-    // MARK: Package Actions
+    // MARK: Install
 
-    func installFormula(name: String) async {
-        await run(.install(name: name, isCask: false)) { activity in
-            try await activity.stream(Formula.installOutput(name: name))
+    func install(_ package: PackageType) async {
+        switch package {
+        case .formula(let formula): await installFormula(name: formula.fullName)
+        case .cask(let cask): await installCask(cask)
         }
     }
 
+    /// Installs and then selects the formula so its inspector — with any
+    /// caveats — opens.
+    func installFormula(name: String) async {
+        // A tap-qualified name installs a formula listed under its short name.
+        let installedName = name.split(separator: "/").last.map(String.init) ?? name
+        let succeeded = await run(.install(name: installedName, isCask: false)) { activity in
+            try await activity.stream(Formula.installOutput(name: name))
+        }
+        if succeeded {
+            formulaList.select(PackageID(kind: .formula, name: installedName))
+        }
+    }
+
+    /// Installs and then selects the cask so its inspector opens.
     func installCask(_ cask: Cask) async {
-        await run(.install(name: cask.token, isCask: true)) { activity in
+        let succeeded = await run(.install(name: cask.token, isCask: true)) { activity in
             try await activity.stream(cask.installOutput())
+        }
+        if succeeded {
+            caskList.select(PackageID(kind: .cask, name: cask.token))
+        }
+    }
+
+    // MARK: Upgrade
+
+    func upgrade(_ package: PackageType) async {
+        switch package {
+        case .formula(let formula): await upgrade(formula)
+        case .cask(let cask): await upgrade(cask)
         }
     }
 
@@ -132,30 +201,96 @@ final class PackageStore: LoadableStore {
         }
     }
 
+    /// Upgrades a cask that updates itself, which brew otherwise skips.
+    func forceUpgrade(_ cask: Cask) async {
+        await run(.upgrade(name: cask.token, isCask: true)) { activity in
+            try await activity.stream(cask.greedyUpgradeOutput())
+        }
+    }
+
+    /// brew refuses to upgrade a pinned formula, so unpin it first.
+    func unpinAndUpgrade(_ formula: Formula) async {
+        guard await unpin(formula) else { return }
+        await upgrade(formula)
+    }
+
+    /// Upgrades several packages as one batch with per-package progress;
+    /// a single package upgrades on its own. Pinned formulae are skipped.
+    func upgrade(_ packages: [PackageType]) async {
+        let upgradable = packages.filter(\.canUpgrade)
+        if upgradable.count == 1, let package = upgradable.first {
+            await upgrade(package)
+            return
+        }
+        startUpgradeBatch(upgradable)
+    }
+
+    func reinstall(_ package: PackageType) async {
+        await run(.reinstall(name: package.identifier, isCask: package.kind == .cask)) { activity in
+            switch package {
+            case .formula(let formula): try await activity.stream(formula.reinstallOutput())
+            case .cask(let cask): try await activity.stream(cask.reinstallOutput())
+            }
+        }
+    }
+
+    // MARK: Uninstall
+
     func uninstall(_ formula: Formula, force: Bool = false) async {
         let succeeded = await run(.uninstall(name: formula.name, isCask: false)) { _ in
             try await formula.uninstall(force: force)
         }
-        if succeeded, selectedFormulaId == formula.id {
-            selectedFormulaId = nil
+        if succeeded {
+            formulaList.deselect(PackageID(kind: .formula, name: formula.name))
         }
     }
 
-    func uninstall(_ cask: Cask, force: Bool = false) async {
+    /// - Parameters:
+    ///   - force: Remove it even if brew thinks it isn't installed.
+    ///   - zap: Also delete the app's settings, caches and support files.
+    func uninstall(_ cask: Cask, force: Bool = false, zap: Bool = false) async {
         let succeeded = await run(.uninstall(name: cask.token, isCask: true)) { _ in
-            try await cask.uninstall(force: force)
+            try await cask.uninstall(force: force, zap: zap)
         }
-        if succeeded, selectedCaskId == cask.id {
-            selectedCaskId = nil
+        if succeeded {
+            caskList.deselect(PackageID(kind: .cask, name: cask.token))
         }
     }
 
-    func pin(_ formula: Formula) async {
+    /// Uninstalls one package after another.
+    /// - Parameters:
+    ///   - ignoringDependents: Remove formulae other formulae still need.
+    ///   - zap: Also delete cask app data.
+    func uninstall(_ packages: [PackageType], ignoringDependents: Bool = false, zap: Bool = false) async {
+        for package in packages {
+            switch package {
+            case .formula(let formula): await uninstall(formula, force: ignoringDependents)
+            case .cask(let cask): await uninstall(cask, zap: zap)
+            }
+        }
+    }
+
+    // MARK: Pin
+
+    @discardableResult
+    func pin(_ formula: Formula) async -> Bool {
         await run(.pin(name: formula.name)) { _ in try await formula.pin() }
     }
 
-    func unpin(_ formula: Formula) async {
+    @discardableResult
+    func unpin(_ formula: Formula) async -> Bool {
         await run(.unpin(name: formula.name)) { _ in try await formula.unpin() }
+    }
+
+    /// Pins or unpins each formula that isn't already in that state.
+    func setPinned(_ pinned: Bool, for formulae: [Formula]) async {
+        for formula in formulae where formula.pinned != pinned {
+            if pinned {
+                await pin(formula)
+            } else {
+                await unpin(formula)
+            }
+        }
     }
 
     // MARK: Update Check
@@ -198,11 +333,11 @@ final class PackageStore: LoadableStore {
 
     // MARK: Upgrade All
 
-    /// The latest Upgrade All — kept after it finishes so failures can be
+    /// The latest upgrade batch — kept after it finishes so failures can be
     /// shown and retried.
     private var upgradeAllOperationID: UUID?
 
-    /// The activity entry of the latest Upgrade All, carrying per-package
+    /// The activity entry of the latest upgrade batch, carrying per-package
     /// progress: which package is upgrading and how many are left.
     var upgradeAllOperation: BrewOperation? {
         upgradeAllOperationID.flatMap(activityStore.operation)
@@ -212,32 +347,18 @@ final class PackageStore: LoadableStore {
         upgradeAllOperation?.isRunning == true
     }
 
-    /// Outdated formulae Upgrade All will touch. Pinned ones are skipped
-    /// because brew refuses to upgrade them.
-    var upgradableFormulae: [Formula] {
-        outdatedFormulae.filter { !$0.pinned }
-    }
-
-    var pinnedOutdatedCount: Int {
-        outdatedFormulae.count(where: \.pinned)
-    }
-
-    /// Upgrades packages one at a time so progress can be reported per
-    /// package and one failure doesn't stop the rest.
+    /// Upgrades every outdated package that isn't pinned, one at a time, so
+    /// progress can be reported per package and one failure doesn't stop
+    /// the rest.
     func upgradeAll() {
-        startUpgradeBatch(formulae: upgradableFormulae, casks: outdatedCasks)
+        startUpgradeBatch(outdatedPackages.filter(\.canUpgrade))
     }
 
     /// Runs a new batch with just the packages that failed in `operation`
     /// and are still outdated.
     func retryFailedUpgrades(of operation: BrewOperation) {
-        let failed = operation.failedSteps
-        let formulaNames = Set(failed.filter { !$0.isCask }.map(\.name))
-        let caskTokens = Set(failed.filter(\.isCask).map(\.name))
-        startUpgradeBatch(
-            formulae: upgradableFormulae.filter { formulaNames.contains($0.name) },
-            casks: outdatedCasks.filter { caskTokens.contains($0.token) }
-        )
+        let failedStepIDs = Set(operation.failedSteps.map(\.id))
+        startUpgradeBatch(outdatedPackages.filter { failedStepIDs.contains($0.upgradeStep.id) && $0.canUpgrade })
     }
 
     func cancelUpgradeAll() {
@@ -245,31 +366,22 @@ final class PackageStore: LoadableStore {
         activityStore.cancel(upgradeAllOperationID)
     }
 
-    private func startUpgradeBatch(formulae: [Formula], casks: [Cask]) {
+    private func startUpgradeBatch(_ packages: [PackageType]) {
         // Packages busy with another operation would collide with brew's lock.
-        let formulae = formulae.filter { !activityStore.isActive(.package($0.name)) }
-        let casks = casks.filter { !activityStore.isActive(.package($0.token)) }
-        let steps = formulae.map(BrewOperation.Step.init(formula:)) + casks.map(BrewOperation.Step.init(cask:))
-        guard !steps.isEmpty, !activityStore.isActive(.homebrew) else { return }
+        let packages = packages.filter { !isBusy($0) }
+        guard !packages.isEmpty, !activityStore.isActive(.homebrew) else { return }
 
         Task {
             await activityStore.perform(
-                .upgradeAll(count: steps.count),
-                steps: steps,
+                .upgradeAll(count: packages.count),
+                steps: packages.map(\.upgradeStep),
                 retry: .custom { operation in self.retryFailedUpgrades(of: operation) }
             ) { activity in
                 self.upgradeAllOperationID = activity.id
                 var failures: [String] = []
-                for formula in formulae {
-                    let stepID = BrewOperation.Step.id(name: formula.name, isCask: false)
-                    if try await !Self.runStep(stepID, in: activity, output: formula.upgradeOutput) {
-                        failures.append(formula.name)
-                    }
-                }
-                for cask in casks {
-                    let stepID = BrewOperation.Step.id(name: cask.token, isCask: true)
-                    if try await !Self.runStep(stepID, in: activity, output: cask.upgradeOutput) {
-                        failures.append(cask.token)
+                for package in packages {
+                    if try await !Self.runStep(of: package, in: activity) {
+                        failures.append(package.identifier)
                     }
                 }
                 await self.loadAll(forceRefresh: true)
@@ -280,14 +392,14 @@ final class PackageStore: LoadableStore {
 
     /// Runs one package of a batch and reports whether it upgraded.
     /// Cancellation propagates so the whole batch stops.
-    private static func runStep(
-        _ stepID: String,
-        in activity: ActivityContext,
-        output: () -> AsyncThrowingStream<String, Error>
-    ) async throws -> Bool {
+    private static func runStep(of package: PackageType, in activity: ActivityContext) async throws -> Bool {
+        let stepID = package.upgradeStep.id
         activity.setStep(stepID, .running)
         do {
-            try await activity.stream(output())
+            switch package {
+            case .formula(let formula): try await activity.stream(formula.upgradeOutput())
+            case .cask(let cask): try await activity.stream(cask.upgradeOutput())
+            }
             activity.setStep(stepID, .succeeded)
             return true
         } catch where !isOperationCancellation(error) {
@@ -296,28 +408,44 @@ final class PackageStore: LoadableStore {
         }
     }
 
-    // MARK: Remote Search
+    // MARK: Homebrew Search
 
-    func searchRemoteFormulae() async {
-        let query = formulaSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard query.count >= 2 else {
-            searchResultFormulae = []
-            return
-        }
-        isSearchingFormulae = true
-        searchResultFormulae = (try? await Formula.search(for: query)) ?? []
-        isSearchingFormulae = false
+    /// Brew matches too broadly below this length to be useful.
+    static let minimumSearchLength = 2
+    /// Search results described with `brew info`; the rest show names only.
+    static let searchDetailLimit = 30
+
+    /// The search box text of the Formulae page. Setting it from elsewhere
+    /// (Quick Open) shows the Homebrew results for it.
+    var formulaSearchQuery: String {
+        get { formulaList.searchQuery }
+        set { formulaList.showHomebrewResults(for: newValue) }
     }
 
-    func searchRemoteCasks() async {
-        let query = caskSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard query.count >= 2 else {
-            searchResultCasks = []
-            return
+    /// The search box text of the Casks page; see `formulaSearchQuery`.
+    var caskSearchQuery: String {
+        get { caskList.searchQuery }
+        set { caskList.showHomebrewResults(for: newValue) }
+    }
+
+    /// Searches Homebrew for the list's query. Results for a query the user
+    /// has since changed are dropped.
+    func searchHomebrew(_ kind: PackageKind) async {
+        let list = list(kind)
+        let query = list.trimmedQuery
+        guard query.count >= Self.minimumSearchLength else { return }
+        list.isSearching = true
+        do {
+            let results: [PackageType] = switch kind {
+            case .formula: try await Formula.search(for: query, detailLimit: Self.searchDetailLimit).map(PackageType.formula)
+            case .cask: try await Cask.search(for: query, detailLimit: Self.searchDetailLimit).map(PackageType.cask)
+            }
+            guard list.trimmedQuery == query else { return }
+            list.finishSearch(query: query, results: results, error: nil)
+        } catch {
+            guard list.trimmedQuery == query, !isOperationCancellation(error) else { return }
+            list.finishSearch(query: query, results: [], error: error.briefDescription)
         }
-        isSearchingCasks = true
-        searchResultCasks = (try? await Cask.search(for: query)) ?? []
-        isSearchingCasks = false
     }
 
     // MARK: Private
@@ -333,6 +461,68 @@ final class PackageStore: LoadableStore {
             try await body(activity)
             await self.loadAll(forceRefresh: true)
         } != nil
+    }
+}
+
+// MARK: - PackageListState
+
+/// What one package page shows besides the installed list: its selection
+/// and its Homebrew search.
+@Observable
+@MainActor
+final class PackageListState {
+
+    enum SearchScope: Hashable {
+        /// Filter the installed packages.
+        case installed
+        /// Search everything Homebrew offers.
+        case homebrew
+    }
+
+    var selection: Set<PackageID> = []
+    var searchQuery = ""
+    var searchScope = SearchScope.installed
+
+    private(set) var searchResults: [PackageType] = []
+    /// The query `searchResults` and `searchError` belong to.
+    private(set) var resultsQuery: String?
+    private(set) var searchError: String?
+    /// Set as soon as the query changes, before the debounce, so the page
+    /// says "Searching…" instead of flashing "No Results".
+    fileprivate(set) var isSearching = false
+
+    var trimmedQuery: String {
+        searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The one selected package, which the inspector shows.
+    var singleSelection: PackageID? {
+        selection.count == 1 ? selection.first : nil
+    }
+
+    func select(_ id: PackageID?) {
+        selection = id.map { [$0] } ?? []
+    }
+
+    func deselect(_ id: PackageID) {
+        selection.remove(id)
+    }
+
+    /// Call when the query or scope changed, before waiting to search.
+    func prepareSearch() {
+        isSearching = searchScope == .homebrew && trimmedQuery.count >= PackageStore.minimumSearchLength
+    }
+
+    fileprivate func showHomebrewResults(for query: String) {
+        searchQuery = query
+        searchScope = .homebrew
+    }
+
+    fileprivate func finishSearch(query: String, results: [PackageType], error: String?) {
+        searchResults = results
+        resultsQuery = query
+        searchError = error
+        isSearching = false
     }
 }
 
