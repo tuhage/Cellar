@@ -95,28 +95,6 @@ public nonisolated final class BrewService: Sendable {
         process.stream(["cleanup", "--prune=all", "-s"])
     }
 
-    // MARK: - Services
-
-    public func listServicesData() async throws -> Data {
-        try await runJSON(["services", "list", "--json"])
-    }
-
-    public func startService(_ name: String, privileged: Bool = false) async throws {
-        try await runChecked(["services", "start", name], privileged: privileged)
-    }
-
-    public func stopService(_ name: String, privileged: Bool = false) async throws {
-        try await runChecked(["services", "stop", name], privileged: privileged)
-    }
-
-    public func restartService(_ name: String, privileged: Bool = false) async throws {
-        try await runChecked(["services", "restart", name], privileged: privileged)
-    }
-
-    public func killService(_ name: String) async throws {
-        try await runChecked(["services", "kill", name])
-    }
-
     // MARK: - Taps
 
     public func listTapsData() async throws -> Data {
@@ -197,20 +175,31 @@ public nonisolated final class BrewService: Sendable {
         try await runChecked(["unpin", name])
     }
 
-    // MARK: - Private
+    // MARK: - Helpers
 
+    /// Internal so per-domain extensions in other files can use them.
     @discardableResult
-    private func runChecked(_ arguments: [String], privileged: Bool = false) async throws -> ProcessOutput {
+    func runChecked(_ arguments: [String], privileged: Bool = false) async throws -> ProcessOutput {
         let output = privileged
             ? try await process.runPrivileged(arguments)
             : try await process.run(arguments)
+        return try Self.checked(output)
+    }
+
+    /// Runs several commands as root under one authentication prompt.
+    @discardableResult
+    func runPrivilegedChecked(_ commands: [PrivilegedCommand]) async throws -> ProcessOutput {
+        try Self.checked(await process.runPrivileged(commands))
+    }
+
+    private static func checked(_ output: ProcessOutput) throws -> ProcessOutput {
         guard output.exitCode == 0 else {
             throw BrewError.processFailure(exitCode: output.exitCode, stderr: output.stderr)
         }
         return output
     }
 
-    private func runJSON(_ arguments: [String]) async throws -> Data {
+    func runJSON(_ arguments: [String]) async throws -> Data {
         let output = try await runChecked(arguments)
         guard let data = output.stdout.data(using: .utf8) else {
             throw BrewError.parsingFailure(context: "Invalid UTF-8 in brew output")

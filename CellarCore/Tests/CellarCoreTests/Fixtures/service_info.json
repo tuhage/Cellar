@@ -1,0 +1,23 @@
+[
+  {
+    "name": "postgresql@17",
+    "service_name": "homebrew.mxcl.postgresql@17",
+    "running": true,
+    "loaded": true,
+    "schedulable": false,
+    "pid": 1828,
+    "exit_code": null,
+    "user": "example",
+    "status": "started",
+    "file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.postgresql@17.plist",
+    "registered": true,
+    "loaded_file": "/Users/example/Library/LaunchAgents/homebrew.mxcl.postgresql@17.plist",
+    "command": "LC_ALL=\"en_US.UTF-8\" /opt/homebrew/opt/postgresql@17/bin/postgres -D /opt/homebrew/var/postgresql@17",
+    "working_dir": "/opt/homebrew",
+    "root_dir": null,
+    "log_path": "/opt/homebrew/var/log/postgresql@17.log",
+    "error_log_path": "/opt/homebrew/var/log/postgresql@17.log",
+    "interval": null,
+    "cron": "0 * * * *"
+  }
+]

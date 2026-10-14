@@ -11,7 +11,7 @@ struct MenuBarView: View {
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(MaintenanceStore.self) private var maintenanceStore
-    @Environment(ResourceStore.self) private var resourceStore
+    @Environment(ServiceMetricsStore.self) private var resourceStore
 
     @State private var isLoadingResources = false
     @Environment(\.openWindow) private var openWindow
@@ -49,13 +49,13 @@ struct MenuBarView: View {
                 .disabled(true)
         } else {
             Label(
-                "\(formattedCPU(resourceStore.totalCPU)) CPU",
+                "\(ResourceUsage.formattedCPU(resourceStore.totalCPU)) CPU",
                 systemImage: "cpu"
             )
             .disabled(true)
 
             Label(
-                "\(formattedMemory(resourceStore.totalMemoryMB)) RAM",
+                "\(ResourceUsage.formattedMemory(resourceStore.totalMemoryBytes)) RAM",
                 systemImage: "memorychip"
             )
             .disabled(true)
@@ -192,19 +192,8 @@ struct MenuBarView: View {
 
     private func refreshResourceUsage() async {
         isLoadingResources = true
-        await resourceStore.loadResourceUsage(for: serviceStore.services)
+        await resourceStore.refresh(for: serviceStore.services)
         isLoadingResources = false
-    }
-
-    private func formattedCPU(_ percent: Double) -> String {
-        String(format: "%.1f%%", percent)
-    }
-
-    private func formattedMemory(_ megabytes: Double) -> String {
-        if megabytes >= 1_024 {
-            return String(format: "%.1f GB", megabytes / 1_024)
-        }
-        return String(format: megabytes < 10 ? "%.1f MB" : "%.0f MB", megabytes)
     }
 }
 

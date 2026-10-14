@@ -13,7 +13,7 @@ final class AppStores {
     let projects: ProjectStore
     let maintenance: MaintenanceStore
     let dependencies = DependencyStore()
-    let resources = ResourceStore()
+    let serviceMetrics = ServiceMetricsStore()
     let updates = UpdateStore(startingUpdater: !ProcessInfo.processInfo.isRunningForPreviews)
 
     private var isStarted = false
@@ -104,7 +104,7 @@ extension View {
             .environment(stores.projects)
             .environment(stores.maintenance)
             .environment(stores.dependencies)
-            .environment(stores.resources)
+            .environment(stores.serviceMetrics)
             .environment(stores.updates)
             .environment(\.refreshAll, AsyncAction { await stores.refreshAll() })
             .environment(\.startBackgroundWork, AsyncAction { await stores.start() })

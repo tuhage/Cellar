@@ -2,17 +2,46 @@ import Foundation
 
 // MARK: - ServiceStatus
 
-public enum ServiceStatus: String, Codable, Hashable, Sendable {
+/// The status `brew services` reports.
+public enum ServiceStatus: String, Codable, Hashable, Sendable, CaseIterable {
+    /// Running.
     case started
+    /// Loaded, waiting for its next scheduled run (interval or cron).
+    case scheduled
+    /// Loaded, last run exited normally.
     case stopped
-    case error
+    /// Not loaded in launchd — never started, or stopped with `brew services stop`.
     case none
+    /// Loaded, last run exited with an error.
+    case error
+    /// Loaded, but hasn't run or reported an exit code yet.
+    case other
+    /// launchd didn't report anything.
     case unknown
 
     public nonisolated init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         let rawValue = try container.decode(String.self)
         self = ServiceStatus(rawValue: rawValue) ?? .unknown
+    }
+}
+
+extension ServiceStatus: Comparable {
+    /// Sorts by how much attention a status needs: failures first.
+    public static func < (lhs: ServiceStatus, rhs: ServiceStatus) -> Bool {
+        lhs.severityRank < rhs.severityRank
+    }
+
+    private var severityRank: Int {
+        switch self {
+        case .error: 0
+        case .unknown: 1
+        case .started: 2
+        case .scheduled: 3
+        case .other: 4
+        case .stopped: 5
+        case .none: 6
+        }
     }
 }
 
@@ -52,6 +81,16 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
         return Date(timeIntervalSince1970: TimeInterval(start.tv_sec) + TimeInterval(start.tv_usec) / 1_000_000)
     }
 
+    /// Whether launchd relaunches the process when it exits, read from the
+    /// service's plist — a force-quit service then comes straight back.
+    public var keepsAlive: Bool {
+        guard let file, let plist = NSDictionary(contentsOfFile: file),
+              let keepAlive = plist["KeepAlive"]
+        else { return false }
+        if let flag = keepAlive as? Bool { return flag }
+        return (keepAlive as? [String: Any])?.isEmpty == false
+    }
+
     // MARK: Init
 
     public init(
@@ -74,20 +113,37 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
 
     // MARK: Actions
 
-    public func start(privileged: Bool = false) async throws {
-        try await BrewService.shared.startService(name, privileged: privileged)
+    /// Starts the service and registers it to start at login (boot for root).
+    public func start() async throws {
+        try await BrewService.shared.startService(name, privileged: requiresRoot)
     }
 
-    public func stop(privileged: Bool = false) async throws {
-        try await BrewService.shared.stopService(name, privileged: privileged)
+    /// Starts the service for this session only.
+    public func runOnce() async throws {
+        try await BrewService.shared.runService(name, privileged: requiresRoot)
     }
 
-    public func restart(privileged: Bool = false) async throws {
-        try await BrewService.shared.restartService(name, privileged: privileged)
+    /// Stops the service. With `keepRegistered` it still starts at next login.
+    public func stop(keepRegistered: Bool = false) async throws {
+        try await BrewService.shared.stopService(name, keepRegistered: keepRegistered, privileged: requiresRoot)
     }
 
-    public func kill() async throws {
-        try await BrewService.shared.killService(name)
+    public func restart() async throws {
+        try await BrewService.shared.restartService(name, privileged: requiresRoot)
+    }
+
+    /// Kills the service's process with SIGKILL. The PID is looked up again
+    /// first: a cached one may since belong to another process.
+    public func forceQuit() async throws {
+        guard let pid = await Self.currentPIDs(of: [self])[name] else {
+            throw BrewError.parsingFailure(context: "\(name) isn’t running")
+        }
+        try await BrewService.shared.forceQuit(pid: pid, privileged: requiresRoot)
+    }
+
+    /// Restarts root services under a single password prompt.
+    public static func restartAsRoot(_ services: [BrewServiceItem]) async throws {
+        try await BrewService.shared.restartServicesPrivileged(services.map(\.name))
     }
 
     // MARK: Factory Methods
@@ -96,33 +152,20 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
         get async throws {
             let data = try await BrewService.shared.listServicesData()
             if data.isEmpty { return [] }
-            var items = try JSONDecoder().decode([BrewServiceItem].self, from: data)
+            let items = try JSONDecoder().decode([BrewServiceItem].self, from: data)
+            let pids = await currentPIDs(of: items)
+            return items.map { $0.applyingLaunchdPID(pids[$0.name]) }
+        }
+    }
 
-            for index in items.indices {
-                let item = items[index]
-
-                // Non-privileged `brew services list` only inspects the current
-                // user's LaunchAgents. Root services live in the system domain,
-                // so Homebrew can report "none" even while the daemon is running.
-                if item.requiresRoot,
-                   let runtime = await resolveSystemRuntimeViaLaunchctl(for: item.name),
-                   runtime.isRunning {
-                    items[index] = item.withRuntimeState(
-                        status: .started,
-                        pid: runtime.pid ?? item.pid
-                    )
-                    continue
-                }
-
-                // Homebrew sometimes omits the pid for running user services.
-                if item.isRunning,
-                   item.pid == nil,
-                   let resolved = await resolvePIDViaLaunchctl(for: item.name) {
-                    items[index] = item.withRuntimeState(status: item.status, pid: resolved)
-                }
+    /// Log paths, command and schedule from `brew services info`.
+    public var info: ServiceInfo {
+        get async throws {
+            let data = try await BrewService.shared.serviceInfoData(name)
+            guard let info = try JSONDecoder().decode([ServiceInfo].self, from: data).first else {
+                throw BrewError.parsingFailure(context: "No info for service \(name)")
             }
-
-            return items
+            return info
         }
     }
 
@@ -141,21 +184,54 @@ public struct BrewServiceItem: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - PID Resolution
+// MARK: - launchd
 
 extension BrewServiceItem {
 
-    /// Returns a copy with launchctl's runtime state applied.
-    func withRuntimeState(status: ServiceStatus, pid: Int?) -> BrewServiceItem {
-        BrewServiceItem(
+    /// Labels Homebrew registers services under, newest convention last.
+    var launchdLabels: [String] {
+        ["homebrew.mxcl.\(name)", "sh.brew.\(name)"]
+    }
+
+    /// The PID of each running service, read from launchd now — the services
+    /// list may come from a cache. Root services live in the system domain,
+    /// which can be inspected without elevating.
+    public static func currentPIDs(of services: [BrewServiceItem]) async -> [String: Int] {
+        let userJobs = services.contains { !$0.requiresRoot }
+            ? await SystemCommand.output("/bin/launchctl", ["list"]).map(parseLaunchctlList) ?? [:]
+            : [:]
+        var pids: [String: Int] = [:]
+        for service in services {
+            let pid = service.requiresRoot
+                ? await service.systemDomainPID()
+                : service.launchdLabels.lazy.compactMap { userJobs[$0] }.first
+            pids[service.name] = pid
+        }
+        return pids
+    }
+
+    /// Brew's list omits PIDs, and without root it can't see LaunchDaemons,
+    /// so it reports a running root service as "none".
+    func applyingLaunchdPID(_ pid: Int?) -> BrewServiceItem {
+        guard let pid, isRunning || requiresRoot else { return self }
+        return BrewServiceItem(
             name: name,
-            status: status,
+            status: .started,
             user: user,
             file: file,
             exitCode: exitCode,
             pid: pid,
             registered: registered
         )
+    }
+
+    private func systemDomainPID() async -> Int? {
+        for label in launchdLabels {
+            if let output = await SystemCommand.output("/bin/launchctl", ["print", "system/\(label)"]) {
+                return Self.parseLaunchctlRuntime(output).pid
+            }
+        }
+        return nil
     }
 
     struct LaunchctlRuntime: Equatable, Sendable {
@@ -186,97 +262,16 @@ extension BrewServiceItem {
         return LaunchctlRuntime(isRunning: state == "running" || pid != nil, pid: pid)
     }
 
-    /// Root Homebrew services are registered in launchd's system domain, which
-    /// can be inspected without elevating the Cellar process.
-    private static func resolveSystemRuntimeViaLaunchctl(
-        for serviceName: String
-    ) async -> LaunchctlRuntime? {
-        let label = "homebrew.mxcl.\(serviceName)"
-
-        return await withCheckedContinuation { continuation in
-            let process = Process()
-            let pipe = Pipe()
-
-            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            process.arguments = ["print", "system/\(label)"]
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-
-            process.terminationHandler = { _ in
-                guard process.terminationStatus == 0 else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                guard let output = String(data: data, encoding: .utf8) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                continuation.resume(returning: parseLaunchctlRuntime(output))
-            }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(returning: nil)
-            }
+    /// Parses `launchctl list` ("PID  Status  Label" rows; "-" when not
+    /// running) into the PIDs of running jobs by label.
+    static func parseLaunchctlList(_ output: String) -> [String: Int] {
+        var pids: [String: Int] = [:]
+        for line in output.split(whereSeparator: \.isNewline) {
+            let fields = line.split(whereSeparator: \.isWhitespace)
+            guard fields.count >= 3, let pid = Int(fields[0]) else { continue }
+            pids[String(fields[2])] = pid
         }
-    }
-
-    /// Queries `launchctl list` for the service's PID using the
-    /// standard Homebrew label convention (`homebrew.mxcl.<name>`).
-    private static func resolvePIDViaLaunchctl(for serviceName: String) async -> Int? {
-        let label = "homebrew.mxcl.\(serviceName)"
-
-        return await withCheckedContinuation { continuation in
-            let process = Process()
-            let pipe = Pipe()
-
-            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            process.arguments = ["list", label]
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-
-            process.terminationHandler = { _ in
-                guard process.terminationStatus == 0 else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                guard let output = String(data: data, encoding: .utf8) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                // launchctl output contains a line like:  "PID" = 12345;
-                for line in output.components(separatedBy: "\n") {
-                    let trimmed = line.trimmingCharacters(in: .whitespaces)
-                    if trimmed.hasPrefix("\"PID\"") {
-                        let parts = trimmed.components(separatedBy: "=")
-                        if parts.count >= 2 {
-                            let value = parts[1]
-                                .trimmingCharacters(in: .whitespaces)
-                                .replacingOccurrences(of: ";", with: "")
-                            if let pid = Int(value) {
-                                continuation.resume(returning: pid)
-                                return
-                            }
-                        }
-                    }
-                }
-
-                continuation.resume(returning: nil)
-            }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(returning: nil)
-            }
-        }
+        return pids
     }
 }
 
