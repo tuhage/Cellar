@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 import CellarCore
 
@@ -46,4 +45,3 @@ extension BrewOperation {
         ]
     }
 }
-#endif

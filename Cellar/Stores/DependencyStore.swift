@@ -121,7 +121,6 @@ enum DependencyFilter: String, CaseIterable {
     }
 }
 
-#if DEBUG
 extension DependencyStore {
     /// `stores.dependencies` showing `DependencyGraph.preview`, with the
     /// preview's install reasons as formulae, for previews.
@@ -142,4 +141,3 @@ extension DependencyStore {
         return stores
     }
 }
-#endif

@@ -309,7 +309,6 @@ final class ActivityStore {
     }
 }
 
-#if DEBUG
 extension ActivityStore {
     /// A store holding the given operations, for previews.
     static func preview(_ operations: [BrewOperation]) -> ActivityStore {
@@ -318,7 +317,6 @@ extension ActivityStore {
         return store
     }
 }
-#endif
 
 // MARK: - ActivityContext
 
