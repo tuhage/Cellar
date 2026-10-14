@@ -24,6 +24,9 @@ struct EmptyStateView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
+        // A grouped Form row lays a lone view out like a label, in the
+        // leading column; filling the width keeps it centered there too.
+        .frame(maxWidth: .infinity)
         .transition(.opacity)
     }
 }
