@@ -1,0 +1,63 @@
+[
+  {
+    "name": "homebrew/cask",
+    "user": "Homebrew",
+    "repo": "cask",
+    "path": "/opt/homebrew/Library/Taps/homebrew/homebrew-cask",
+    "installed": false,
+    "official": true,
+    "formula_names": [],
+    "cask_tokens": ["0-ad", "firefox", "iterm2"],
+    "formula_files": [],
+    "cask_files": [],
+    "command_files": [],
+    "remote": null,
+    "custom_remote": null,
+    "private": null,
+    "HEAD": null,
+    "last_commit": null,
+    "branch": null
+  },
+  {
+    "name": "homebrew/core",
+    "user": "Homebrew",
+    "repo": "core",
+    "path": "/opt/homebrew/Library/Taps/homebrew/homebrew-core",
+    "installed": false,
+    "official": true,
+    "formula_names": ["a2ps", "gh", "wget"],
+    "cask_tokens": [],
+    "formula_files": [],
+    "cask_files": [],
+    "command_files": [],
+    "remote": null,
+    "custom_remote": null,
+    "private": null,
+    "HEAD": null,
+    "last_commit": null,
+    "branch": null
+  },
+  {
+    "name": "mobile-dev-inc/tap",
+    "user": "mobile-dev-inc",
+    "repo": "tap",
+    "path": "/opt/homebrew/Library/Taps/mobile-dev-inc/homebrew-tap",
+    "installed": true,
+    "official": false,
+    "formula_names": [
+      "mobile-dev-inc/tap/ips2crash",
+      "mobile-dev-inc/tap/maestro-head",
+      "mobile-dev-inc/tap/maestro"
+    ],
+    "cask_tokens": [],
+    "formula_files": [],
+    "cask_files": [],
+    "command_files": [],
+    "remote": "https://github.com/mobile-dev-inc/homebrew-tap",
+    "custom_remote": false,
+    "private": false,
+    "HEAD": "4f1c2a9e0b7d",
+    "last_commit": "2 weeks ago",
+    "branch": "master"
+  }
+]

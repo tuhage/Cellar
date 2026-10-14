@@ -44,6 +44,12 @@ final class TapStore: LoadableStore {
         }
     }
 
+    /// Whether a local clone of the tap exists. Core taps served by the
+    /// Homebrew API can still be tapped to clone them.
+    func isTapped(_ name: String) -> Bool {
+        taps.contains { $0.installed && $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
     // MARK: Actions
 
     func load(forceRefresh: Bool = false) async {
@@ -58,17 +64,19 @@ final class TapStore: LoadableStore {
         }
     }
 
-    /// Adds a tap; progress and output appear in Activity.
-    func addTap(_ name: String) async {
+    /// Adds a tap, cloned from `remote` when given; progress and output
+    /// appear in Activity.
+    func addTap(_ name: String, remote: String? = nil) async {
         await activityStore.perform(.tapAdd(name: name)) { activity in
-            try await activity.stream(BrewService.shared.addTap(name))
+            try await activity.stream(BrewService.shared.addTap(name, remote: remote))
             await self.load(forceRefresh: true)
         }
     }
 
-    func removeTap(_ tap: Tap) async {
+    /// `force` untaps even while installed packages come from the tap.
+    func removeTap(_ tap: Tap, force: Bool = false) async {
         await activityStore.perform(.tapRemove(name: tap.name)) { _ in
-            try await tap.remove()
+            try await tap.remove(force: force)
             await self.load(forceRefresh: true)
         }
     }

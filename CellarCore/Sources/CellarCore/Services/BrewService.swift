@@ -102,20 +102,6 @@ public nonisolated final class BrewService: Sendable {
         try await runChecked(["services", "kill", name])
     }
 
-    // MARK: - Taps
-
-    public func listTapsData() async throws -> Data {
-        try await runJSON(["tap-info", "--json", "--installed"])
-    }
-
-    public func addTap(_ name: String) -> AsyncThrowingStream<String, Error> {
-        process.stream(["tap", name])
-    }
-
-    public func removeTap(_ name: String) async throws {
-        try await runChecked(["untap", name])
-    }
-
     // MARK: - Generic Stream
 
     public func streamCommand(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
@@ -127,23 +113,6 @@ public nonisolated final class BrewService: Sendable {
     public func missing() async throws -> String {
         let output = try await process.run(["missing"])
         return output.stdout
-    }
-
-    // MARK: - Dependencies
-
-    public func deps(_ name: String) async throws -> String {
-        let output = try await runChecked(["deps", "--tree", name])
-        return output.stdout
-    }
-
-    public func depsInstalled() async throws -> String {
-        let output = try await runChecked(["deps", "--installed"])
-        return output.stdout
-    }
-
-    public func uses(_ name: String) async throws -> [String] {
-        let output = try await runChecked(["uses", "--installed", name])
-        return parseLines(output.stdout)
     }
 
     // MARK: - Brewfile
@@ -176,7 +145,7 @@ public nonisolated final class BrewService: Sendable {
         try await runChecked(["unpin", name])
     }
 
-    // MARK: - Private
+    // MARK: - Helpers (internal for the per-domain extensions)
 
     /// Internal so per-domain extensions can run commands that must succeed.
     @discardableResult
@@ -190,7 +159,7 @@ public nonisolated final class BrewService: Sendable {
         return output
     }
 
-    private func runJSON(_ arguments: [String]) async throws -> Data {
+    func runJSON(_ arguments: [String]) async throws -> Data {
         let output = try await runChecked(arguments)
         guard let data = output.stdout.data(using: .utf8) else {
             throw BrewError.parsingFailure(context: "Invalid UTF-8 in brew output")
@@ -198,7 +167,7 @@ public nonisolated final class BrewService: Sendable {
         return data
     }
 
-    private func parseLines(_ string: String) -> [String] {
+    func parseLines(_ string: String) -> [String] {
         string.split(separator: "\n").map(String.init)
     }
 }

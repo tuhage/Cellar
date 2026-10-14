@@ -1,0 +1,16 @@
+ca-certificates:
+cairo: fontconfig freetype gettext glib libpng libunistring pcre2
+firefox:
+fontconfig: freetype gettext libpng libunistring
+freetype: libpng
+gettext: libunistring
+gh:
+glib: gettext libunistring pcre2
+libidn2: gettext libunistring
+libnghttp3:
+libngtcp2: ca-certificates openssl@3
+libpng:
+libunistring:
+openssl@3: ca-certificates
+pcre2:
+wget: ca-certificates gettext libidn2 libunistring openssl@3

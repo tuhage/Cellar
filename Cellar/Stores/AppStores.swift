@@ -13,7 +13,7 @@ final class AppStores {
     let brewfiles: BrewfileStore
     let projects: ProjectStore
     let maintenance: MaintenanceStore
-    let dependencies = DependencyStore()
+    let dependencies: DependencyStore
     let resources = ResourceStore()
     let updates = UpdateStore(startingUpdater: !ProcessInfo.processInfo.isRunningForPreviews)
 
@@ -27,6 +27,7 @@ final class AppStores {
     init(activity: ActivityStore = ActivityStore()) {
         self.activity = activity
         packages = PackageStore(activityStore: activity)
+        dependencies = DependencyStore(packageStore: packages)
         services = ServiceStore(activityStore: activity)
         taps = TapStore(activityStore: activity)
         brewfiles = BrewfileStore(activityStore: activity)

@@ -3,395 +3,267 @@ import CellarCore
 
 // MARK: - DependencyGraphView
 
-/// Displays the full dependency graph for all installed Homebrew formulae.
-///
-/// Layout:
-/// - Top stats row (total packages, orphans, leaves, most depended)
-/// - Searchable, filterable list of packages with expandable dependency trees
-/// - Selecting a package shows a detail panel with dependents and dependencies
+/// Every installed package with why it's installed — by the user, or as a
+/// dependency — and which dependencies nothing needs anymore. A list rather
+/// than a drawn graph, so it stays readable with hundreds of packages.
 struct DependencyGraphView: View {
     @Environment(DependencyStore.self) private var store
+    @Environment(ActivityStore.self) private var activityStore
+    @FocusedValue(\.windowCommands) private var windowCommands
+
+    @AppStorage("dependencyInspectorPresented") private var isInspectorPresented = true
+    @State private var packageToUninstall: DependencyNode?
 
     var body: some View {
         @Bindable var store = store
+        let graph = store.graph
 
-        Group {
-            if store.isLoading && store.graph == nil {
-                LoadingView(message: "Analyzing dependencies\u{2026}")
-            } else if let errorMessage = store.errorMessage, store.graph == nil {
-                ErrorView(message: errorMessage) {
-                    Task { await store.loadGraph() }
-                }
-            } else if store.graph == nil {
-                EmptyStateView(
-                    title: "No Dependencies",
-                    systemImage: "point.3.connected.trianglepath.dotted",
-                    description: "Could not load dependency information.",
-                    actionTitle: "Analyze Again"
-                ) {
-                    Task { await store.loadGraph() }
-                }
-            } else if let graph = store.graph {
-                graphContent(graph: graph)
-            }
-        }
-        .navigationTitle("Dependency Browser")
-        .searchable(text: $store.searchQuery, prompt: "Filter packages")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                RefreshToolbarButton(isLoading: store.isLoading) {
-                    await store.loadGraph()
+        content(graph)
+            .loadErrorBanner(for: store) { await store.load(forceRefresh: true) }
+            .navigationTitle("Dependencies")
+            .dataFreshness(store.lastUpdated)
+            .searchable(text: $store.searchQuery, prompt: "Search packages")
+            .searchScopes($store.searchScope) {
+                ForEach(DependencySearchScope.allCases, id: \.self) { scope in
+                    Text(scope.title).tag(scope)
                 }
             }
-
-            ToolbarItem(placement: .automatic) {
-                Toggle(isOn: $store.showOrphansOnly) {
-                    Label("Orphans Only", systemImage: "exclamationmark.triangle")
-                }
-                .toggleStyle(.button)
-                .help("Show only orphan packages (nothing depends on them)")
+            .toolbar { toolbar(graph) }
+            .pageInspector(isPresented: $isInspectorPresented, widthKey: "dependencyInspectorWidth") {
+                inspector(graph)
             }
-        }
-        .task(id: "refresh") {
-            await store.loadGraph()
-        }
+            .task(id: store.packageStore.lastUpdated) { await store.load() }
+            .focusedSceneValue(\.pageRefresh, AsyncAction { await store.load(forceRefresh: true) })
+            .confirmationDialog(
+                "Uninstall \(packageToUninstall?.name ?? "")?",
+                isPresented: Binding(
+                    get: { packageToUninstall != nil },
+                    set: { if !$0 { packageToUninstall = nil } }
+                ),
+                presenting: packageToUninstall
+            ) { node in
+                Button("Uninstall", role: .destructive) {
+                    Task { await store.uninstall(node.name) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { node in
+                Text(uninstallMessage(for: node, in: graph))
+            }
     }
 
     // MARK: - Content
 
-    private func graphContent(graph: DependencyGraph) -> some View {
-        HSplitView {
-            nodeList(graph: graph)
-                .frame(minWidth: 280, idealWidth: 350)
-
-            detailPanel
-                .frame(minWidth: 250, idealWidth: 320, maxWidth: 400)
-        }
-    }
-
-    // MARK: - Node List
-
-    private func nodeList(graph: DependencyGraph) -> some View {
-        VStack(spacing: 0) {
-            statsRow(graph: graph)
-                .padding()
-
-            Divider()
-
-            if store.filteredNodes.isEmpty {
-                ContentUnavailableView.search(text: store.searchQuery)
-                    .frame(maxHeight: .infinity)
-            } else {
-                List(store.filteredNodes, selection: Binding(
-                    get: { store.selectedNodeName },
-                    set: { store.selectedNodeName = $0 }
-                )) { node in
-                    DependencyNodeRow(node: node)
-                        .tag(node.name)
-                }
-                .listStyle(.inset)
-            }
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
-    }
-
-    // MARK: - Stats Row
-
-    private func statsRow(graph: DependencyGraph) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 0) {
-                dependencyMetric("Packages", value: graph.totalPackages, icon: "shippingbox", color: .blue)
-                metricDivider
-                dependencyMetric("Orphans", value: graph.orphans.count, icon: "exclamationmark.triangle", color: .orange)
-                metricDivider
-                dependencyMetric("Leaves", value: graph.leaves.count, icon: "leaf", color: .green)
-                metricDivider
-                dependencyMetric("Connections", value: graph.totalEdges, icon: "arrow.triangle.branch", color: .purple)
-            }
-            .padding(.vertical, Spacing.item)
-            .cardStyle(cornerRadius: CornerRadius.card)
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.item) {
-                dependencyMetric("Packages", value: graph.totalPackages, icon: "shippingbox", color: .blue)
-                dependencyMetric("Orphans", value: graph.orphans.count, icon: "exclamationmark.triangle", color: .orange)
-                dependencyMetric("Leaves", value: graph.leaves.count, icon: "leaf", color: .green)
-                dependencyMetric("Connections", value: graph.totalEdges, icon: "arrow.triangle.branch", color: .purple)
-            }
-            .padding(Spacing.item)
-            .cardStyle(cornerRadius: CornerRadius.card)
-        }
-    }
-
-    private func dependencyMetric(_ title: String, value: Int, icon: String, color: Color) -> some View {
-        HStack(spacing: Spacing.item) {
-            Image(systemName: icon)
-                .foregroundStyle(color)
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text("\(value)")
-                    .font(.headline.monospacedDigit())
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Spacing.row)
-    }
-
-    private var metricDivider: some View {
-        Divider().frame(height: 28)
-    }
-
-    // MARK: - Detail Panel
-
     @ViewBuilder
-    private var detailPanel: some View {
-        if let node = store.selectedNode {
-            DependencyDetailView(node: node) { name in
-                store.select(name)
+    private func content(_ graph: DependencyGraph?) -> some View {
+        if let graph, !graph.nodes.isEmpty {
+            VStack(spacing: 0) {
+                filterBar(graph)
+                Divider()
+                nodeList(graph)
+            }
+        } else if store.isLoading {
+            LoadingView(message: "Reading dependencies\u{2026}")
+        } else if let errorMessage = store.errorMessage {
+            ErrorView(message: errorMessage) {
+                Task { await store.load(forceRefresh: true) }
             }
         } else {
-            ContentUnavailableView(
-                "Select a Package",
+            EmptyStateView(
+                title: "No Packages",
                 systemImage: "point.3.connected.trianglepath.dotted",
-                description: Text("Choose a package to see its dependency details.")
+                description: "Installed packages and their dependencies will appear here.",
+                actionTitle: "Check Again"
+            ) {
+                Task { await store.load(forceRefresh: true) }
+            }
+        }
+    }
+
+    /// Counts double as the filter, so "Removable 3" is one click away.
+    private func filterBar(_ graph: DependencyGraph) -> some View {
+        @Bindable var store = store
+
+        return Picker("Show", selection: $store.filter) {
+            ForEach(DependencyFilter.allCases, id: \.self) { filter in
+                Text("\(filter.title) \(filter.count(in: graph))").tag(filter)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .padding(.horizontal, Spacing.cardPadding)
+        .padding(.vertical, Spacing.item)
+    }
+
+    @ViewBuilder
+    private func nodeList(_ graph: DependencyGraph) -> some View {
+        let nodes = store.visibleNodes(in: graph)
+        if nodes.isEmpty {
+            emptyFilterState
+                .frame(maxHeight: .infinity)
+        } else {
+            List(nodes, selection: Binding(
+                get: { store.selectedNodeName },
+                set: { store.selectedNodeName = $0 }
+            )) { node in
+                DependencyRow(node: node, graph: graph, matches: store.matches(for: node), scope: store.searchScope)
+                    .tag(node.name)
+            }
+            .listStyle(.inset)
+            .contextMenu(forSelectionType: String.self) { names in
+                if let name = names.first, let node = graph.node(named: name) {
+                    nodeContextMenu(node)
+                }
+            } primaryAction: { names in
+                store.selectedNodeName = names.first
+                isInspectorPresented = true
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var emptyFilterState: some View {
+        if !store.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+            ContentUnavailableView.search(text: store.searchQuery)
+        } else {
+            switch store.filter {
+            case .removable:
+                EmptyStateView(
+                    title: "No Removable Packages",
+                    systemImage: "checkmark.circle",
+                    description: "Every dependency is still needed by a package you installed."
+                )
+            case .requested:
+                EmptyStateView(title: "No Packages Installed by You", systemImage: "person")
+            case .dependencies:
+                EmptyStateView(title: "No Dependencies", systemImage: "link")
+            case .all:
+                EmptyStateView(title: "No Packages", systemImage: "shippingbox")
+            }
+        }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private func toolbar(_ graph: DependencyGraph?) -> some ToolbarContent {
+        let removableCount = graph?.removableNodes.count ?? 0
+
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                windowCommands?.navigate(.maintenance)
+            } label: {
+                Label(
+                    removableCount > 0 ? "Remove \(removableCount) Unused\u{2026}" : "Remove Unused\u{2026}",
+                    systemImage: "shippingbox.and.arrow.backward"
+                )
+            }
+            .disabled(removableCount == 0 || windowCommands == nil)
+            .help("Uninstall dependencies nothing needs anymore (brew autoremove)")
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            RefreshToolbarButton(isLoading: store.isLoading) {
+                await store.load(forceRefresh: true)
+            }
+        }
+    }
+
+    // MARK: - Context Menu
+
+    @ViewBuilder
+    private func nodeContextMenu(_ node: DependencyNode) -> some View {
+        Button {
+            store.select(node.name)
+            isInspectorPresented = true
+        } label: {
+            Label("Why Is It Installed?", systemImage: "questionmark.circle")
+        }
+
+        ShowPackageButton(name: node.name, isCask: store.isCask(node.name))
+
+        Divider()
+
+        if let blocker = node.uninstallBlocker {
+            Button(role: .destructive) {} label: {
+                Label("Can’t Uninstall — \(blocker)", systemImage: "trash")
+            }
+            .disabled(true)
+        } else {
+            Button(role: .destructive) {
+                packageToUninstall = node
+            } label: {
+                Label("Uninstall\u{2026}", systemImage: "trash")
+            }
+            .disabled(activityStore.isActive(.package(node.name)))
+        }
+    }
+
+    // MARK: - Inspector
+
+    @ViewBuilder
+    private func inspector(_ graph: DependencyGraph?) -> some View {
+        if let graph, let name = store.selectedNodeName, let node = graph.node(named: name) {
+            DependencyInspector(
+                node: node,
+                graph: graph,
+                isCask: store.isCask(name),
+                isBusy: activityStore.isActive(.package(name)),
+                uninstall: { packageToUninstall = node }
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ContentUnavailableView(
+                "No Selection",
+                systemImage: "point.3.connected.trianglepath.dotted",
+                description: Text("Select a package to see why it’s installed and what needs it.")
+            )
+        }
+    }
+
+    // MARK: - Uninstall
+
+    private func uninstallMessage(for node: DependencyNode, in graph: DependencyGraph?) -> String {
+        let freed = graph?.dependenciesFreed(byRemoving: node.name) ?? []
+        let removal = "\(node.name) will be removed from your Mac."
+        guard !freed.isEmpty else { return removal }
+        return removal + " Afterwards, Remove Unused can uninstall \(freed.briefList()), which nothing else needs."
+    }
+}
+
+// MARK: - Titles
+
+extension DependencySearchScope {
+    var title: String {
+        switch self {
+        case .name: "Name"
+        case .dependsOn: "Depends On"
+        case .usedBy: "Used By"
         }
     }
 }
 
-// MARK: - DependencyNode Appearance
-
-private extension DependencyNode {
-    var color: Color {
-        if isOrphan { return .orange }
-        if isLeaf { return .green }
-        return .blue
-    }
-
-    var icon: String {
-        if isOrphan { return "exclamationmark.triangle" }
-        if isLeaf { return "leaf" }
-        return "shippingbox"
-    }
-}
-
-// MARK: - DependencyNodeRow
-
-/// A single row in the dependency list showing a package name, dependency count,
-/// and badges for orphan/leaf status.
-private struct DependencyNodeRow: View {
-    let node: DependencyNode
-
-    var body: some View {
-        HStack(spacing: Spacing.row) {
-            Image(systemName: node.icon)
-                .font(.caption)
-                .foregroundStyle(node.color)
-                .frame(width: IconSize.smallIcon, height: IconSize.smallIcon)
-                .background(node.color.opacity(Opacity.iconBackground), in: RoundedRectangle(cornerRadius: CornerRadius.small))
-
-            VStack(alignment: .leading, spacing: Spacing.textPair) {
-                Text(node.name)
-                    .fontWeight(.medium)
-
-                HStack(spacing: Spacing.sectionContent) {
-                    if !node.dependencies.isEmpty {
-                        Label(
-                            "\(node.dependencies.count) deps",
-                            systemImage: "arrow.down.circle"
-                        )
-                    }
-                    if !node.dependents.isEmpty {
-                        Label(
-                            "\(node.dependents.count) used by",
-                            systemImage: "arrow.up.circle"
-                        )
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if node.isOrphan {
-                StatusBadge(text: "Orphan", color: .orange)
-            }
-            if node.isLeaf {
-                StatusBadge(text: "Leaf", color: .green)
-            }
-        }
-        .padding(.vertical, Spacing.compact)
-    }
-}
-
-// MARK: - DependencyDetailView
-
-/// Shows full dependency detail for a selected node.
-///
-/// Displays the package name, status badges, and two sections:
-/// - Dependencies: what this package requires
-/// - Dependents: what requires this package
-private struct DependencyDetailView: View {
-    let node: DependencyNode
-    let onNavigate: (String) -> Void
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.section) {
-                header
-                Divider()
-                infoSection
-                Divider()
-                dependenciesSection
-                Divider()
-                dependentsSection
-            }
-            .padding(Spacing.section)
-        }
-        .scrollIndicators(.hidden)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background)
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: Spacing.detailElement) {
-            Image(systemName: node.icon)
-                .font(.title2)
-                .foregroundStyle(node.color)
-                .frame(width: IconSize.headerIcon, height: IconSize.headerIcon)
-                .background(node.color.opacity(Opacity.iconBackground), in: Circle())
-                .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
-
-            VStack(alignment: .leading, spacing: Spacing.related) {
-                Text(node.name)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-
-                HStack(spacing: Spacing.item) {
-                    if node.isOrphan {
-                        StatusBadge(text: "Orphan", color: .orange)
-                    }
-                    if node.isLeaf {
-                        StatusBadge(text: "Leaf", color: .green)
-                    }
-                    if !node.isOrphan && !node.isLeaf {
-                        StatusBadge(text: "Intermediate", color: .blue)
-                    }
-                }
-            }
+extension DependencyFilter {
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .requested: "Installed by You"
+        case .dependencies: "Dependencies"
+        case .removable: "Removable"
         }
     }
 
-    // MARK: Info Section
-
-    private var infoSection: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Spacing.cardPadding, verticalSpacing: Spacing.row) {
-            GridRow {
-                Text("Connections")
-                    .foregroundStyle(.secondary)
-                    .gridColumnAlignment(.trailing)
-                Text("\(node.connectionCount)")
-            }
-            GridRow {
-                Text("Dependencies")
-                    .foregroundStyle(.secondary)
-                Text("\(node.dependencies.count)")
-            }
-            GridRow {
-                Text("Used By")
-                    .foregroundStyle(.secondary)
-                Text("\(node.dependents.count)")
-            }
-        }
-        .font(.callout)
-    }
-
-    // MARK: Dependencies Section
-
-    private var dependenciesSection: some View {
-        packageListSection(
-            title: "Dependencies",
-            systemImage: "arrow.down.circle",
-            color: .blue,
-            packages: node.dependencies,
-            emptyText: "No dependencies \u{2014} this is a leaf package."
-        )
-    }
-
-    // MARK: Dependents Section
-
-    private var dependentsSection: some View {
-        packageListSection(
-            title: "Used By",
-            systemImage: "arrow.up.circle",
-            color: .purple,
-            packages: node.dependents,
-            emptyText: "Nothing depends on this package."
-        )
-    }
-
-    private func packageListSection(
-        title: String,
-        systemImage: String,
-        color: Color,
-        packages: [String],
-        emptyText: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.item) {
-            SectionHeaderView(title: title, systemImage: systemImage, color: color) {
-                Text("\(packages.count)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            if packages.isEmpty {
-                Text(emptyText)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 4)
-            } else {
-                FlowLayout(spacing: Spacing.related) {
-                    ForEach(packages, id: \.self) { name in
-                        Button { onNavigate(name) } label: {
-                            Text(name)
-                                .font(.callout)
-                                .fontDesign(.monospaced)
-                                .chipInset()
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: CornerRadius.small))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: CornerRadius.small)
-                                        .strokeBorder(.primary.opacity(Opacity.subtleBorder), lineWidth: 0.5)
-                                )
-                                .shadow(color: Shadow.subtleColor, radius: Shadow.subtleBlur, y: Shadow.subtleY)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
+    func count(in graph: DependencyGraph) -> Int {
+        graph.nodes.count(where: { includes($0, in: graph) })
     }
 }
 
 // MARK: - Preview
 
 #Preview {
+    let stores = DependencyStore.preview(in: AppStores(), selecting: "openssl@3")
+
     NavigationStack {
         DependencyGraphView()
-            .environment(previewDependencyStore())
+            .environment(stores)
     }
-    .frame(width: 900, height: 600)
-}
-
-@MainActor
-private func previewDependencyStore() -> DependencyStore {
-    let store = DependencyStore()
-    store.graph = DependencyGraph.preview
-    store.selectedNodeName = "openssl@3"
-    return store
+    .frame(width: 960, height: 600)
 }
