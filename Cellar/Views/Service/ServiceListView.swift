@@ -59,9 +59,9 @@ struct ServiceListView: View {
 
     @ViewBuilder
     private var content: some View {
-        if store.isLoading && store.services.isEmpty {
+        if store.isLoading && store.lastUpdated == nil {
             LoadingView(message: "Loading Services\u{2026}")
-        } else if let errorMessage = store.errorMessage, store.services.isEmpty {
+        } else if let errorMessage = store.errorMessage, store.lastUpdated == nil {
             ErrorView(message: errorMessage) {
                 Task { await store.load(forceRefresh: true) }
             }
@@ -70,7 +70,7 @@ struct ServiceListView: View {
                 title: "No Services",
                 systemImage: "gearshape.2",
                 description: "Formulae that run in the background, such as databases, appear here.",
-                actionTitle: "Check Again"
+                actionTitle: "Reload"
             ) {
                 Task { await store.load(forceRefresh: true) }
             }

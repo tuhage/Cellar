@@ -15,10 +15,10 @@ final class DiskUsageStore: LoadableStore {
 
     private static let cache = CachePolicy(fileName: "cache-disk-usage.json", maxAge: 600)
 
-    func load(force: Bool = false) async {
+    func load(forceRefresh: Bool = false) async {
         await load(
             cache: Self.cache,
-            force: force,
+            force: forceRefresh,
             failureMessage: "Disk usage couldn’t be measured.",
             fetch: { try await HomebrewDiskUsage.measure() },
             apply: { self.usage = $0 }
@@ -29,6 +29,6 @@ final class DiskUsageStore: LoadableStore {
     /// shown, so background maintenance doesn't walk the disk for nothing.
     func reloadIfLoaded() async {
         guard usage != nil else { return }
-        await load(force: true)
+        await load(forceRefresh: true)
     }
 }

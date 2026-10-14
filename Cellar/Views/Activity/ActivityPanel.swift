@@ -8,10 +8,10 @@ struct ActivityPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             if store.operations.isEmpty {
-                ContentUnavailableView(
-                    "No Activity",
+                EmptyStateView(
+                    title: "No Activity",
                     systemImage: "clock.arrow.circlepath",
-                    description: Text("Installs, upgrades and other Homebrew operations appear here.")
+                    description: "Installs, upgrades and other Homebrew operations appear here."
                 )
             } else {
                 List {

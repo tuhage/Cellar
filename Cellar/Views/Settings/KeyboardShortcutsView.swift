@@ -20,7 +20,7 @@ struct KeyboardShortcutsView: View {
             }
             .padding(Spacing.section)
         }
-        .frame(width: 420, height: 560)
+        .frame(width: WindowSize.narrowWidth, height: 560)
         .background(.background)
     }
 

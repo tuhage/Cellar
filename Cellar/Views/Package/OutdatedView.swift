@@ -31,7 +31,7 @@ struct OutdatedView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 RestartServicesBanner()
             }
-            .loadErrorBanner(for: store) { await store.loadAll(forceRefresh: true) }
+            .loadErrorBanner(for: store) { await store.load(forceRefresh: true) }
             .navigationTitle("Updates")
             .dataFreshness(store.lastUpdated)
             .searchable(text: $searchText, prompt: "Search updates")
@@ -45,7 +45,7 @@ struct OutdatedView: View {
             }
             .packageSelection(selectedPackage, uninstallRequest: $uninstallRequest)
             .task {
-                await store.loadAll()
+                await store.load()
             }
     }
 
@@ -56,14 +56,15 @@ struct OutdatedView: View {
             LoadingView(message: "Checking for Updates\u{2026}")
         } else if let errorMessage = store.errorMessage, store.lastUpdated == nil {
             ErrorView(message: errorMessage) {
-                Task { await store.loadAll(forceRefresh: true) }
+                Task { await store.load(forceRefresh: true) }
             }
         } else if store.totalOutdated == 0 {
             EmptyStateView(
                 title: "Everything Up to Date",
                 systemImage: "checkmark.circle",
                 description: lastCheckDescription,
-                actionTitle: "Check Again"
+                actionTitle: "Check for Updates",
+                actionSystemImage: "arrow.triangle.2.circlepath"
             ) {
                 Task { await store.checkForUpdates() }
             }

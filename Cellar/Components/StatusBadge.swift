@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// A reusable capsule badge for displaying status labels.
-///
-/// Used across FormulaListView, CaskListView, DependencyGraphView,
-/// PackageDetailView, and other views that show package/node status.
+/// A tinted capsule with a short status label, such as "Installed" or
+/// "Official", and an optional icon.
 struct StatusBadge: View {
     let text: String
     let color: Color

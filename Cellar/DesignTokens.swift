@@ -143,8 +143,11 @@ nonisolated enum Opacity {
 // MARK: - WindowSize
 
 nonisolated enum WindowSize {
-    /// 420 pt — Narrow sheets (Add Tap, project activation)
-    static let narrowSheet: CGFloat = 420
+    /// 420 pt — Narrow sheets and columns (Add Tap, project activation,
+    /// keyboard shortcuts, operation notices, dashboard columns)
+    static let narrowWidth: CGFloat = 420
+    /// 560 pt — Widest comfortable line (live progress, inspectors)
+    static let readableWidth: CGFloat = 560
     /// 500 pt — Medium sheets (add Brewfile, item pickers, removal previews)
     static let mediumSheet: CGFloat = 500
     /// 400 pt — Medium sheet minimum height

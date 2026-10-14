@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// A consistent section header with icon, title, and optional trailing content.
-///
-/// Used across Dashboard, Outdated, Search, Health, and other views
-/// to provide uniform section labeling.
+/// A card section header with icon, title, and optional trailing content,
+/// such as the Dashboard's "See All".
 struct SectionHeaderView<Trailing: View>: View {
     let title: String
     let systemImage: String

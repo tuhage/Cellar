@@ -65,17 +65,17 @@ final class AppStores {
         isStarted = true
         defer { isStarted = false }
 
-        await refreshAll(force: false)
+        await refreshAll(forceRefresh: false)
         async let servicePolling: Void = pollServices()
         async let scheduledWork: Void = runScheduledWork()
         _ = await (servicePolling, scheduledWork)
     }
 
     /// Reloads every list Cellar shows outside a single page.
-    func refreshAll(force: Bool = true) async {
-        async let packages: Void = packages.loadAll(forceRefresh: force)
-        async let services: Void = services.load(forceRefresh: force)
-        async let taps: Void = taps.load(forceRefresh: force)
+    func refreshAll(forceRefresh: Bool = true) async {
+        async let packages: Void = packages.load(forceRefresh: forceRefresh)
+        async let services: Void = services.load(forceRefresh: forceRefresh)
+        async let taps: Void = taps.load(forceRefresh: forceRefresh)
         _ = await (packages, services, taps)
     }
 

@@ -27,7 +27,7 @@ struct DiskUsageSection: View {
             } else if let errorMessage = store.errorMessage {
                 LabeledContent {
                     Button("Try Again") {
-                        Task { await store.load(force: true) }
+                        Task { await store.load(forceRefresh: true) }
                     }
                 } label: {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")

@@ -64,7 +64,7 @@ struct AddTapSheet: View {
             }
         }
         .padding(Spacing.section)
-        .frame(width: WindowSize.narrowSheet)
+        .frame(width: WindowSize.narrowWidth)
     }
 
     // MARK: - Details

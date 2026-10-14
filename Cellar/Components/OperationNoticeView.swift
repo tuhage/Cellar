@@ -45,7 +45,7 @@ struct OperationNoticeView: View {
             .accessibilityLabel("Dismiss")
         }
         .padding(Spacing.cardPadding)
-        .frame(width: 420)
+        .frame(width: WindowSize.narrowWidth)
         .floatingSurface()
         .onHover { noticeStore.setHovering($0) }
         .accessibilityElement(children: .contain)

@@ -1,9 +1,6 @@
 import SwiftUI
 
-/// A section header displaying a label with a trailing count badge.
-///
-/// Used in list sections across FormulaListView, CaskListView, SearchView,
-/// and OutdatedView to show section titles with item counts.
+/// A list section header: a label with a trailing count badge.
 struct CountedSectionHeader: View {
     let title: String
     let systemImage: String

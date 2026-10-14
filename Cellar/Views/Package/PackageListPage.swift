@@ -37,7 +37,7 @@ struct PackageListPage: View {
         content
             .navigationTitle(kind.title)
             .dataFreshness(store.lastUpdated)
-            .loadErrorBanner(for: store) { await store.loadAll(forceRefresh: true) }
+            .loadErrorBanner(for: store) { await store.load(forceRefresh: true) }
             .searchable(text: $list.searchQuery, isPresented: $isSearchPresented, prompt: "Search \(kind.noun(count: 2))")
             .searchScopes($list.searchScope) {
                 Text("Installed").tag(PackageListState.SearchScope.installed)
@@ -47,10 +47,10 @@ struct PackageListPage: View {
                 help: "Reload installed \(kind.noun(count: 2)). Use Check for Updates on the Updates page to find new versions.",
                 isLoading: store.isLoading
             ) {
-                await store.loadAll(forceRefresh: true)
+                await store.load(forceRefresh: true)
             }
             .packageSelection(selectedPackage, uninstallRequest: $uninstallRequest)
-            .task { await store.loadAll() }
+            .task { await store.load() }
             .task(id: SearchTrigger(query: list.trimmedQuery, scope: list.searchScope)) {
                 list.prepareSearch()
                 guard list.isSearching else { return }
@@ -66,11 +66,11 @@ struct PackageListPage: View {
 
     @ViewBuilder
     private var content: some View {
-        if store.isLoading && store.packages(kind).isEmpty {
+        if store.isLoading && store.lastUpdated == nil {
             LoadingView(message: "Loading \(kind.title)\u{2026}")
         } else if let errorMessage = store.errorMessage, store.lastUpdated == nil {
             ErrorView(message: errorMessage) {
-                Task { await store.loadAll(forceRefresh: true) }
+                Task { await store.load(forceRefresh: true) }
             }
         } else if isShowingHomebrewResults {
             PackageSearchResults(kind: kind, menu: menu, showDetails: showDetails)

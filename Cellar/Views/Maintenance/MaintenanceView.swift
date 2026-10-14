@@ -62,7 +62,7 @@ struct MaintenanceView: View {
     }
 
     private func reloadDiskUsage() async {
-        await store.diskUsage.load(force: true)
+        await store.diskUsage.load(forceRefresh: true)
     }
 
     // MARK: - Tasks
@@ -90,10 +90,10 @@ struct MaintenanceView: View {
             }
 
             TaskRow(
-                title: "Check Health",
+                title: "Health Check",
                 description: "Run brew doctor to find problems with your Homebrew setup.",
                 systemImage: "stethoscope",
-                buttonTitle: "Check Health",
+                buttonTitle: "Run Health Check",
                 isDisabled: isBusy
             ) {
                 Task { await store.runHealthCheck() }
@@ -101,7 +101,7 @@ struct MaintenanceView: View {
 
             TaskRow(
                 title: "Run All",
-                description: "Clean up, then check health. Stops if the cleanup fails or is cancelled.",
+                description: "Clean up, then run a health check. Stops if the cleanup fails or is cancelled.",
                 systemImage: "play",
                 buttonTitle: "Run All\u{2026}",
                 isDisabled: isBusy
@@ -120,12 +120,12 @@ struct MaintenanceView: View {
             if let report = store.latestHealthCheck {
                 DoctorFindingList(report: DoctorReport(output: report.details ?? ""))
             } else {
-                Text("Check health to see whether brew doctor finds any problems.")
+                Text("Run a health check to see whether brew doctor finds any problems.")
                     .foregroundStyle(.secondary)
             }
         } header: {
             HStack {
-                Text("Health")
+                Text("Health Check")
                 Spacer()
                 if let date = store.latestHealthCheck?.date {
                     Text("Checked \(date.formatted(.relative(presentation: .named)))")

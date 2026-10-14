@@ -5,7 +5,7 @@ import SwiftUI
 enum AppShortcut: CaseIterable {
     case quickOpen
     case showActivity
-    case refresh
+    case reload
     case checkForPackageUpdates
     case upgradeAll
     case upgradeSelection
@@ -18,7 +18,7 @@ enum AppShortcut: CaseIterable {
         switch self {
         case .quickOpen: "k"
         case .showActivity: "a"
-        case .refresh, .checkForPackageUpdates: "r"
+        case .reload, .checkForPackageUpdates: "r"
         case .upgradeAll, .upgradeSelection: "u"
         case .uninstallSelection: .delete
         case .cleanUp: "k"
@@ -29,7 +29,7 @@ enum AppShortcut: CaseIterable {
 
     var modifiers: EventModifiers {
         switch self {
-        case .quickOpen, .refresh, .upgradeSelection, .uninstallSelection: .command
+        case .quickOpen, .reload, .upgradeSelection, .uninstallSelection: .command
         case .showActivity, .upgradeAll, .cleanUp, .toggleService: [.command, .shift]
         case .checkForPackageUpdates: [.command, .option]
         case .restartService: [.command, .shift, .option]
@@ -40,7 +40,7 @@ enum AppShortcut: CaseIterable {
         switch self {
         case .quickOpen: "Quick Open"
         case .showActivity: "Show Activity"
-        case .refresh: "Refresh"
+        case .reload: "Reload"
         case .checkForPackageUpdates: "Check for Package Updates"
         case .upgradeAll: "Upgrade All"
         case .upgradeSelection: "Upgrade Selected Package"
@@ -73,7 +73,7 @@ extension AppShortcut {
     var category: Category {
         switch self {
         case .quickOpen, .showActivity: .navigation
-        case .refresh, .checkForPackageUpdates, .upgradeAll, .upgradeSelection, .uninstallSelection, .cleanUp: .packages
+        case .reload, .checkForPackageUpdates, .upgradeAll, .upgradeSelection, .uninstallSelection, .cleanUp: .packages
         case .toggleService, .restartService: .services
         }
     }

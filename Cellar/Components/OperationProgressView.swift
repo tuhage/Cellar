@@ -129,7 +129,7 @@ struct RunningOperationBar: View {
     var body: some View {
         NoticeBanner(tint: .accentColor, systemImage: operation.kind.symbolName) {
             OperationProgressView(operation: operation)
-                .frame(maxWidth: 560, alignment: .leading)
+                .frame(maxWidth: WindowSize.readableWidth, alignment: .leading)
         } actions: {
             Button("Details") {
                 ActivityPanel.show()

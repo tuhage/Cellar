@@ -19,7 +19,7 @@ struct PageInspector<Inspector: View>: ViewModifier {
     @AppStorage private var width: Double
 
     private static var minWidth: Double { 320 }
-    private static var maxWidth: Double { 560 }
+    private static var maxWidth: Double { WindowSize.readableWidth }
 
     init(page: InspectorPage, isPresented: Binding<Bool>, hasContent: Bool, @ViewBuilder inspector: () -> Inspector) {
         _isPresented = isPresented

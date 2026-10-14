@@ -406,7 +406,7 @@ final class BrewfileStore {
     /// The Brewfiles page re-checks status when the package list reloads.
     private func reloadPackages() async {
         reloadContent()
-        async let packages: Void = packages.loadAll(forceRefresh: true)
+        async let packages: Void = packages.load(forceRefresh: true)
         async let taps: Void = taps.load(forceRefresh: true)
         _ = await (packages, taps)
     }

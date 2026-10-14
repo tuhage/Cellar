@@ -69,9 +69,9 @@ struct TapListView: View {
 
     @ViewBuilder
     private var content: some View {
-        if store.isLoading && store.taps.isEmpty {
+        if store.isLoading && store.lastUpdated == nil {
             LoadingView(message: "Loading Taps\u{2026}")
-        } else if let errorMessage = store.errorMessage, store.taps.isEmpty {
+        } else if let errorMessage = store.errorMessage, store.lastUpdated == nil {
             ErrorView(message: errorMessage) {
                 Task { await store.load(forceRefresh: true) }
             }
@@ -197,10 +197,10 @@ struct TapListView: View {
                 untap: { tapToRemove = selectedUsage }
             )
         } else {
-            ContentUnavailableView(
-                "No Selection",
+            EmptyStateView(
+                title: "No Selection",
                 systemImage: "spigot",
-                description: Text("Select a tap to see its packages and repository.")
+                description: "Select a tap to see its packages and repository."
             )
         }
     }

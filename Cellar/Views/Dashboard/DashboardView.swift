@@ -98,12 +98,12 @@ struct DashboardView: View {
                         VStack(alignment: .leading, spacing: Spacing.section) {
                             primaryColumn(summary)
                         }
-                        .frame(minWidth: 420, maxWidth: .infinity, alignment: .topLeading)
+                        .frame(minWidth: WindowSize.narrowWidth, maxWidth: .infinity, alignment: .topLeading)
 
                         VStack(alignment: .leading, spacing: Spacing.section) {
                             secondaryColumn(summary)
                         }
-                        .frame(minWidth: 360, idealWidth: 420, maxWidth: 480, alignment: .topLeading)
+                        .frame(minWidth: 360, idealWidth: WindowSize.narrowWidth, maxWidth: 480, alignment: .topLeading)
                     }
 
                     VStack(alignment: .leading, spacing: Spacing.section) {
@@ -219,7 +219,7 @@ struct DashboardView: View {
         QuickActionButton(
             title: "Health Check",
             subtitle: maintenanceStore.runningTask?.kind == .healthCheck ? "Checking\u{2026}" : "Run brew doctor",
-            systemImage: "heart.circle.fill",
+            systemImage: "stethoscope.circle.fill",
             color: .green,
             isDisabled: maintenanceStore.isRunning
         ) {

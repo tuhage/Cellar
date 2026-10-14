@@ -48,9 +48,9 @@ struct DependencyGraphView: View {
                 Divider()
                 nodeList(graph)
             }
-        } else if store.isLoading {
-            LoadingView(message: "Reading dependencies\u{2026}")
-        } else if let errorMessage = store.errorMessage {
+        } else if store.isLoading && store.lastUpdated == nil {
+            LoadingView(message: "Reading Dependencies\u{2026}")
+        } else if let errorMessage = store.errorMessage, store.lastUpdated == nil {
             ErrorView(message: errorMessage) {
                 Task { await store.load(forceRefresh: true) }
             }
@@ -59,7 +59,7 @@ struct DependencyGraphView: View {
                 title: "No Packages",
                 systemImage: "point.3.connected.trianglepath.dotted",
                 description: "Installed packages and their dependencies will appear here.",
-                actionTitle: "Check Again"
+                actionTitle: "Reload"
             ) {
                 Task { await store.load(forceRefresh: true) }
             }
@@ -187,10 +187,10 @@ struct DependencyGraphView: View {
                 uninstall: { requestUninstall(name) }
             )
         } else {
-            ContentUnavailableView(
-                "No Selection",
+            EmptyStateView(
+                title: "No Selection",
                 systemImage: "point.3.connected.trianglepath.dotted",
-                description: Text("Select a package to see why it’s installed and what needs it.")
+                description: "Select a package to see why it’s installed and what needs it."
             )
         }
     }

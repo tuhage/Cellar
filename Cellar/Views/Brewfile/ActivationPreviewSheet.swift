@@ -58,7 +58,7 @@ struct ActivationPreviewSheet: View {
             }
         }
         .padding(Spacing.section)
-        .frame(width: WindowSize.narrowSheet)
+        .frame(width: WindowSize.narrowWidth)
     }
 
     @ViewBuilder

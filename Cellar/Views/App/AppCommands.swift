@@ -48,8 +48,8 @@ struct AppCommands: Commands {
         }
 
         CommandMenu("Packages") {
-            Button("Refresh") { refresh() }
-                .shortcut(.refresh)
+            Button("Reload") { reload() }
+                .shortcut(.reload)
                 .disabled(window == nil)
 
             Button("Check for Package Updates") { window?.checkForPackageUpdates() }
@@ -94,8 +94,8 @@ struct AppCommands: Commands {
         }
     }
 
-    /// ⌘R reloads the visible page, or everything when it has no own refresh.
-    private func refresh() {
+    /// ⌘R reloads the visible page, or everything when the page has none.
+    private func reload() {
         Task {
             if let pageRefresh {
                 await pageRefresh()

@@ -57,23 +57,17 @@ struct PackageSearchResults: View {
     @ViewBuilder
     private var emptyState: some View {
         if isQueryTooShort {
-            ContentUnavailableView(
-                "Keep Typing",
+            EmptyStateView(
+                title: "Keep Typing",
                 systemImage: "magnifyingglass",
-                description: Text("Type at least \(PackageStore.minimumSearchLength) characters to search Homebrew.")
+                description: "Type at least \(PackageStore.minimumSearchLength) characters to search Homebrew."
             )
         } else if let error = list.searchError, !list.isSearching {
-            ContentUnavailableView {
-                Label("Couldn’t Search Homebrew", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(error)
-            } actions: {
-                Button("Try Again") {
-                    Task { await store.searchHomebrew(kind) }
-                }
+            ErrorView(message: "Couldn’t search Homebrew.", suggestion: error) {
+                Task { await store.searchHomebrew(kind) }
             }
         } else if list.isSearching || list.resultsQuery != list.trimmedQuery {
-            ProgressView("Searching Homebrew\u{2026}")
+            LoadingView(message: "Searching Homebrew\u{2026}")
         } else {
             ContentUnavailableView.search(text: list.trimmedQuery)
         }

@@ -194,7 +194,7 @@ extension BrewOperation {
             case .brewUpdate: ("Checking for package updates", "Package list is up to date", "arrow.triangle.2.circlepath")
             case .cleanup: ("Cleaning up Homebrew", "Cleaned up Homebrew", "trash.circle")
             case .autoremove: ("Removing unused dependencies", "Removed unused dependencies", "shippingbox")
-            case .healthCheck: ("Running brew doctor", "Finished brew doctor", "stethoscope")
+            case .healthCheck: ("Running health check", "Finished health check", "stethoscope")
             }
         }
     }

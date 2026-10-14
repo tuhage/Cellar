@@ -62,7 +62,7 @@ struct QuickActionButton: View {
         )
 
         QuickActionButton(
-            title: "Cleanup",
+            title: "Clean Up",
             subtitle: "Free disk space",
             systemImage: "trash.circle.fill",
             color: .red,

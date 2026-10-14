@@ -116,22 +116,23 @@ struct PackageTable: View {
     @ViewBuilder
     private var emptyState: some View {
         if !query.isEmpty && filter == .all {
-            ContentUnavailableView {
-                Label("No Results", systemImage: "magnifyingglass")
-            } description: {
-                Text("No installed \(kind.noun(count: 2)) match “\(query)”.")
-            } actions: {
-                Button("Search Homebrew") {
-                    list.searchScope = .homebrew
-                }
+            EmptyStateView(
+                title: "No Results",
+                systemImage: "magnifyingglass",
+                description: "No installed \(kind.noun(count: 2)) match “\(query)”.",
+                actionTitle: "Search Homebrew",
+                actionSystemImage: "magnifyingglass"
+            ) {
+                list.searchScope = .homebrew
             }
         } else {
-            ContentUnavailableView {
-                Label(filter.emptyTitle(for: kind), systemImage: "line.3.horizontal.decrease.circle")
-            } actions: {
-                Button("Show All") {
-                    filter = .all
-                }
+            EmptyStateView(
+                title: filter.emptyTitle(for: kind),
+                systemImage: "line.3.horizontal.decrease.circle",
+                actionTitle: "Show All",
+                actionSystemImage: "line.3.horizontal.decrease.circle"
+            ) {
+                filter = .all
             }
         }
     }

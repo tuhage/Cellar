@@ -116,7 +116,7 @@ final class PackageStore: LoadableStore {
 
     // MARK: Loading
 
-    func loadAll(forceRefresh: Bool = false) async {
+    func load(forceRefresh: Bool = false) async {
         await load(
             cache: Self.cache,
             force: forceRefresh,
@@ -298,7 +298,7 @@ final class PackageStore: LoadableStore {
             let checkedAt = Date()
             self.lastUpdateCheck = checkedAt
             UserDefaults.standard.set(checkedAt, forKey: SettingsKey.lastHomebrewUpdateCheck)
-            await self.loadAll(forceRefresh: true)
+            await self.load(forceRefresh: true)
         }
     }
 
@@ -361,7 +361,7 @@ final class PackageStore: LoadableStore {
                         failures.append(package.identifier)
                     }
                 }
-                await self.loadAll(forceRefresh: true)
+                await self.load(forceRefresh: true)
                 guard failures.isEmpty else { throw UpgradeBatchFailure(packages: failures) }
             }
         }
@@ -434,7 +434,7 @@ final class PackageStore: LoadableStore {
         _ kind: BrewOperation.Kind,
         _ body: @escaping @MainActor (ActivityContext) async throws -> Void
     ) async -> Bool {
-        await activityStore.perform(kind, reloading: { await self.loadAll(forceRefresh: true) }, body)
+        await activityStore.perform(kind, reloading: { await self.load(forceRefresh: true) }, body)
     }
 }
 

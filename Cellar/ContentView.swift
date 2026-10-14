@@ -53,10 +53,10 @@ struct ContentView: View {
             if let item = selection.wrappedValue {
                 DetailView(item: item)
             } else {
-                ContentUnavailableView(
-                    "Select an Item",
+                EmptyStateView(
+                    title: "Select an Item",
                     systemImage: "sidebar.left",
-                    description: Text("Choose a section from the sidebar.")
+                    description: "Choose a section from the sidebar."
                 )
             }
         }
