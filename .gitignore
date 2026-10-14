@@ -31,3 +31,4 @@ build/
 docs/
 scripts/*
 !scripts/release.sh
+!scripts/update-cask.sh

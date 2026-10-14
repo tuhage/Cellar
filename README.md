@@ -73,8 +73,13 @@
 
 ## Installation
 
-1. Download the latest `.dmg` from [Releases](https://github.com/tuhage/Cellar/releases/latest).
-2. Open it and drag **Cellar** to **Applications**.
+Install with Homebrew:
+
+```bash
+brew install --cask tuhage/cellar/cellar
+```
+
+Or download the latest `.dmg` from [Releases](https://github.com/tuhage/Cellar/releases/latest), open it and drag **Cellar** to **Applications**.
 
 Cellar is signed with a Developer ID and notarized by Apple. It checks for its own updates daily and installs them in-app; signed updates are verified before they're installed. You can change this under **Settings › About**.
 
@@ -82,7 +87,7 @@ Cellar is signed with a Developer ID and notarized by Apple. It checks for its o
 
 ## Command-Line Tool
 
-Install it from **Settings › Extensions**, then:
+Homebrew installs it along with the app. Otherwise, install it from **Settings › Extensions**. Then:
 
 ```bash
 cellar status                 # Packages, services and updates at a glance

@@ -216,6 +216,15 @@ echo "  App: $APP_PATH"
 echo "  DMG: $DMG_PATH"
 echo "  Appcast: $APPCAST_PATH"
 echo
+RELEASE_ASSETS="\"$DMG_PATH\" \"$APPCAST_PATH\""
+RELEASE_NOTES="--generate-notes"
+if [[ -n "${RELEASE_NOTES_FILE:-}" ]]; then
+  # The appcast's release notes link points at this file on the release.
+  RELEASE_ASSETS+=" \"$APPCAST_DIR/Cellar-$VERSION.md\""
+  RELEASE_NOTES="--notes-file \"$RELEASE_NOTES_FILE\""
+fi
+
 echo "Publish:"
 echo "  git tag -a v$VERSION -m \"v$VERSION\" && git push origin v$VERSION"
-echo "  gh release create v$VERSION \"$DMG_PATH\" \"$APPCAST_PATH\" --title \"Cellar $VERSION\" --generate-notes"
+echo "  gh release create v$VERSION $RELEASE_ASSETS --title \"Cellar $VERSION\" $RELEASE_NOTES --verify-tag"
+echo "  ./scripts/update-cask.sh $VERSION"
