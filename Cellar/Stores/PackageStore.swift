@@ -73,7 +73,7 @@ final class PackageStore: LoadableStore {
     /// Whether an operation — including a queued batch step — keeps the
     /// package busy. Use it to disable actions.
     func isBusy(_ package: PackageType) -> Bool {
-        activityStore.isActive(.package(package.identifier))
+        activityStore.isActive(.package(package.activityName))
     }
 
     // MARK: Selection
@@ -160,8 +160,7 @@ final class PackageStore: LoadableStore {
     /// Installs and then selects the formula so its inspector — with any
     /// caveats — opens.
     func installFormula(name: String) async {
-        // A tap-qualified name installs a formula listed under its short name.
-        let installedName = name.split(separator: "/").last.map(String.init) ?? name
+        let installedName = PackageType.formula(.stub(name: name)).activityName
         let succeeded = await run(.install(name: installedName, isCask: false)) { activity in
             try await activity.stream(Formula.installOutput(name: name))
         }
@@ -301,7 +300,6 @@ final class PackageStore: LoadableStore {
     private static let lastUpdateCheckKey = "lastHomebrewUpdateCheck"
     /// Matches brew's own auto-update interval.
     private static let automaticCheckInterval: TimeInterval = 86_400
-    static let automaticCheckSettingKey = "checksPackageUpdatesAutomatically"
 
     var isCheckingForUpdates: Bool {
         activityStore.runningOperation(for: .homebrew)?.kind == .brewUpdate
@@ -323,7 +321,7 @@ final class PackageStore: LoadableStore {
     /// Checks once a day unless turned off in Settings.
     func checkForUpdatesIfDue() async {
         guard BrewProcess.isInstalled,
-              UserDefaults.standard.object(forKey: Self.automaticCheckSettingKey) as? Bool ?? true
+              UserDefaults.standard.object(forKey: SettingsKey.checksPackageUpdatesDaily) as? Bool ?? true
         else { return }
         if let lastUpdateCheck, Date().timeIntervalSince(lastUpdateCheck) < Self.automaticCheckInterval {
             return

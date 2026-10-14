@@ -12,9 +12,9 @@ enum PackageActivity: Equatable {
     case operation(BrewOperation.Kind)
 
     init?(_ package: PackageType, activityStore: ActivityStore) {
-        if let step = activityStore.runningBatchStep(name: package.identifier, isCask: package.kind == .cask) {
+        if let step = activityStore.runningBatchStep(name: package.activityName, isCask: package.kind == .cask) {
             self = .batchStep(step.status)
-        } else if let operation = activityStore.runningOperation(for: .package(package.identifier)) {
+        } else if let operation = activityStore.runningOperation(for: .package(package.activityName)) {
             self = .operation(operation.kind)
         } else {
             return nil

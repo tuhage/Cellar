@@ -21,6 +21,7 @@ private struct UninstallConfirmation: ViewModifier {
     @Binding var request: UninstallRequest?
 
     @Environment(PackageStore.self) private var store
+    @AppStorage(SettingsKey.confirmsBeforeUninstall) private var confirmsBeforeUninstall = true
 
     /// How many app data paths the message lists before summarizing.
     private static let listedPathLimit = 5
@@ -28,23 +29,40 @@ private struct UninstallConfirmation: ViewModifier {
     func body(content: Content) -> some View {
         content.confirmationDialog(
             request.map(title) ?? "",
-            isPresented: Binding(get: { request != nil }, set: { if !$0 { request = nil } }),
+            isPresented: Binding(
+                get: { request.map(needsConfirmation) ?? false },
+                set: { if !$0 { request = nil } }
+            ),
             titleVisibility: .visible,
             presenting: request
         ) { request in
-            let ignoresDependents = !dependents(of: request).isEmpty
-            Button(ignoresDependents ? "Uninstall Anyway" : "Uninstall", role: .destructive) {
-                Task {
-                    await store.uninstall(
-                        request.packages,
-                        ignoringDependents: ignoresDependents,
-                        zap: request.removesAppData
-                    )
-                }
+            Button(dependents(of: request).isEmpty ? "Uninstall" : "Uninstall Anyway", role: .destructive) {
+                perform(request)
             }
             Button("Cancel", role: .cancel) {}
         } message: { request in
             Text(message(for: request))
+        }
+        .onChange(of: request?.id) {
+            guard let request, !needsConfirmation(request) else { return }
+            perform(request)
+            self.request = nil
+        }
+    }
+
+    /// The Settings switch only skips safe uninstalls: breaking other
+    /// packages or deleting app data always asks.
+    private func needsConfirmation(_ request: UninstallRequest) -> Bool {
+        confirmsBeforeUninstall || request.removesAppData || !dependents(of: request).isEmpty
+    }
+
+    private func perform(_ request: UninstallRequest) {
+        Task {
+            await store.uninstall(
+                request.packages,
+                ignoringDependents: !dependents(of: request).isEmpty,
+                zap: request.removesAppData
+            )
         }
     }
 

@@ -66,6 +66,12 @@ nonisolated enum PackageType: Identifiable, Hashable, Sendable {
     }
 
     /// What people call it: the formula name or the cask's app name.
+    /// The name brew operations are tracked under: a tap-qualified search
+    /// result ("user/tap/foo") installs as "foo".
+    var activityName: String {
+        identifier.split(separator: "/").last.map(String.init) ?? identifier
+    }
+
     var name: String {
         switch self {
         case .formula(let formula): formula.name
