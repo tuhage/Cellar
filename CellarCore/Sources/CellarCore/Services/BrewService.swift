@@ -43,11 +43,10 @@ public nonisolated final class BrewService: Sendable {
 
     // MARK: - Install / Uninstall / Upgrade
 
+    /// `--formula` / `--cask` is always explicit: without it brew resolves a
+    /// bare name like `maestro` to a same-named cask instead of the formula.
     public func install(_ name: String, isCask: Bool = false) -> AsyncThrowingStream<String, Error> {
-        var args = ["install"]
-        if isCask { args.append("--cask") }
-        args.append(name)
-        return process.stream(args)
+        process.stream(["install", isCask ? "--cask" : "--formula", name])
     }
 
     public func uninstall(_ name: String, force: Bool = false) async throws {
@@ -57,12 +56,27 @@ public nonisolated final class BrewService: Sendable {
         try await runChecked(args)
     }
 
-    public func upgrade(_ name: String) -> AsyncThrowingStream<String, Error> {
-        process.stream(["upgrade", name])
+    public func upgrade(_ name: String, isCask: Bool = false) -> AsyncThrowingStream<String, Error> {
+        process.stream(["upgrade", isCask ? "--cask" : "--formula", name], includingStandardError: true)
     }
 
     public func upgradeAll() -> AsyncThrowingStream<String, Error> {
         process.stream(["upgrade"])
+    }
+
+    /// What `brew upgrade` would do for the given packages, without doing it.
+    public func upgradeDryRun(_ names: [String], isCask: Bool) async throws -> String {
+        guard !names.isEmpty else { return "" }
+        let output = try await runChecked(["upgrade", "--dry-run", isCask ? "--cask" : "--formula"] + names)
+        return output.stdout
+    }
+
+    // MARK: - Update
+
+    /// Refreshes Homebrew's package metadata. Every other command runs with
+    /// auto-update disabled, so this is what makes "outdated" current.
+    public func update() -> AsyncThrowingStream<String, Error> {
+        process.stream(["update"], includingStandardError: true)
     }
 
     // MARK: - Cleanup

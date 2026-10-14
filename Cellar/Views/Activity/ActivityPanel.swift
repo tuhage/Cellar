@@ -22,7 +22,10 @@ struct ActivityPanel: View {
                                 onCancel: op.isRunning && store.canCancel(op.id)
                                     ? { store.cancel(op.id) }
                                     : nil,
-                                onForceRetry: shouldOfferForceRetry(op) ? { forceRetry(op) } : nil
+                                onForceRetry: shouldOfferForceRetry(op) ? { forceRetry(op) } : nil,
+                                onRetryFailed: packageStore.canRetryFailedUpgrades(of: op)
+                                    ? { packageStore.retryFailedUpgrades(of: op) }
+                                    : nil
                             )
                             .padding(.horizontal, Spacing.cardPadding)
                             Divider()
@@ -101,11 +104,24 @@ struct ActivityPanel: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
+            Button {
+                openLogsFolder()
+            } label: {
+                Label("Logs", systemImage: "folder")
+            }
+            .controlSize(.small)
+            .help("Show saved operation logs in Finder")
             ClearCompletedButton(isDisabled: completedCount == 0) {
                 store.clearCompleted()
             }
         }
         .padding(Spacing.item)
+    }
+
+    private func openLogsFolder() {
+        let directory = ActivityLogService.shared.directory
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(directory)
     }
 
     private var completedCount: Int {

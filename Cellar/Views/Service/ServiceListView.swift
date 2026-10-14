@@ -3,6 +3,8 @@ import CellarCore
 
 struct ServiceListView: View {
     @Environment(ServiceStore.self) private var store
+    @Environment(PackageStore.self) private var packageStore
+    @Environment(ActivityStore.self) private var activityStore
 
     @State private var sortOrder: [KeyPathComparator<BrewServiceItem>]
     @State private var serviceToKill: BrewServiceItem?
@@ -54,6 +56,9 @@ struct ServiceListView: View {
             } else {
                 serviceTable
             }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            restartBanner
         }
         .navigationTitle("Services")
         .toolbar {
@@ -132,6 +137,23 @@ struct ServiceListView: View {
 
     private var hasEffectiveFilters: Bool {
         hasActiveFilters && store.visibleServices.count != store.services.count
+    }
+
+    /// Services upgraded while running still execute the old build.
+    @ViewBuilder
+    private var restartBanner: some View {
+        let services = store.servicesNeedingRestart(formulae: packageStore.formulae)
+        if !services.isEmpty {
+            VStack(spacing: 0) {
+                RestartServicesBanner(
+                    services: services,
+                    isRestarting: services.contains { activityStore.isActive(target: $0.name) }
+                ) {
+                    Task { await store.restart(services) }
+                }
+                Divider()
+            }
+        }
     }
 
     private var serviceTable: some View {
@@ -336,6 +358,8 @@ private struct ServiceStatusBadge: View {
     NavigationStack {
         ServiceListView()
             .environment(ServiceStore())
+            .environment(PackageStore())
+            .environment(ActivityStore())
     }
     .frame(width: 700, height: 500)
 }

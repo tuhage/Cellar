@@ -35,17 +35,21 @@ final class ActivityNotificationService {
         guard case .upgradeAll(let count) = op.kind else { return }
         notifiedIDs.insert(op.id)
 
+        let upgraded = op.steps.isEmpty ? count : op.succeededStepCount
         let content = UNMutableNotificationContent()
         switch op.status {
         case .succeeded:
             content.title = "Upgrade Complete"
-            content.body = "\(count) packages upgraded."
+            content.body = "\(upgraded) packages upgraded."
         case .failed(let reason):
-            content.title = "Upgrade Failed"
-            content.body = reason
+            let failed = op.failedSteps
+            content.title = failed.isEmpty ? "Upgrade Failed" : "Upgrade Finished with Errors"
+            content.body = failed.isEmpty
+                ? reason
+                : "\(upgraded) upgraded, \(failed.count) failed: \(failed.map(\.name).joined(separator: ", "))"
         case .cancelled:
             content.title = "Upgrade Cancelled"
-            content.body = "Cancelled while upgrading \(count) packages."
+            content.body = "Cancelled after upgrading \(upgraded) of \(count) packages."
         case .running:
             return
         }

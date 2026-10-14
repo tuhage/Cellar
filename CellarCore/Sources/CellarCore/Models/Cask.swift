@@ -72,8 +72,14 @@ public struct Cask: Identifiable, Codable, Hashable, Sendable {
         try await BrewService.shared.uninstall(token, force: force)
     }
 
+    /// Streams `brew upgrade --cask` output line by line. Uses the fully
+    /// qualified token so a tap cask is never mistaken for a same-named one.
+    public func upgradeOutput() -> AsyncThrowingStream<String, Error> {
+        BrewService.shared.upgrade(fullToken.isEmpty ? token : fullToken, isCask: true)
+    }
+
     public func upgrade() async throws {
-        for try await _ in BrewService.shared.upgrade(token) {}
+        for try await _ in upgradeOutput() {}
     }
 
     // MARK: Factory Methods

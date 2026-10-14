@@ -222,21 +222,39 @@ struct DashboardView: View {
         }
     }
 
+    private func upgradeAllSubtitle(_ summary: SystemSummary) -> String {
+        if packageStore.isUpgradingAll {
+            guard let operation = packageStore.upgradeAllOperation,
+                  let step = operation.currentStep,
+                  let position = operation.currentStepNumber
+            else { return "Show progress" }
+            return "\(step.name) · \(position) of \(operation.steps.count)"
+        }
+        if packageStore.isCheckingForUpdates {
+            return "Checking for updates\u{2026}"
+        }
+        return summary.updatesAvailable > 0 ? "\(summary.updatesAvailable) available" : "All up to date"
+    }
+
     @ViewBuilder
     private func quickActionButtons(_ summary: SystemSummary) -> some View {
                 QuickActionButton(
-                    title: "Upgrade All",
-                    subtitle: summary.updatesAvailable > 0
-                        ? "\(summary.updatesAvailable) available"
-                        : "All up to date",
+                    title: packageStore.isUpgradingAll ? "Upgrading\u{2026}" : "Upgrade All",
+                    subtitle: upgradeAllSubtitle(summary),
                     systemImage: "arrow.up.circle.fill",
                     color: .orange,
-                    isDisabled: summary.updatesAvailable == 0
-                        || dashboardStore.isPerformingAction
-                        || packageStore.isUpgradingAll,
+                    isDisabled: !packageStore.isUpgradingAll
+                        && (summary.updatesAvailable == 0
+                            || dashboardStore.isPerformingAction
+                            || packageStore.isCheckingForUpdates),
                     isProminent: true
                 ) {
-                    packageStore.upgradeAll()
+                    // While running, the button shows where the upgrade is.
+                    if packageStore.isUpgradingAll {
+                        NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                    } else {
+                        packageStore.upgradeAll()
+                    }
                 }
 
                 QuickActionButton(

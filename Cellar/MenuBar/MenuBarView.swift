@@ -103,7 +103,14 @@ struct MenuBarView: View {
     private var updatesSection: some View {
         let outdated = packageStore.totalOutdated
 
-        if outdated == 0 {
+        if packageStore.isUpgradingAll {
+            Label(upgradeProgressTitle, systemImage: "arrow.up.circle")
+                .disabled(true)
+
+            Button("Cancel Upgrade") {
+                packageStore.cancelUpgradeAll()
+            }
+        } else if outdated == 0 {
             Label("Everything Up to Date", systemImage: "checkmark.circle")
                 .disabled(true)
         } else {
@@ -116,7 +123,21 @@ struct MenuBarView: View {
             Button("Upgrade All") {
                 packageStore.upgradeAll()
             }
+            .disabled(packageStore.isCheckingForUpdates)
         }
+
+        Button(packageStore.isCheckingForUpdates ? "Checking for Updates\u{2026}" : "Check for Updates") {
+            Task { await packageStore.checkForUpdates() }
+        }
+        .disabled(packageStore.isCheckingForUpdates || packageStore.isUpgradingAll)
+    }
+
+    private var upgradeProgressTitle: String {
+        guard let operation = packageStore.upgradeAllOperation,
+              let step = operation.currentStep,
+              let position = operation.currentStepNumber
+        else { return "Upgrading Packages\u{2026}" }
+        return "Upgrading \(step.name) (\(position) of \(operation.steps.count))"
     }
 
     // MARK: - Actions

@@ -14,7 +14,13 @@ final class ServiceStore: LoadableStore {
 
     // MARK: Data
 
-    var services: [BrewServiceItem] = []
+    var services: [BrewServiceItem] = [] {
+        didSet { processStartDates = Self.processStartDates(of: services) }
+    }
+
+    /// When each running service's process started, captured whenever the
+    /// list changes so views don't query the kernel on every render.
+    private var processStartDates: [String: Date] = [:]
 
     // MARK: State
 
@@ -134,6 +140,30 @@ final class ServiceStore: LoadableStore {
         isLoading = false
     }
 
+    /// Running services whose process started before their formula's
+    /// current version was installed: they keep running the old build until
+    /// restarted.
+    func servicesNeedingRestart(formulae: [Formula]) -> [BrewServiceItem] {
+        let installTimes = Dictionary(
+            formulae.compactMap { formula in formula.installTime.map { (formula.name, $0) } },
+            uniquingKeysWith: max
+        )
+        return services.filter { service in
+            guard service.isRunning,
+                  let startedAt = processStartDates[service.name],
+                  let installedAt = installTimes[service.name]
+            else { return false }
+            return startedAt < installedAt
+        }
+    }
+
+    /// Restarts each service in turn; root services prompt for a password.
+    func restart(_ services: [BrewServiceItem]) async {
+        for service in services {
+            await restart(service)
+        }
+    }
+
     /// Starts a service and reloads the service list.
     /// Services registered under `root` are started with elevated privileges.
     func start(_ service: BrewServiceItem) async {
@@ -245,6 +275,15 @@ final class ServiceStore: LoadableStore {
         }
         errorMessage = error.localizedDescription
         if let opID { activityStore?.setStatus(opID, .failed(reason: error.localizedDescription)) }
+    }
+
+    private static func processStartDates(of services: [BrewServiceItem]) -> [String: Date] {
+        Dictionary(
+            services.compactMap { service in
+                service.isRunning ? service.processStartDate.map { (service.name, $0) } : nil
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     private func refreshServices() async throws {

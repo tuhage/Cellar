@@ -6,6 +6,11 @@ public protocol BrewProcessProtocol: Sendable {
     func run(_ arguments: [String]) async throws -> ProcessOutput
     func stream(_ arguments: [String]) -> AsyncThrowingStream<String, Error>
 
+    /// Like `stream(_:)`, optionally interleaving stderr lines. When stdout
+    /// isn't a terminal brew prints its progress (downloads, the update
+    /// report) to stderr, so long operations want both.
+    func stream(_ arguments: [String], includingStandardError: Bool) -> AsyncThrowingStream<String, Error>
+
     /// Runs `brew` as root via the macOS admin authentication prompt
     /// (Touch ID / password). Used for services registered under `root`.
     func runPrivileged(_ arguments: [String]) async throws -> ProcessOutput
@@ -16,6 +21,11 @@ public extension BrewProcessProtocol {
     /// implement privileged execution.
     func runPrivileged(_ arguments: [String]) async throws -> ProcessOutput {
         try await run(arguments)
+    }
+
+    /// Default ignores stderr so test doubles need only implement `stream(_:)`.
+    func stream(_ arguments: [String], includingStandardError: Bool) -> AsyncThrowingStream<String, Error> {
+        stream(arguments)
     }
 }
 
@@ -71,6 +81,10 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
     }
 
     public func stream(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
+        stream(arguments, includingStandardError: false)
+    }
+
+    public func stream(_ arguments: [String], includingStandardError: Bool) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let worker = Task {
                 do {
@@ -78,6 +92,7 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
                         executableURL: URL(fileURLWithPath: self.brewPath),
                         arguments: arguments,
                         environment: Self.brewEnvironment(),
+                        includingStandardError: includingStandardError,
                         continuation: continuation
                     )
                 } catch is CancellationError {
@@ -95,6 +110,11 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
 
     // MARK: - Process Execution
 
+    /// How long to keep draining a pipe after the process has exited. EOF
+    /// normally arrives immediately; it only lags when a detached grandchild
+    /// (a daemon started by a post-install step, say) inherited the pipe.
+    private static let pipeDrainGracePeriod: Duration = .seconds(2)
+
     /// Executes a process while draining stdout and stderr concurrently.
     /// Cancellation terminates the underlying process instead of only
     /// cancelling the Swift task that is waiting for it.
@@ -103,14 +123,10 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         arguments: [String],
         environment: [String: String]?
     ) async throws -> ProcessOutput {
-        let process = Process()
+        let process = makeProcess(executableURL: executableURL, arguments: arguments, environment: environment)
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         let state = ProcessCancellationState(process: process)
-
-        process.executableURL = executableURL
-        process.arguments = arguments
-        process.environment = environment
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
@@ -123,16 +139,18 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
             }
             state.processDidLaunch()
 
-            async let stdoutData = readAll(from: stdoutPipe.fileHandleForReading)
-            async let stderrData = readAll(from: stderrPipe.fileHandleForReading)
-            async let exitCode = waitForExit(process)
+            let stdout = PipeReader(stdoutPipe.fileHandleForReading)
+            let stderr = PipeReader(stderrPipe.fileHandleForReading)
+            let exitCode = await waitForExit(process)
+            async let stdoutData = stdout.result(waitingAtMost: pipeDrainGracePeriod)
+            async let stderrData = stderr.result(waitingAtMost: pipeDrainGracePeriod)
 
-            let result = await (stdoutData, stderrData, exitCode)
+            let result = await (stdoutData, stderrData)
             try Task.checkCancellation()
             return ProcessOutput(
                 stdout: String(decoding: result.0, as: UTF8.self),
                 stderr: String(decoding: result.1, as: UTF8.self),
-                exitCode: result.2
+                exitCode: exitCode
             )
         } onCancel: {
             state.cancel()
@@ -143,18 +161,18 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         executableURL: URL,
         arguments: [String],
         environment: [String: String]?,
+        includingStandardError: Bool,
         continuation: AsyncThrowingStream<String, Error>.Continuation
     ) async throws {
-        let process = Process()
+        let process = makeProcess(executableURL: executableURL, arguments: arguments, environment: environment)
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         let state = ProcessCancellationState(process: process)
-
-        process.executableURL = executableURL
-        process.arguments = arguments
-        process.environment = environment
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        let forwardLine: @Sendable (String) -> Void = { line in
+            continuation.yield(line)
+        }
 
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
@@ -165,14 +183,17 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
             }
             state.processDidLaunch()
 
-            async let stdout: Void = readLines(
-                from: stdoutPipe.fileHandleForReading,
-                continuation: continuation
+            let stdout = PipeReader(stdoutPipe.fileHandleForReading, collects: false, onLine: forwardLine)
+            // stderr is always collected for the failure message.
+            let stderr = PipeReader(
+                stderrPipe.fileHandleForReading,
+                onLine: includingStandardError ? forwardLine : nil
             )
-            async let stderrData = readAll(from: stderrPipe.fileHandleForReading)
-            async let exitCode = waitForExit(process)
+            let status = await waitForExit(process)
+            async let stdoutDrained = stdout.result(waitingAtMost: pipeDrainGracePeriod)
+            async let stderrData = stderr.result(waitingAtMost: pipeDrainGracePeriod)
 
-            let (_, errorData, status) = await (stdout, stderrData, exitCode)
+            let (_, errorData) = await (stdoutDrained, stderrData)
             try Task.checkCancellation()
             guard status == 0 else {
                 throw BrewError.processFailure(
@@ -186,43 +207,20 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
         }
     }
 
-    private static func readAll(from handle: FileHandle) async -> Data {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                continuation.resume(returning: (try? handle.readToEnd()) ?? Data())
-            }
-        }
-    }
-
-    /// Reads complete UTF-8 lines without losing characters that happen to be
-    /// split across pipe reads. A final unterminated line is also delivered.
-    private static func readLines(
-        from handle: FileHandle,
-        continuation: AsyncThrowingStream<String, Error>.Continuation
-    ) async {
-        await withCheckedContinuation { finished in
-            DispatchQueue.global(qos: .utility).async {
-                var buffer = Data()
-
-                while true {
-                    let chunk = handle.availableData
-                    guard !chunk.isEmpty else { break }
-                    buffer.append(chunk)
-
-                    while let newline = buffer.firstIndex(of: 0x0A) {
-                        var lineData = buffer[..<newline]
-                        if lineData.last == 0x0D { lineData = lineData.dropLast() }
-                        continuation.yield(String(decoding: lineData, as: UTF8.self))
-                        buffer.removeSubrange(...newline)
-                    }
-                }
-
-                if !buffer.isEmpty {
-                    continuation.yield(String(decoding: buffer, as: UTF8.self))
-                }
-                finished.resume()
-            }
-        }
+    /// stdin is `/dev/null` so a prompt (sudo, a confirmation, a credential
+    /// helper) fails fast instead of waiting forever for input that a GUI app
+    /// can never provide.
+    private static func makeProcess(
+        executableURL: URL,
+        arguments: [String],
+        environment: [String: String]?
+    ) -> Process {
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.environment = environment
+        process.standardInput = FileHandle.nullDevice
+        return process
     }
 
     private static func waitForExit(_ process: Process) async -> Int32 {
@@ -283,6 +281,89 @@ public nonisolated final class BrewProcess: BrewProcessProtocol, Sendable {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return "\"\(escaped)\""
+    }
+}
+
+/// Drains one end of a pipe on a background thread.
+///
+/// With an `onLine` handler, complete UTF-8 lines are delivered as they
+/// arrive without losing characters that happen to be split across pipe
+/// reads; a final unterminated line is also delivered. With `collects`,
+/// every byte is also kept for `result(waitingAtMost:)`.
+private final class PipeReader: @unchecked Sendable {
+    private let lock = NSLock()
+    private var collected = Data()
+    private var isFinished = false
+    private var waiter: CheckedContinuation<Data, Never>?
+
+    init(_ handle: FileHandle, collects: Bool = true, onLine: (@Sendable (String) -> Void)? = nil) {
+        DispatchQueue.global(qos: .utility).async {
+            var buffer = Data()
+
+            while true {
+                let chunk = handle.availableData
+                guard !chunk.isEmpty else { break }
+                if collects { self.collect(chunk) }
+                guard let onLine else { continue }
+                buffer.append(chunk)
+
+                while let newline = buffer.firstIndex(of: 0x0A) {
+                    var lineData = buffer[..<newline]
+                    if lineData.last == 0x0D { lineData = lineData.dropLast() }
+                    onLine(String(decoding: lineData, as: UTF8.self))
+                    buffer.removeSubrange(...newline)
+                }
+            }
+
+            if let onLine, !buffer.isEmpty {
+                onLine(String(decoding: buffer, as: UTF8.self))
+            }
+            self.finish()
+        }
+    }
+
+    /// The collected bytes once the pipe reaches EOF. Call after the process
+    /// has exited: if EOF hasn't arrived within `grace`, a grandchild is
+    /// holding the pipe open and whatever was read so far is returned.
+    func result(waitingAtMost grace: Duration) async -> Data {
+        let deadline = Task {
+            try? await Task.sleep(for: grace)
+            self.finish()
+        }
+        defer { deadline.cancel() }
+
+        return await withCheckedContinuation { continuation in
+            lock.lock()
+            if isFinished {
+                let data = collected
+                lock.unlock()
+                continuation.resume(returning: data)
+            } else {
+                waiter = continuation
+                lock.unlock()
+            }
+        }
+    }
+
+    private func collect(_ chunk: Data) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !isFinished else { return }
+        collected.append(chunk)
+    }
+
+    private func finish() {
+        lock.lock()
+        guard !isFinished else {
+            lock.unlock()
+            return
+        }
+        isFinished = true
+        let pending = waiter
+        waiter = nil
+        let data = collected
+        lock.unlock()
+        pending?.resume(returning: data)
     }
 }
 

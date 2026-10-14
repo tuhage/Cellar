@@ -25,6 +25,7 @@ private struct GeneralTab: View {
     @AppStorage("showMenuBarExtra") private var showMenuBarExtra = true
     @AppStorage("confirmBeforeUninstall") private var confirmBeforeUninstall = true
     @AppStorage("showNotifications") private var showNotifications = true
+    @AppStorage(PackageStore.automaticCheckSettingKey) private var checksPackageUpdatesAutomatically = true
 
     var body: some View {
         Form {
@@ -39,9 +40,12 @@ private struct GeneralTab: View {
             }
 
             Section {
+                Toggle("Check for Package Updates Daily", isOn: $checksPackageUpdatesAutomatically)
                 Toggle("Confirm Before Uninstall", isOn: $confirmBeforeUninstall)
             } header: {
                 Text("Packages")
+            } footer: {
+                Text("Runs `brew update` once a day so Outdated lists the latest versions.")
             }
 
             Section {

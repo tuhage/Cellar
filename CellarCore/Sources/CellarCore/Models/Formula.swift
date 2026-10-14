@@ -86,8 +86,15 @@ public struct Formula: Identifiable, Codable, Hashable, Sendable {
         for try await _ in BrewService.shared.install(name, isCask: false) {}
     }
 
+    /// Streams `brew upgrade` output line by line. Uses the fully qualified
+    /// name so a tap formula is never mistaken for a same-named cask or core
+    /// formula.
+    public func upgradeOutput() -> AsyncThrowingStream<String, Error> {
+        BrewService.shared.upgrade(fullName, isCask: false)
+    }
+
     public func upgrade() async throws {
-        for try await _ in BrewService.shared.upgrade(name) {}
+        for try await _ in upgradeOutput() {}
     }
 
     public func uninstall(force: Bool = false) async throws {
@@ -184,6 +191,7 @@ extension Formula {
         case dependencies
         case buildDependencies = "build_dependencies"
         case installed
+        case linkedKeg = "linked_keg"
         case isKegOnly = "keg_only"
     }
 
@@ -216,7 +224,9 @@ extension Formula {
         }
 
         // Parse the "installed" array -- may be empty or missing for search results
-        if let entry = try container.decodeIfPresent([InstalledEntry].self, forKey: .installed)?.first {
+        let installedEntries = try container.decodeIfPresent([InstalledEntry].self, forKey: .installed) ?? []
+        let linkedKeg = try container.decodeIfPresent(String.self, forKey: .linkedKeg)
+        if let entry = InstalledEntry.current(in: installedEntries, linkedKeg: linkedKeg) {
             self.installedVersion = entry.version
             self.version = entry.version
             self.latestVersion = stableVersion
@@ -277,6 +287,17 @@ extension Formula {
 
 /// Represents a single entry in the `installed` array of the brew formula JSON.
 private struct InstalledEntry: Codable, Sendable {
+
+    /// The version in use. Without `brew cleanup` old kegs stay installed and
+    /// the array lists them oldest first, so the linked keg wins, then the
+    /// most recently installed one.
+    static func current(in entries: [InstalledEntry], linkedKeg: String?) -> InstalledEntry? {
+        if let linkedKeg, let linked = entries.first(where: { $0.version == linkedKeg }) {
+            return linked
+        }
+        return entries.max { ($0.time ?? 0) < ($1.time ?? 0) } ?? entries.last
+    }
+
     let version: String
     let installedOnRequest: Bool
     let installedAsDependency: Bool

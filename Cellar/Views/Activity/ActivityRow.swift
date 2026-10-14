@@ -5,8 +5,10 @@ struct ActivityRow: View {
     let operation: BrewOperation
     let onCancel: (() -> Void)?
     let onForceRetry: (() -> Void)?
+    var onRetryFailed: (() -> Void)?
 
     @State private var isLogExpanded = false
+    @State private var isStepsExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.compact) {
@@ -19,12 +21,20 @@ struct ActivityRow: View {
                     Text(operation.kind.displayTitle)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    Text(statusLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if !showsBatchProgress {
+                        Text(statusLabel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(operation.isRunning ? 1 : nil)
+                            .truncationMode(.tail)
+                    }
                 }
                 Spacer()
                 statusIndicator
+            }
+
+            if showsBatchProgress {
+                BatchProgressView(operation: operation)
             }
 
             if case .failed = operation.status, let onForceRetry {
@@ -39,6 +49,24 @@ struct ActivityRow: View {
                     .tint(.orange)
                 }
                 .padding(.top, Spacing.compact)
+            }
+
+            if !operation.steps.isEmpty {
+                DisclosureGroup(isExpanded: $isStepsExpanded) {
+                    ScrollView {
+                        BatchStepList(steps: operation.steps)
+                            .padding(.vertical, Spacing.compact)
+                    }
+                    .frame(maxHeight: 180)
+                } label: {
+                    Text(stepsDisclosureTitle)
+                        .font(.caption)
+                        .foregroundStyle(operation.failedSteps.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
+                }
+            }
+
+            if onRetryFailed != nil || operation.logFileURL != nil {
+                actionButtons
             }
 
             if !operation.log.isEmpty {
@@ -61,17 +89,67 @@ struct ActivityRow: View {
         .padding(.vertical, Spacing.item)
     }
 
+    private var actionButtons: some View {
+        HStack(spacing: Spacing.item) {
+            Spacer()
+            if let onRetryFailed {
+                Button(action: onRetryFailed) {
+                    Label("Retry Failed", systemImage: "arrow.clockwise")
+                }
+                .help("Upgrade the packages that failed again")
+            }
+            if let logFileURL = operation.logFileURL {
+                Button {
+                    NSWorkspace.shared.open(logFileURL)
+                } label: {
+                    Label("Open Log", systemImage: "doc.text")
+                }
+                .help("Open the full log in Console")
+            }
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .font(.caption)
+    }
+
+    private var showsBatchProgress: Bool {
+        operation.isRunning && !operation.steps.isEmpty
+    }
+
     private var statusLabel: String {
+        if !operation.steps.isEmpty {
+            return batchStatusLabel
+        }
         switch operation.status {
         case .running:
-            "Running"
+            return operation.lastLogLine ?? "Running"
         case .succeeded:
-            "Completed"
+            return "Completed"
         case .failed(let reason):
-            "Failed — \(reason)"
+            return "Failed — \(reason)"
         case .cancelled:
-            "Cancelled"
+            return "Cancelled"
         }
+    }
+
+    private var batchStatusLabel: String {
+        let upgraded = operation.succeededStepCount
+        let failed = operation.failedSteps.count
+        switch operation.status {
+        case .running:
+            return "Running"
+        case .succeeded:
+            return "\(upgraded) upgraded"
+        case .failed:
+            return "\(upgraded) upgraded, \(failed) failed"
+        case .cancelled:
+            return "Cancelled after upgrading \(upgraded) of \(operation.steps.count)"
+        }
+    }
+
+    private var stepsDisclosureTitle: String {
+        let failed = operation.failedSteps.count
+        return failed > 0 ? "Packages (\(failed) failed)" : "Packages"
     }
 
     @ViewBuilder
@@ -108,6 +186,16 @@ struct ActivityRow: View {
             kind: .upgrade(name: "openssl@3", isCask: false),
             log: ["Downloading openssl@3-3.6.0.bottle.tar.gz", "Installing openssl@3"]
         ),
+        onCancel: {},
+        onForceRetry: nil
+    )
+    .padding()
+    .frame(width: 340)
+}
+
+#Preview("Upgrade All") {
+    ActivityRow(
+        operation: .upgradeAllPreview,
         onCancel: {},
         onForceRetry: nil
     )

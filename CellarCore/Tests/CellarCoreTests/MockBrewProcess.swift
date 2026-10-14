@@ -17,3 +17,22 @@ struct MockBrewProcess: BrewProcessProtocol {
         }
     }
 }
+
+/// Records the arguments of every streamed command.
+final class RecordingBrewProcess: BrewProcessProtocol, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [[String]] = []
+
+    var streamedArguments: [[String]] {
+        lock.withLock { recorded }
+    }
+
+    func run(_ arguments: [String]) async throws -> ProcessOutput {
+        ProcessOutput(stdout: "", stderr: "", exitCode: 0)
+    }
+
+    func stream(_ arguments: [String]) -> AsyncThrowingStream<String, Error> {
+        lock.withLock { recorded.append(arguments) }
+        return AsyncThrowingStream { $0.finish() }
+    }
+}

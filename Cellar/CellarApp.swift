@@ -41,10 +41,14 @@ struct CellarApp: App {
                     maintenanceStore.loadSettings()
                     maintenanceStore.loadReports()
                     UNUserNotificationCenter.current().delegate = notificationDelegate
+                    // Not queued behind the permission prompt, which waits
+                    // for the user to answer.
+                    Task { await packageStore.checkForUpdatesIfDue() }
                     await ActivityNotificationService.shared.requestPermission()
                     await runMaintenanceScheduler()
                 }
                 .onChange(of: activityStore.operations) {
+                    DockProgressService.shared.update(for: activityStore.runningBatchOperation)
                     for op in activityStore.operations {
                         guard !op.isRunning else { continue }
                         guard case .upgradeAll = op.kind else { continue }
@@ -98,6 +102,7 @@ struct CellarApp: App {
                 return
             }
             await maintenanceStore.checkSchedule()
+            await packageStore.checkForUpdatesIfDue()
         }
     }
 

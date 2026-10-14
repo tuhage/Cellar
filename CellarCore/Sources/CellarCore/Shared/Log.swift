@@ -25,6 +25,8 @@ public enum Log {
     public static let resources    = Logger(subsystem: subsystem, category: "resources")
     /// CoreSpotlight indexing
     public static let spotlight    = Logger(subsystem: subsystem, category: "spotlight")
+    /// Activity log files written to ~/Library/Logs/Cellar
+    public static let activity     = Logger(subsystem: subsystem, category: "activity")
     /// App-level lifecycle, URL routing, environment
     public static let app          = Logger(subsystem: subsystem, category: "app")
 

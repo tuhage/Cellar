@@ -18,6 +18,37 @@ struct FormulaParsingTests {
         #expect(formula.latestVersion == "3.6.0")
     }
 
+    @Test("formula_decode_withSeveralKegs_usesLinkedKeg")
+    func formula_decode_withSeveralKegs_usesLinkedKeg() throws {
+        let formula = try JSONDecoder().decode(Formula.self, from: Data(Self.multiKegJSON(linkedKeg: "\"17.11_1\"").utf8))
+
+        #expect(formula.version == "17.11_1")
+        #expect(formula.installTime == Date(timeIntervalSince1970: 1_791_918_049))
+    }
+
+    @Test("formula_decode_withSeveralKegsAndNoLinkedKeg_usesNewestKeg")
+    func formula_decode_withSeveralKegsAndNoLinkedKeg_usesNewestKeg() throws {
+        let formula = try JSONDecoder().decode(Formula.self, from: Data(Self.multiKegJSON(linkedKeg: "null").utf8))
+
+        #expect(formula.version == "17.11_1")
+    }
+
+    /// brew lists old kegs first when `brew cleanup` hasn't removed them.
+    private static func multiKegJSON(linkedKeg: String) -> String {
+        """
+        {
+          "name": "postgresql@17",
+          "full_name": "postgresql@17",
+          "versions": { "stable": "17.11" },
+          "linked_keg": \(linkedKeg),
+          "installed": [
+            { "version": "17.10", "time": 1785356324 },
+            { "version": "17.11_1", "time": 1791918049 }
+          ]
+        }
+        """
+    }
+
     @Test("formula_decode_parsesInstalledFields")
     func formula_decode_parsesInstalledFields() throws {
         let data = try fixtureData("formula_installed.json")

@@ -19,6 +19,34 @@ struct BrewServiceTests {
         #expect(response.formulae.first?.name == "openssl@3")
     }
 
+    @Test("brewService_upgradeAndInstall_passExplicitFormulaOrCaskFlag")
+    func brewService_upgradeAndInstall_passExplicitFormulaOrCaskFlag() async throws {
+        let process = RecordingBrewProcess()
+        let service = BrewService(process: process)
+
+        for try await _ in service.upgrade("mobile-dev-inc/tap/maestro", isCask: false) {}
+        for try await _ in service.upgrade("firefox", isCask: true) {}
+        for try await _ in service.install("wget", isCask: false) {}
+
+        #expect(process.streamedArguments == [
+            ["upgrade", "--formula", "mobile-dev-inc/tap/maestro"],
+            ["upgrade", "--cask", "firefox"],
+            ["install", "--formula", "wget"],
+        ])
+    }
+
+    @Test("brewServiceItem_processStartDate_readsRunningProcess")
+    func brewServiceItem_processStartDate_readsRunningProcess() throws {
+        let item = BrewServiceItem(
+            name: "self", status: .started, user: nil, file: nil,
+            exitCode: nil, pid: Int(ProcessInfo.processInfo.processIdentifier), registered: true
+        )
+
+        let started = try #require(item.processStartDate)
+        #expect(started <= Date())
+        #expect(started > Date().addingTimeInterval(-3600))
+    }
+
     @Test("brewService_listServicesData_parsesBrewServiceItems")
     func brewService_listServicesData_parsesBrewServiceItems() async throws {
         let json = String(data: try fixtureData("services_list.json"), encoding: .utf8)!
