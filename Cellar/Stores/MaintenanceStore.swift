@@ -22,6 +22,8 @@ final class MaintenanceStore {
     /// Failures to read or write the schedule and reports.
     var errorMessage: String?
     /// Set to show the cleanup preview from anywhere in the app.
+    /// Set to show the autoremove preview from anywhere in the app.
+    var isAutoremovePreviewPresented = false
     var isCleanupPreviewPresented = false {
         didSet {
             if !isCleanupPreviewPresented { checksHealthAfterCleanup = false }

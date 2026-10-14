@@ -81,6 +81,9 @@ struct ContentView: View {
         .sheet(isPresented: $maintenance.isCleanupPreviewPresented) {
             CleanupPreviewSheet()
         }
+        .sheet(isPresented: $maintenance.isAutoremovePreviewPresented) {
+            AutoremovePreviewSheet()
+        }
         .overlay {
             if isQuickOpenPresented {
                 quickOpen

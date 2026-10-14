@@ -6,7 +6,6 @@ struct MaintenanceView: View {
     @Environment(MaintenanceStore.self) private var store
 
     @State private var searchText = ""
-    @State private var isAutoremovePreviewPresented = false
     @State private var isClearReportsConfirmationPresented = false
 
     /// Any Homebrew-wide operation (Upgrade All, `brew update`, maintenance)
@@ -57,9 +56,6 @@ struct MaintenanceView: View {
         }
         .focusedSceneValue(\.pageRefresh, AsyncAction { await reloadDiskUsage() })
         .task { await store.diskUsage.load() }
-        .sheet(isPresented: $isAutoremovePreviewPresented) {
-            AutoremovePreviewSheet()
-        }
         .confirmationDialog(
             "Clear all maintenance reports?",
             isPresented: $isClearReportsConfirmationPresented
@@ -97,7 +93,7 @@ struct MaintenanceView: View {
                 buttonTitle: "Remove\u{2026}",
                 isDisabled: isBusy
             ) {
-                isAutoremovePreviewPresented = true
+                store.isAutoremovePreviewPresented = true
             }
 
             TaskRow(

@@ -9,6 +9,7 @@ import CellarCore
 struct DependencyGraphView: View {
     @Environment(DependencyStore.self) private var store
     @Environment(ActivityStore.self) private var activityStore
+    @Environment(MaintenanceStore.self) private var maintenanceStore
     @FocusedValue(\.windowCommands) private var windowCommands
 
     @AppStorage("dependencyInspectorPresented") private var isInspectorPresented = true
@@ -150,14 +151,14 @@ struct DependencyGraphView: View {
 
         ToolbarItem(placement: .primaryAction) {
             Button {
-                windowCommands?.navigate(.maintenance)
+                maintenanceStore.isAutoremovePreviewPresented = true
             } label: {
                 Label(
                     removableCount > 0 ? "Remove \(removableCount) Unused\u{2026}" : "Remove Unused\u{2026}",
                     systemImage: "shippingbox.and.arrow.backward"
                 )
             }
-            .disabled(removableCount == 0 || windowCommands == nil)
+            .disabled(removableCount == 0 || maintenanceStore.isRunning)
             .help("Uninstall dependencies nothing needs anymore (brew autoremove)")
         }
 
