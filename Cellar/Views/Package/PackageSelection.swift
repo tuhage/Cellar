@@ -1,12 +1,6 @@
 import SwiftUI
 import CellarCore
 
-/// Whether package pages show the inspector for their selection — one
-/// setting for all of them, like a Finder window's preview pane.
-enum PackageInspector {
-    static let visibilityKey = "showsPackageInspector"
-}
-
 extension View {
     /// What every package page offers for its selection: the inspector, a
     /// toolbar button to show or hide it, the Packages menu commands and the
@@ -21,29 +15,16 @@ private struct PackageSelectionModifier: ViewModifier {
     @Binding var uninstallRequest: UninstallRequest?
 
     @Environment(PackageStore.self) private var store
-    @AppStorage(PackageInspector.visibilityKey) private var showsInspector = true
+    /// One setting for every package page, like a Finder window's preview pane.
+    @AppStorage(SettingsKey.showsInspector(.package)) private var showsInspector = true
 
     func body(content: Content) -> some View {
         content
-            .inspector(isPresented: Binding(
-                get: { showsInspector && selected != nil },
-                set: { showsInspector = $0 }
-            )) {
+            .pageInspector(.package, isPresented: $showsInspector, hasContent: selected != nil) {
                 if let selected {
                     PackageDetailView(package: selected)
                         // Fresh state per package, so nothing leaks between them.
                         .id(selected.id)
-                        .inspectorColumnWidth(min: 360, ideal: 400, max: 560)
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showsInspector.toggle()
-                    } label: {
-                        Label("Inspector", systemImage: "sidebar.trailing")
-                    }
-                    .help(showsInspector ? "Hide Inspector" : "Show Inspector")
                 }
             }
             .uninstallConfirmation($uninstallRequest)

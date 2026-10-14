@@ -64,18 +64,12 @@ struct CellarApp: App {
 
     // MARK: - Spotlight
 
+    /// Spotlight items are identified by `PackageID.rawValue`.
     private func handleSpotlightActivity(_ activity: NSUserActivity) {
-        guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String else {
-            return
-        }
-
-        if identifier.hasPrefix("formula:") {
-            UserDefaults.standard.set(SidebarItem.formulae.rawValue, forKey: "selectedSidebarItem")
-            stores.packages.selectedFormulaId = String(identifier.dropFirst("formula:".count))
-        } else if identifier.hasPrefix("cask:") {
-            UserDefaults.standard.set(SidebarItem.casks.rawValue, forKey: "selectedSidebarItem")
-            stores.packages.selectedCaskId = String(identifier.dropFirst("cask:".count))
-        }
+        guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+              let package = PackageID(rawValue: identifier)
+        else { return }
+        Navigator.show(package, in: stores.packages)
     }
 }
 

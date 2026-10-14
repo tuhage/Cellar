@@ -57,7 +57,7 @@ public struct CleanupPlan: Hashable, Sendable {
             parts.append("Freed \(reclaimableBytes.formatted(.byteCount(style: .file)))")
         }
         if !isEmpty {
-            parts.append("\(items.count) \(items.count == 1 ? "item" : "items")")
+            parts.append(String.count(items.count, "item"))
         }
         return parts.joined(separator: " · ")
     }
@@ -123,7 +123,7 @@ public struct CleanupPlan: Hashable, Sendable {
         guard let start = line.range(of: "approximately "),
               let end = line.range(of: " of disk space", range: start.upperBound..<line.endIndex)
         else { return nil }
-        return UpgradePlan.parseSize(String(line[start.upperBound..<end.lowerBound]))
+        return ByteSize.parse(String(line[start.upperBound..<end.lowerBound]))
     }
 
     // MARK: Preview
@@ -232,7 +232,7 @@ extension CleanupPlan {
             if remainder.hasSuffix(")"), let open = remainder.range(of: " (", options: .backwards) {
                 let details = remainder[open.upperBound..<remainder.index(before: remainder.endIndex)]
                 bytes = details.split(separator: ",").last.flatMap {
-                    UpgradePlan.parseSize($0.trimmingCharacters(in: .whitespaces))
+                    ByteSize.parse($0.trimmingCharacters(in: .whitespaces))
                 }
                 remainder = String(remainder[..<open.lowerBound])
             }

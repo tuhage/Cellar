@@ -7,7 +7,6 @@ struct OnboardingView: View {
     let onBrewDetected: () -> Void
 
     @State private var isWaitingForInstall = false
-    @State private var isCopied = false
     @State private var errorMessage: String?
 
     private static let installCommand =
@@ -67,11 +66,8 @@ struct OnboardingView: View {
 
             Spacer()
 
-            Button(action: copyInstallCommand) {
-                Label(isCopied ? "Copied" : "Copy", systemImage: isCopied ? "checkmark" : "doc.on.doc")
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(.bordered)
+            CopyButton(text: Self.installCommand)
+                .buttonStyle(.bordered)
         }
         .padding(Spacing.sectionContent)
         .cardStyle(cornerRadius: CornerRadius.card)
@@ -121,16 +117,6 @@ struct OnboardingView: View {
     }
 
     // MARK: - Private
-
-    private func copyInstallCommand() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(Self.installCommand, forType: .string)
-        isCopied = true
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            isCopied = false
-        }
-    }
 
     private func recheck() {
         if BrewProcess.isInstalled {

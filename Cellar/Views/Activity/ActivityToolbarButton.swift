@@ -56,7 +56,15 @@ struct ActivityToolbarButton: View {
     }
 }
 
-extension Notification.Name {
+extension ActivityPanel {
+    /// Opens Activity from the frontmost main window's toolbar — what every
+    /// Details and Show Activity button does.
+    static func show() {
+        NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+    }
+}
+
+private extension Notification.Name {
     static let openActivityPanel = Notification.Name("cellar.openActivityPanel")
 }
 

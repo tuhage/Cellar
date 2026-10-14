@@ -3,47 +3,38 @@ import CellarCore
 
 /// Opens the Formulae or Casks page with the package selected.
 struct ShowPackageButton<Label: View>: View {
-    let name: String
-    let isCask: Bool
+    let package: PackageID
     @ViewBuilder let label: Label
 
     @Environment(PackageStore.self) private var packageStore
-    @FocusedValue(\.windowCommands) private var windowCommands
 
     var body: some View {
         Button {
-            if isCask {
-                packageStore.selectedCaskId = name
-                windowCommands?.navigate(.casks)
-            } else {
-                packageStore.selectedFormulaId = name
-                windowCommands?.navigate(.formulae)
-            }
+            Navigator.show(package, in: packageStore)
         } label: {
             label
         }
-        .disabled(windowCommands == nil)
-        .help(Self.title(isCask: isCask))
+        .help(Self.title(for: package.kind))
     }
 
-    static func title(isCask: Bool) -> String {
-        isCask ? "Show in Casks" : "Show in Formulae"
+    /// "Show in Formulae" / "Show in Casks".
+    static func title(for kind: PackageKind) -> String {
+        "Show in \(kind.title)"
     }
 }
 
 extension ShowPackageButton where Label == SwiftUI.Label<Text, Image> {
-    /// "Show in Formulae" / "Show in Casks".
-    init(name: String, isCask: Bool) {
-        self.init(name: name, isCask: isCask) {
-            SwiftUI.Label(Self.title(isCask: isCask), systemImage: "arrow.forward.circle")
+    init(package: PackageID) {
+        self.init(package: package) {
+            SwiftUI.Label(Self.title(for: package.kind), systemImage: "arrow.forward.circle")
         }
     }
 }
 
 #Preview {
     VStack {
-        ShowPackageButton(name: "wget", isCask: false)
-        ShowPackageButton(name: "firefox", isCask: true)
+        ShowPackageButton(package: PackageID(kind: .formula, name: "wget"))
+        ShowPackageButton(package: PackageID(kind: .cask, name: "firefox"))
     }
     .padding()
     .environment(AppStores())

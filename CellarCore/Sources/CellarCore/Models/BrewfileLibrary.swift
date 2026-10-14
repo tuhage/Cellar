@@ -85,12 +85,12 @@ public struct BrewfileLibrary: Codable, Equatable, Sendable {
             )
         }
         let projectBrewfiles = projects.map { project in
-            let isBrewfilePath = (project.path as NSString).lastPathComponent == "Brewfile"
+            let isBrewfilePath = Brewfile.isNamedBrewfile(project.path)
             return Brewfile(
                 id: project.id,
                 kind: .project,
                 name: project.name,
-                path: isBrewfilePath ? project.path : (project.path as NSString).appendingPathComponent("Brewfile"),
+                path: isBrewfilePath ? project.path : Brewfile.path(inFolder: URL(fileURLWithPath: project.path)),
                 services: project.services ?? [],
                 pendingPackages: project.packages ?? []
             )

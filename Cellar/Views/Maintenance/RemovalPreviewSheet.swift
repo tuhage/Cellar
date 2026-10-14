@@ -168,7 +168,7 @@ private struct GroupLabel: View {
         } label: {
             Label {
                 Text(group.category.title)
-                Text("\(group.items.count) \(group.items.count == 1 ? "item" : "items")")
+                Text(String.count(group.items.count, "item"))
             } icon: {
                 Image(systemName: group.category.systemImage)
             }

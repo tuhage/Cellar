@@ -9,9 +9,9 @@ struct OperationNoticeView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.sectionContent) {
-            Image(systemName: notice.outcome.systemImage)
+            Image(systemName: notice.status.symbolName)
                 .font(.title3)
-                .foregroundStyle(notice.outcome.color)
+                .foregroundStyle(notice.status.color)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Spacing.textPair) {
@@ -28,7 +28,7 @@ struct OperationNoticeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Button("Details") {
-                NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                ActivityPanel.show()
                 noticeStore.dismiss()
             }
             .buttonStyle(.borderless)

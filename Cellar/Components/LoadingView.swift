@@ -23,7 +23,7 @@ struct LoadingView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                     Button("Show Activity") {
-                        NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                        ActivityPanel.show()
                     }
                 }
                 .frame(maxWidth: 360)

@@ -6,8 +6,6 @@ import CellarCore
 /// The overview: what needs attention first, then counts, services,
 /// updates, recent installs and taps. Every row opens its item.
 struct DashboardView: View {
-    @Binding var selection: SidebarItem?
-
     @Environment(PackageStore.self) private var packageStore
     @Environment(ServiceStore.self) private var serviceStore
     @Environment(TapStore.self) private var tapStore
@@ -34,14 +32,7 @@ struct DashboardView: View {
         }
         .navigationTitle("Dashboard")
         .dataFreshness(packageStore.lastUpdated)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                RefreshToolbarButton(isLoading: packageStore.isLoading || serviceStore.isLoading) {
-                    await refreshAll()
-                }
-            }
-        }
-        .focusedSceneValue(\.pageRefresh, refreshAll)
+        .pageRefresh(isLoading: packageStore.isLoading || serviceStore.isLoading) { await refreshAll() }
     }
 
     /// `nil` until the first data arrives.
@@ -75,19 +66,11 @@ struct DashboardView: View {
                     : "\(failedServices.count) services failed",
                 message: "Open Services to see the exit code and logs."
             ) {
-                Button("Show") { open(firstFailed) }
+                Button("Show") { Navigator.show(service: firstFailed.name, in: serviceStore) }
             }
         }
 
-        let staleServices = serviceStore.servicesNeedingRestart(formulae: packageStore.formulae)
-        if !staleServices.isEmpty {
-            RestartServicesBanner(
-                services: staleServices,
-                isRestarting: staleServices.contains { activityStore.isActive(.package($0.name)) }
-            ) {
-                Task { await serviceStore.restart(staleServices) }
-            }
-        }
+        RestartServicesBanner()
 
         if activityStore.failedCount > 0 {
             NoticeBanner(
@@ -98,7 +81,7 @@ struct DashboardView: View {
                     : "\(activityStore.failedCount) operations failed"
             ) {
                 Button("Show Activity") {
-                    NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                    ActivityPanel.show()
                 }
             }
         }
@@ -161,8 +144,8 @@ struct DashboardView: View {
             columns: [GridItem(.adaptive(minimum: 210), spacing: Spacing.sectionContent)],
             spacing: Spacing.sectionContent
         ) {
-            statCard(.formulae, value: "\(summary.totalFormulae)", color: .blue)
-            statCard(.casks, value: "\(summary.totalCasks)", color: .purple)
+            statCard(.formulae, value: "\(summary.totalFormulae)", color: PackageKind.formula.color)
+            statCard(.casks, value: "\(summary.totalCasks)", color: PackageKind.cask.color)
             statCard(
                 .services,
                 value: "\(summary.runningServices)/\(summary.totalServices)",
@@ -180,7 +163,7 @@ struct DashboardView: View {
         accessibilityValue: String? = nil
     ) -> some View {
         Button {
-            selection = item
+            Navigator.show(item)
         } label: {
             StatCardView(
                 title: item.title,
@@ -213,12 +196,11 @@ struct DashboardView: View {
             subtitle: upgradeAllSubtitle(summary),
             systemImage: "arrow.up.circle.fill",
             color: .orange,
-            isDisabled: !packageStore.isUpgradingAll
-                && (!summary.hasOutdatedPackages || packageStore.isCheckingForUpdates),
+            isDisabled: !packageStore.isUpgradingAll && !packageStore.canUpgradeAll,
             isProminent: true
         ) {
             if packageStore.isUpgradingAll {
-                NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                ActivityPanel.show()
             } else {
                 packageStore.isUpgradePreviewPresented = true
             }
@@ -247,10 +229,7 @@ struct DashboardView: View {
 
     private func upgradeAllSubtitle(_ summary: SystemSummary) -> String {
         if let operation = packageStore.upgradeAllOperation, operation.isRunning {
-            guard let step = operation.currentStep, let position = operation.currentStepNumber else {
-                return "Show progress"
-            }
-            return "\(step.name) · \(position) of \(operation.steps.count)"
+            return operation.currentStep.map { "\($0.name) · \(operation.stepProgress)" } ?? "Show progress"
         }
         if packageStore.isCheckingForUpdates {
             return "Checking for updates\u{2026}"
@@ -267,8 +246,8 @@ struct DashboardView: View {
             color: .green,
             items: Array(summary.services.prefix(Self.listLimit)),
             hiddenCount: summary.services.count - Self.listLimit,
-            seeAll: { selection = .services },
-            select: open
+            seeAll: { Navigator.show(.services) },
+            select: { Navigator.show(service: $0.name, in: serviceStore) }
         ) { service in
             HStack(spacing: Spacing.row) {
                 Image(systemName: "circle.fill")
@@ -286,27 +265,24 @@ struct DashboardView: View {
     }
 
     private func updatesCard(_ summary: SystemSummary) -> some View {
-        let updates = summary.outdatedFormulae.map(DashboardUpdate.init(formula:))
-            + summary.outdatedCasks.map(DashboardUpdate.init(cask:))
+        let updates = summary.outdatedFormulae.map(PackageType.formula) + summary.outdatedCasks.map(PackageType.cask)
         return DashboardListCard(
             title: "Updates",
             systemImage: SidebarItem.outdated.icon,
             color: .orange,
             items: Array(updates.prefix(Self.listLimit)),
             hiddenCount: updates.count - Self.listLimit,
-            seeAll: { selection = .outdated },
+            seeAll: { Navigator.show(.outdated) },
             select: open
         ) { update in
             HStack(spacing: Spacing.row) {
-                Image(systemName: update.isCask ? SidebarItem.casks.icon : SidebarItem.formulae.icon)
-                    .foregroundStyle(update.isCask ? .purple : .blue)
-                    .frame(width: IconSize.iconColumn)
-                    .accessibilityLabel(update.isCask ? "Cask" : "Formula")
+                packageIcon(update.kind)
+                    .accessibilityLabel(update.kind == .cask ? "Cask" : "Formula")
                 Text(update.name)
                     .fontWeight(.medium)
                     .lineLimit(1)
                 Spacer()
-                Text("\(update.currentVersion) → \(update.targetVersion)")
+                Text("\(update.version) → \(update.latestVersion)")
                     .font(.callout.monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -320,13 +296,11 @@ struct DashboardView: View {
             systemImage: "clock.arrow.circlepath",
             color: .blue,
             items: summary.recentlyInstalled,
-            seeAll: { selection = .formulae },
-            select: { formula in open(DashboardUpdate(formula: formula)) }
+            seeAll: { Navigator.show(.formulae) },
+            select: { open(.formula($0)) }
         ) { formula in
             HStack(spacing: Spacing.row) {
-                Image(systemName: SidebarItem.formulae.icon)
-                    .foregroundStyle(.blue)
-                    .frame(width: IconSize.iconColumn)
+                packageIcon(.formula)
                     .accessibilityHidden(true)
                 Text(formula.name)
                     .fontWeight(.medium)
@@ -347,8 +321,8 @@ struct DashboardView: View {
             color: .teal,
             items: Array(summary.taps.prefix(Self.listLimit)),
             hiddenCount: summary.taps.count - Self.listLimit,
-            seeAll: { selection = .taps },
-            select: { _ in selection = .taps }
+            seeAll: { Navigator.show(.taps) },
+            select: { _ in Navigator.show(.taps) }
         ) { tap in
             HStack(spacing: Spacing.row) {
                 Text(tap.name)
@@ -364,21 +338,14 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Navigation
-
-    private func open(_ service: BrewServiceItem) {
-        serviceStore.selectedServiceId = service.id
-        selection = .services
+    private func packageIcon(_ kind: PackageKind) -> some View {
+        Image(systemName: kind.systemImage)
+            .foregroundStyle(kind.color)
+            .frame(width: IconSize.iconColumn)
     }
 
-    private func open(_ update: DashboardUpdate) {
-        if update.isCask {
-            packageStore.selectedCaskId = update.id
-            selection = .casks
-        } else {
-            packageStore.selectedFormulaId = update.id
-            selection = .formulae
-        }
+    private func open(_ package: PackageType) {
+        Navigator.show(package.id, in: packageStore)
     }
 }
 
@@ -422,39 +389,11 @@ private struct DashboardListCard<Item: Identifiable, Row: View>: View {
     }
 }
 
-// MARK: - Dashboard Update
-
-/// An outdated formula or cask as one dashboard row.
-private struct DashboardUpdate: Identifiable {
-    let id: String
-    let name: String
-    let isCask: Bool
-    let currentVersion: String
-    let targetVersion: String
-
-    init(formula: Formula) {
-        id = formula.id
-        name = formula.name
-        isCask = false
-        currentVersion = formula.version
-        targetVersion = formula.latestVersion ?? "latest"
-    }
-
-    init(cask: Cask) {
-        id = cask.id
-        name = cask.displayName
-        isCask = true
-        currentVersion = cask.installed ?? cask.version
-        targetVersion = cask.version
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
-    @Previewable @State var selection: SidebarItem? = .dashboard
     NavigationStack {
-        DashboardView(selection: $selection)
+        DashboardView()
     }
     .environment(AppStores())
     .frame(width: 1000, height: 760)

@@ -43,7 +43,7 @@ struct ActivityRow: View {
         HStack(alignment: .top, spacing: Spacing.item) {
             Image(systemName: operation.kind.symbolName)
                 .font(.title3)
-                .foregroundStyle(iconColor)
+                .foregroundStyle(operation.status.color)
                 .frame(width: IconSize.smallIcon)
                 .accessibilityHidden(true)
 
@@ -74,33 +74,14 @@ struct ActivityRow: View {
     @ViewBuilder
     private var timing: some View {
         if let completedAt = operation.completedAt {
-            Text("\(statusDescription) \(completedAt, style: .relative) ago · took \(duration(until: completedAt))")
+            Text("\(statusDescription) \(completedAt, style: .relative) ago · took \(Duration.elapsed(from: operation.startedAt, to: completedAt))")
         } else {
             Text("Started \(operation.startedAt, style: .relative) ago")
         }
     }
 
     private var statusDescription: String {
-        switch operation.status {
-        case .running: operation.isCancelling ? "Cancelling" : "Running"
-        case .succeeded: "Finished"
-        case .failed: "Failed"
-        case .cancelled: "Cancelled"
-        }
-    }
-
-    private var iconColor: Color {
-        switch operation.status {
-        case .running: .accentColor
-        case .succeeded: .green
-        case .failed: .red
-        case .cancelled: .secondary
-        }
-    }
-
-    private func duration(until end: Date) -> String {
-        Duration.seconds(max(0, end.timeIntervalSince(operation.startedAt)))
-            .formatted(.time(pattern: .minuteSecond))
+        operation.isCancelling ? "Cancelling" : operation.status.label
     }
 
     // MARK: - Disclosures
@@ -155,10 +136,7 @@ struct ActivityRow: View {
                 }
             }
             if let logFileURL = operation.logFileURL {
-                Button("Open Log", systemImage: "doc.text") {
-                    NSWorkspace.shared.open(logFileURL)
-                }
-                .help("Open the full log in Console")
+                FileActions(path: logFileURL.path(percentEncoded: false), openTitle: "Open Log")
             }
         }
         .buttonStyle(.borderless)
@@ -169,10 +147,7 @@ struct ActivityRow: View {
     @ViewBuilder
     private var contextMenu: some View {
         if case .failed(let reason) = operation.status {
-            Button("Copy Error") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(reason, forType: .string)
-            }
+            Button("Copy Error") { NSPasteboard.copy(reason) }
         }
         if store.canRetry(operation.id) {
             Button("Retry") { Task { await store.retry(operation.id) } }

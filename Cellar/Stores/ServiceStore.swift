@@ -36,19 +36,16 @@ final class ServiceStore: LoadableStore {
 
     // MARK: Hidden Services
 
-    private static let showsHiddenKey = "com.tuhage.Cellar.services.showsHidden"
-    private static let hiddenServicesKey = "com.tuhage.Cellar.services.hiddenNames"
-
     /// Whether to show services the user has hidden.
     var showsHiddenServices: Bool {
-        didSet { UserDefaults.standard.set(showsHiddenServices, forKey: Self.showsHiddenKey) }
+        didSet { UserDefaults.standard.set(showsHiddenServices, forKey: SettingsKey.showsHiddenServices) }
     }
 
     /// Names the user has hidden via the context menu.
     private(set) var hiddenServiceNames: Set<String> {
         didSet {
             let array = Array(hiddenServiceNames).sorted()
-            UserDefaults.standard.set(array, forKey: Self.hiddenServicesKey)
+            UserDefaults.standard.set(array, forKey: SettingsKey.hiddenServiceNames)
         }
     }
 
@@ -86,6 +83,12 @@ final class ServiceStore: LoadableStore {
         processStartDates[service.name]
     }
 
+    /// Whether an operation — including an upgrade of its formula — keeps
+    /// the service busy. Use it to disable actions.
+    func isBusy(_ service: BrewServiceItem) -> Bool {
+        activityStore.isActive(.package(service.name))
+    }
+
     func isHidden(_ service: BrewServiceItem) -> Bool {
         hiddenServiceNames.contains(service.name)
     }
@@ -95,8 +98,8 @@ final class ServiceStore: LoadableStore {
     init(activityStore: ActivityStore) {
         self.activityStore = activityStore
         let defaults = UserDefaults.standard
-        self.showsHiddenServices = defaults.bool(forKey: Self.showsHiddenKey)
-        self.hiddenServiceNames = Set(defaults.stringArray(forKey: Self.hiddenServicesKey) ?? [])
+        self.showsHiddenServices = defaults.bool(forKey: SettingsKey.showsHiddenServices)
+        self.hiddenServiceNames = Set(defaults.stringArray(forKey: SettingsKey.hiddenServiceNames) ?? [])
     }
 
     // MARK: Hide / Unhide
@@ -177,7 +180,7 @@ final class ServiceStore: LoadableStore {
     /// Restarts the services together. Root services share one password
     /// prompt instead of asking once per service.
     func restart(_ services: [BrewServiceItem]) async {
-        let idle = services.filter { !activityStore.isActive(.package($0.name)) }
+        let idle = services.filter { !isBusy($0) }
         let rootServices = idle.filter(\.requiresRoot)
         let rootRestart = rootServices.isEmpty ? nil : Task {
             try await BrewServiceItem.restartAsRoot(rootServices)
@@ -197,8 +200,9 @@ final class ServiceStore: LoadableStore {
     /// Root services wait for the shared privileged restart.
     private func restart(_ service: BrewServiceItem, sharing rootRestart: Task<Void, Error>?) async {
         // Retrying reruns the restart alone; the shared one has finished.
+        // The batch reloads once all of them finished.
         let retry = ActivityStore.Retry.custom { _ in await self.restart(service) }
-        await perform(.serviceRestart(name: service.name), reload: false, retry: retry) {
+        await activityStore.perform(.serviceRestart(name: service.name), retry: retry) { _ in
             guard service.requiresRoot, let rootRestart else {
                 return try await service.restart()
             }
@@ -219,18 +223,11 @@ final class ServiceStore: LoadableStore {
 
     // MARK: Private
 
-    /// Runs a service action as an activity, then reloads the list.
-    private func perform(
-        _ kind: BrewOperation.Kind,
-        reload: Bool = true,
-        retry: ActivityStore.Retry = .rerun,
-        _ action: @escaping @MainActor () async throws -> Void
-    ) async {
-        await activityStore.perform(kind, retry: retry) { _ in
+    /// Runs a service action as an activity, then reloads the list; see
+    /// `ActivityStore.perform(_:retry:reloading:_:)`.
+    private func perform(_ kind: BrewOperation.Kind, _ action: @escaping @MainActor () async throws -> Void) async {
+        await activityStore.perform(kind, reloading: { await self.load(forceRefresh: true) }) { _ in
             try await action()
-            if reload {
-                await self.load(forceRefresh: true)
-            }
         }
     }
 

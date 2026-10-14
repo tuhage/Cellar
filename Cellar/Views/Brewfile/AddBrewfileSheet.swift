@@ -35,7 +35,7 @@ struct AddBrewfileSheet: View {
 
                 LabeledContent(kind == .project ? "Folder" : "Brewfile") {
                     HStack {
-                        Text(path.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? "None")
+                        Text(path.map(\.abbreviatingWithTildeInPath) ?? "None")
                             .foregroundStyle(path == nil ? .secondary : .primary)
                             .lineLimit(1)
                             .truncationMode(.middle)

@@ -4,17 +4,15 @@ import CellarCore
 struct ServiceListView: View {
     @Environment(ServiceStore.self) private var store
     @Environment(ServiceMetricsStore.self) private var metrics
-    @Environment(PackageStore.self) private var packageStore
-    @Environment(ActivityStore.self) private var activityStore
 
     @State private var sortOrder = Self.sortStorage.load()
-    @AppStorage("services.columns") private var columnCustomization = TableColumnCustomization<ServiceRow>()
-    @AppStorage("services.showsInspector") private var showsInspector = true
+    @AppStorage(SettingsKey.serviceColumns) private var columnCustomization = TableColumnCustomization<ServiceRow>()
+    @AppStorage(SettingsKey.showsInspector(.service)) private var showsInspector = true
     @State private var showsOnlyFailed = false
     @State private var pendingAction: PendingServiceAction?
 
     private static let sortStorage = SortOrderStorage<ServiceRow>(
-        key: "services.sort",
+        key: SettingsKey.sortOrder("service"),
         columns: [
             "name": KeyPathComparator(\.name),
             "status": KeyPathComparator(\.status),
@@ -43,19 +41,18 @@ struct ServiceListView: View {
             .navigationTitle("Services")
             .dataFreshness(store.lastUpdated)
             .loadErrorBanner(for: store) { await store.load(forceRefresh: true) }
-            .safeAreaInset(edge: .top, spacing: 0) { restartBanner }
+            .safeAreaInset(edge: .top, spacing: 0) { RestartServicesBanner() }
             .toolbar { toolbarContent }
             .task { await store.load() }
             .task { await metrics.monitor { store.services } }
-            .inspector(isPresented: isInspectorPresented) {
+            .pageInspector(.service, isPresented: $showsInspector, hasContent: store.selectedService != nil) {
                 if let service = store.selectedService {
                     ServiceDetailView(service: service, pendingAction: $pendingAction)
                         .id(service.name)
-                        .inspectorColumnWidth(min: 360, ideal: 420, max: 540)
                 }
             }
             .confirmingServiceAction($pendingAction)
-            .focusedSceneValue(\.pageRefresh, AsyncAction { await store.load(forceRefresh: true) })
+            .pageRefresh(isLoading: store.isLoading) { await store.load(forceRefresh: true) }
             .focusedSceneValue(\.selectedService, selectedServiceCommands)
             .onChange(of: sortOrder) { _, newOrder in Self.sortStorage.save(newOrder) }
     }
@@ -94,41 +91,16 @@ struct ServiceListView: View {
 
     // MARK: - Inspector
 
-    /// Selecting a row shows the inspector unless the user closed it;
-    /// double-click or Return opens it again.
-    private var isInspectorPresented: Binding<Bool> {
-        Binding(
-            get: { showsInspector && store.selectedService != nil },
-            set: { showsInspector = $0 }
-        )
-    }
-
     private var selectedServiceCommands: SelectedServiceCommands? {
         guard let service = store.selectedService else { return nil }
         return SelectedServiceCommands(
             name: service.name,
             isRunning: service.isRunning,
-            isBusy: activityStore.isActive(.package(service.name)),
+            isBusy: store.isBusy(service),
             start: { Task { await store.start(service) } },
             stop: { Task { await store.stop(service) } },
             restart: { Task { await store.restart(service) } }
         )
-    }
-
-    // MARK: - Banner
-
-    /// Services upgraded while running still execute the old build.
-    @ViewBuilder
-    private var restartBanner: some View {
-        let services = store.servicesNeedingRestart(formulae: packageStore.formulae)
-        if !services.isEmpty {
-            RestartServicesBanner(
-                services: services,
-                isRestarting: services.contains { activityStore.isActive(.package($0.name)) }
-            ) {
-                Task { await store.restart(services) }
-            }
-        }
     }
 
     // MARK: - Toolbar
@@ -151,12 +123,6 @@ struct ServiceListView: View {
 
         ToolbarItem(placement: .primaryAction) {
             filterMenu
-        }
-
-        ToolbarItem(placement: .primaryAction) {
-            RefreshToolbarButton(isLoading: store.isLoading) {
-                await store.load(forceRefresh: true)
-            }
         }
     }
 
@@ -206,7 +172,7 @@ struct ServiceListView: View {
             .disabledCustomizationBehavior(.visibility)
 
             TableColumn("Status", value: \.status) { row in
-                ServiceStatusBadge(service: row.service, isBusy: activityStore.isActive(.package(row.name)))
+                ServiceStatusBadge(service: row.service, isBusy: store.isBusy(row.service))
             }
             .width(min: 90, ideal: 110)
             .customizationID("status")

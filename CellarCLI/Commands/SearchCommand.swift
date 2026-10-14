@@ -31,8 +31,7 @@ enum SearchCommand {
             print("")
         }
 
-        let total = formulae.count + casks.count
-        let label = total == 1 ? "result" : "results"
-        print(TerminalOutput.colored("\(total) \(label) found", .dim))
+        let total = String.count(formulae.count + casks.count, "result")
+        print(TerminalOutput.colored("\(total) found", .dim))
     }
 }

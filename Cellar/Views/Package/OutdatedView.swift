@@ -5,13 +5,12 @@ import CellarCore
 /// upgrading them one by one or all at once.
 struct OutdatedView: View {
     @Environment(PackageStore.self) private var store
-    @Environment(ServiceStore.self) private var serviceStore
     @Environment(ActivityStore.self) private var activityStore
 
     @State private var searchText = ""
     @State private var selection: Set<PackageID> = []
     @State private var uninstallRequest: UninstallRequest?
-    @AppStorage(PackageInspector.visibilityKey) private var showsInspector = true
+    @AppStorage(SettingsKey.showsInspector(.package)) private var showsInspector = true
 
     private var query: String {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -30,26 +29,21 @@ struct OutdatedView: View {
     var body: some View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
-                restartBanner
+                RestartServicesBanner()
             }
             .loadErrorBanner(for: store) { await store.loadAll(forceRefresh: true) }
             .navigationTitle("Updates")
             .dataFreshness(store.lastUpdated)
             .searchable(text: $searchText, prompt: "Search updates")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    RefreshToolbarButton(
-                        title: "Check for Updates",
-                        systemImage: "arrow.triangle.2.circlepath",
-                        help: "Check for Updates — asks Homebrew for the latest versions (brew update)",
-                        isLoading: store.isLoading || store.isCheckingForUpdates
-                    ) {
-                        await store.checkForUpdates()
-                    }
-                }
+            .pageRefresh(
+                "Check for Updates",
+                systemImage: "arrow.triangle.2.circlepath",
+                help: "Check for Updates — asks Homebrew for the latest versions (brew update)",
+                isLoading: store.isLoading || store.isCheckingForUpdates
+            ) {
+                await store.checkForUpdates()
             }
             .packageSelection(selectedPackage, uninstallRequest: $uninstallRequest)
-            .focusedSceneValue(\.pageRefresh, AsyncAction { await store.checkForUpdates() })
             .task {
                 await store.loadAll()
             }
@@ -86,21 +80,6 @@ struct OutdatedView: View {
             return "Check for updates to fetch the latest versions from Homebrew."
         }
         return "Checked \(lastCheck.formatted(.relative(presentation: .named)))."
-    }
-
-    // MARK: - Restart Banner
-
-    @ViewBuilder
-    private var restartBanner: some View {
-        let services = serviceStore.servicesNeedingRestart(formulae: store.formulae)
-        if !services.isEmpty {
-            RestartServicesBanner(
-                services: services,
-                isRestarting: services.contains { activityStore.isActive(.package($0.name)) }
-            ) {
-                Task { await serviceStore.restart(services) }
-            }
-        }
     }
 
     // MARK: - List
@@ -196,10 +175,7 @@ struct OutdatedView: View {
             .buttonStyle(.borderedProminent)
             .tint(.orange)
             .help("Choose which packages to upgrade, with download sizes")
-            .disabled(
-                store.isUpgradingAll || store.isCheckingForUpdates
-                    || store.outdatedPackages.allSatisfy { !$0.canUpgrade }
-            )
+            .disabled(!store.canUpgradeAll)
         }
         .padding(.horizontal, Spacing.cardPadding)
         .padding(.vertical, Spacing.row)
@@ -209,7 +185,7 @@ struct OutdatedView: View {
     /// "5 updates · 2 pinned".
     private var summaryTitle: String {
         let total = store.totalOutdated
-        let updates = "\(total) \(total == 1 ? "update" : "updates")"
+        let updates = String.count(total, "update")
         let pinned = store.pinnedOutdatedCount
         return pinned > 0 ? "\(updates) · \(pinned) pinned" : updates
     }
@@ -229,7 +205,7 @@ struct OutdatedView: View {
             title: "\(operation.failedSteps.map(\.name).formatted(.list(type: .and))) failed to upgrade."
         ) {
             Button("Details") {
-                NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                ActivityPanel.show()
             }
             Button("Retry") {
                 Task { await activityStore.retry(operation.id) }

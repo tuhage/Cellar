@@ -68,8 +68,21 @@ public struct Brewfile: Identifiable, Codable, Hashable, Sendable {
 
     // MARK: Location
 
+    /// What `brew bundle` looks for in a folder.
+    public static let fileName = "Brewfile"
+
     /// `~/Brewfile`, the Brewfile of the "This Mac" entry.
-    public static var defaultMacPath: String { "\(NSHomeDirectory())/Brewfile" }
+    public static var defaultMacPath: String { "\(NSHomeDirectory())/\(fileName)" }
+
+    /// Whether `path` names a file called `Brewfile`, as a project's does.
+    public static func isNamedBrewfile(_ path: String) -> Bool {
+        URL(fileURLWithPath: path).lastPathComponent == fileName
+    }
+
+    /// The Brewfile inside `folder`.
+    public static func path(inFolder folder: URL) -> String {
+        folder.appendingPathComponent(fileName).path
+    }
 
     /// Whether `path` is `~/Brewfile`, however it is spelled.
     public static func isDefaultMacPath(_ path: String) -> Bool {
@@ -82,14 +95,14 @@ public struct Brewfile: Identifiable, Codable, Hashable, Sendable {
         var isDirectory: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
         let isFolder = exists ? isDirectory.boolValue : url.hasDirectoryPath
-        return isFolder ? url.appendingPathComponent("Brewfile").path : url.path
+        return isFolder ? path(inFolder: url) : url.path
     }
 
     /// A name for a newly added Brewfile: the folder's name for a file
     /// called `Brewfile`, otherwise the file's own name.
     public static func suggestedName(forPath path: String) -> String {
         let url = URL(fileURLWithPath: path)
-        return url.lastPathComponent == "Brewfile" ? url.deletingLastPathComponent().lastPathComponent : url.lastPathComponent
+        return isNamedBrewfile(path) ? url.deletingLastPathComponent().lastPathComponent : url.lastPathComponent
     }
 
     public var url: URL { URL(fileURLWithPath: path) }
@@ -98,7 +111,7 @@ public struct Brewfile: Identifiable, Codable, Hashable, Sendable {
     public var exists: Bool { FileManager.default.fileExists(atPath: path) }
 
     /// The path with the home folder shortened to `~`.
-    public var displayPath: String { (path as NSString).abbreviatingWithTildeInPath }
+    public var displayPath: String { path.abbreviatingWithTildeInPath }
 
     /// Where `backUp()` keeps the previous version.
     public var backupURL: URL { URL(fileURLWithPath: path + ".bak") }

@@ -4,7 +4,6 @@ import CellarCore
 /// A keyboard-first launcher: go to pages, open installed items, and run
 /// commands such as Upgrade All or restarting a service.
 struct QuickOpenView: View {
-    @Binding var selection: SidebarItem?
     @Binding var isPresented: Bool
 
     @Environment(PackageStore.self) private var packageStore
@@ -15,17 +14,25 @@ struct QuickOpenView: View {
 
     @State private var query = ""
     @State private var selectedIndex = 0
-    @State private var availableFormulae: [Formula] = []
-    @State private var availableCasks: [Cask] = []
+    /// Homebrew's matches for the query, installed or not.
+    @State private var homebrewResults: [PackageType] = []
     @State private var isSearchingHomebrew = false
-    @AppStorage("quickOpenRecentItems") private var recentItemIDs = ""
+    @AppStorage(SettingsKey.quickOpenRecentItems) private var recentItemIDs = ""
     @FocusState private var isSearchFocused: Bool
     /// Where the pointer was when the keyboard last moved the selection;
     /// hover only takes over once the pointer actually moves.
     @State private var pointerAtKeyboardNavigation: CGPoint?
 
+    /// Rows per kind of installed package or Homebrew result.
+    private static let packageLimit = 8
+    private static let homebrewLimit = 6
+
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var results: [QuickOpenItem] {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedQuery = trimmedQuery
 
         if trimmedQuery.isEmpty {
             let recent = recentItemIDs
@@ -34,7 +41,7 @@ struct QuickOpenView: View {
             let pinned = packageStore.formulae
                 .filter(\.pinned)
                 .prefix(6)
-                .map(QuickOpenItem.formula)
+                .map { QuickOpenItem.package(.formula($0)) }
             let destinations = SidebarItem.allCases.map(QuickOpenItem.destination)
             return deduplicated(recent + pinned + destinations)
         }
@@ -45,24 +52,13 @@ struct QuickOpenView: View {
             .filter { $0.matches(trimmedQuery) }
             .map(QuickOpenItem.destination)
 
-        let formulae = packageStore.formulae
-            .filter {
-                $0.name.localizedCaseInsensitiveContains(trimmedQuery)
-                    || ($0.desc?.localizedCaseInsensitiveContains(trimmedQuery) ?? false)
-            }
-            .sorted { matchRank($0.name, query: trimmedQuery) < matchRank($1.name, query: trimmedQuery) }
-            .prefix(8)
-            .map(QuickOpenItem.formula)
-
-        let casks = packageStore.casks
-            .filter {
-                $0.displayName.localizedCaseInsensitiveContains(trimmedQuery)
-                    || $0.token.localizedCaseInsensitiveContains(trimmedQuery)
-                    || ($0.desc?.localizedCaseInsensitiveContains(trimmedQuery) ?? false)
-            }
-            .sorted { matchRank($0.displayName, query: trimmedQuery) < matchRank($1.displayName, query: trimmedQuery) }
-            .prefix(8)
-            .map(QuickOpenItem.cask)
+        let packages = PackageKind.allCases.flatMap { kind in
+            packageStore.packages(kind)
+                .filter { $0.matches(trimmedQuery) }
+                .sorted { matchRank($0.name, query: trimmedQuery) < matchRank($1.name, query: trimmedQuery) }
+                .prefix(Self.packageLimit)
+                .map(QuickOpenItem.package)
+        }
 
         let services = serviceStore.services
             .filter { $0.name.localizedCaseInsensitiveContains(trimmedQuery) }
@@ -70,19 +66,14 @@ struct QuickOpenView: View {
             .prefix(6)
             .map(QuickOpenItem.service)
 
-        let installedFormulaNames = Set(packageStore.formulae.map(\.name))
-        let remoteFormulae = availableFormulae
-            .filter { !installedFormulaNames.contains($0.name) }
-            .prefix(6)
-            .map(QuickOpenItem.availableFormula)
+        let available = PackageKind.allCases.flatMap { kind in
+            homebrewResults
+                .filter { $0.kind == kind && packageStore.package($0.id) == nil }
+                .prefix(Self.homebrewLimit)
+                .map(QuickOpenItem.available)
+        }
 
-        let installedCaskTokens = Set(packageStore.casks.map(\.token))
-        let remoteCasks = availableCasks
-            .filter { !installedCaskTokens.contains($0.token) }
-            .prefix(6)
-            .map(QuickOpenItem.availableCask)
-
-        return commands + destinations + formulae + casks + services + remoteFormulae + remoteCasks
+        return commands + destinations + packages + services + available
     }
 
     // MARK: - Commands
@@ -93,7 +84,7 @@ struct QuickOpenView: View {
                 title: "Upgrade All\u{2026}",
                 keywords: ["upgrade", "update all"],
                 systemImage: "arrow.up.circle",
-                isEnabled: packageStore.totalOutdated > 0 && !packageStore.isUpgradingAll
+                isEnabled: packageStore.canUpgradeAll
             ) { packageStore.isUpgradePreviewPresented = true },
             QuickOpenCommand(
                 title: "Check for Package Updates",
@@ -114,7 +105,7 @@ struct QuickOpenView: View {
                 isEnabled: !maintenanceStore.isRunning
             ) { Task { await maintenanceStore.runHealthCheck() } },
             QuickOpenCommand(title: "Show Activity", keywords: ["log", "progress"], systemImage: "clock") {
-                NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                ActivityPanel.show()
             },
             QuickOpenCommand(title: "Settings\u{2026}", keywords: ["preferences"], systemImage: "gear") {
                 openSettings()
@@ -124,27 +115,23 @@ struct QuickOpenView: View {
             .filter { $0.isEnabled && $0.matches(query) }
     }
 
-    /// Start, stop or restart a service whose name matches the query.
+    /// The basic actions of services whose name matches the query.
     private func serviceCommands(matching query: String) -> [QuickOpenCommand] {
         serviceStore.services
             .filter { query.localizedCaseInsensitiveContains($0.name) || $0.name.localizedCaseInsensitiveContains(query) }
             .prefix(3)
-            .flatMap { service -> [QuickOpenCommand] in
-                let isBusy = activityStore.isActive(.package(service.name))
-                let toggle = service.isRunning
-                    ? QuickOpenCommand(title: "Stop \(service.name)", systemImage: "stop.circle", isEnabled: !isBusy) {
-                        Task { await serviceStore.stop(service) }
+            .flatMap { service in
+                ServiceAction.basic
+                    .filter { $0.isAvailable(for: service) }
+                    .map { action in
+                        QuickOpenCommand(
+                            title: "\(action.title(for: service)) \(service.name)",
+                            systemImage: action.systemImage,
+                            isEnabled: !serviceStore.isBusy(service)
+                        ) {
+                            Task { await action.perform(on: service, store: serviceStore) }
+                        }
                     }
-                    : QuickOpenCommand(title: "Start \(service.name)", systemImage: "play.circle", isEnabled: !isBusy) {
-                        Task { await serviceStore.start(service) }
-                    }
-                guard service.isRunning else { return [toggle] }
-                return [
-                    toggle,
-                    QuickOpenCommand(title: "Restart \(service.name)", systemImage: "arrow.clockwise.circle", isEnabled: !isBusy) {
-                        Task { await serviceStore.restart(service) }
-                    },
-                ]
             }
     }
 
@@ -263,7 +250,7 @@ struct QuickOpenView: View {
             .padding(.vertical, Spacing.related)
             .contentShape(Rectangle())
             .background(
-                index == selectedIndex ? Color.accentColor.opacity(0.12) : .clear,
+                index == selectedIndex ? Color.accentColor.opacity(Opacity.badgeBackground) : .clear,
                 in: RoundedRectangle(cornerRadius: CornerRadius.medium)
             )
         }
@@ -330,22 +317,13 @@ struct QuickOpenView: View {
     private func open(_ result: QuickOpenItem) {
         switch result.kind {
         case .destination(let item):
-            selection = item
-        case .formula(let formula):
-            packageStore.selectedFormulaId = formula.id
-            selection = .formulae
-        case .cask(let cask):
-            packageStore.selectedCaskId = cask.id
-            selection = .casks
+            Navigator.show(item)
+        case .package(let package):
+            Navigator.show(package.id, in: packageStore)
         case .service(let service):
-            serviceStore.selectedServiceId = service.id
-            selection = .services
-        case .availableFormula(let formula):
-            packageStore.formulaSearchQuery = formula.name
-            selection = .formulae
-        case .availableCask(let cask):
-            packageStore.caskSearchQuery = cask.token
-            selection = .casks
+            Navigator.show(service: service.name, in: serviceStore)
+        case .available(let package):
+            Navigator.search(for: package.id, in: packageStore)
         case .command(let command):
             isPresented = false
             command.perform()
@@ -356,32 +334,23 @@ struct QuickOpenView: View {
     }
 
     private func searchHomebrew() async {
-        let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard value.count >= 2 else {
-            availableFormulae = []
-            availableCasks = []
+        let value = trimmedQuery
+        guard value.count >= PackageStore.minimumSearchLength else {
+            homebrewResults = []
             isSearchingHomebrew = false
             return
         }
 
-        try? await Task.sleep(for: .milliseconds(400))
+        try? await Task.sleep(for: PackageStore.searchDelay)
         guard !Task.isCancelled else { return }
         isSearchingHomebrew = true
         defer { isSearchingHomebrew = false }
 
-        do {
-            async let formulae = Formula.search(for: value)
-            async let casks = Cask.search(for: value)
-            let loaded = try await (formulae, casks)
-            guard !Task.isCancelled,
-                  query.trimmingCharacters(in: .whitespacesAndNewlines) == value else { return }
-            availableFormulae = loaded.0
-            availableCasks = loaded.1
-        } catch {
-            guard !Task.isCancelled else { return }
-            availableFormulae = []
-            availableCasks = []
-        }
+        async let formulae = PackageStore.searchHomebrew(value, kind: .formula, detailLimit: Self.homebrewLimit)
+        async let casks = PackageStore.searchHomebrew(value, kind: .cask, detailLimit: Self.homebrewLimit)
+        let found = (try? await formulae + casks) ?? []
+        guard !Task.isCancelled else { return }
+        homebrewResults = found
     }
 
     private func remember(_ item: QuickOpenItem) {
@@ -391,21 +360,14 @@ struct QuickOpenView: View {
         recentItemIDs = ids.prefix(8).joined(separator: "|")
     }
 
+    /// A remembered item, if it still exists.
     private func resolveItem(id: String) -> QuickOpenItem? {
-        let parts = id.split(separator: ":", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return nil }
-        switch parts[0] {
-        case "destination":
-            return SidebarItem.resolve(parts[1]).map(QuickOpenItem.destination)
-        case "formula":
-            return packageStore.formulae.first { $0.id == parts[1] }.map(QuickOpenItem.formula)
-        case "cask":
-            return packageStore.casks.first { $0.id == parts[1] }.map(QuickOpenItem.cask)
-        case "service":
-            return serviceStore.services.first { $0.id == parts[1] }.map(QuickOpenItem.service)
-        default:
-            return nil
+        if let packageID = PackageID(rawValue: id) {
+            return packageStore.package(packageID).map(QuickOpenItem.package)
         }
+        let others = SidebarItem.allCases.map(QuickOpenItem.destination)
+            + serviceStore.services.map(QuickOpenItem.service)
+        return others.first { $0.id == id }
     }
 
     private func deduplicated(_ items: [QuickOpenItem]) -> [QuickOpenItem] {
@@ -422,11 +384,11 @@ struct QuickOpenView: View {
 private struct QuickOpenItem: Identifiable {
     enum Kind {
         case destination(SidebarItem)
-        case formula(Formula)
-        case cask(Cask)
+        /// An installed formula or cask.
+        case package(PackageType)
         case service(BrewServiceItem)
-        case availableFormula(Formula)
-        case availableCask(Cask)
+        /// A package Homebrew offers that isn't installed.
+        case available(PackageType)
         case command(QuickOpenCommand)
     }
 
@@ -438,21 +400,18 @@ private struct QuickOpenItem: Identifiable {
     }
 
     static func destination(_ item: SidebarItem) -> Self { .init(kind: .destination(item)) }
-    static func formula(_ formula: Formula) -> Self { .init(kind: .formula(formula)) }
-    static func cask(_ cask: Cask) -> Self { .init(kind: .cask(cask)) }
+    static func package(_ package: PackageType) -> Self { .init(kind: .package(package)) }
     static func service(_ service: BrewServiceItem) -> Self { .init(kind: .service(service)) }
-    static func availableFormula(_ formula: Formula) -> Self { .init(kind: .availableFormula(formula)) }
-    static func availableCask(_ cask: Cask) -> Self { .init(kind: .availableCask(cask)) }
+    static func available(_ package: PackageType) -> Self { .init(kind: .available(package)) }
     static func command(_ command: QuickOpenCommand) -> Self { .init(kind: .command(command)) }
 
+    /// Recent items are remembered by this; packages by `PackageID.rawValue`.
     var id: String {
         switch kind {
         case .destination(let item): "destination:\(item.id)"
-        case .formula(let formula): "formula:\(formula.id)"
-        case .cask(let cask): "cask:\(cask.id)"
+        case .package(let package): package.id.rawValue
         case .service(let service): "service:\(service.id)"
-        case .availableFormula(let formula): "available-formula:\(formula.id)"
-        case .availableCask(let cask): "available-cask:\(cask.id)"
+        case .available(let package): "available-\(package.id.rawValue)"
         case .command(let command): "command:\(command.title)"
         }
     }
@@ -460,11 +419,8 @@ private struct QuickOpenItem: Identifiable {
     var title: String {
         switch kind {
         case .destination(let item): item.title
-        case .formula(let formula): formula.name
-        case .cask(let cask): cask.displayName
+        case .package(let package), .available(let package): package.name
         case .service(let service): service.name
-        case .availableFormula(let formula): formula.name
-        case .availableCask(let cask): cask.token
         case .command(let command): command.title
         }
     }
@@ -472,11 +428,9 @@ private struct QuickOpenItem: Identifiable {
     var subtitle: String {
         switch kind {
         case .destination(let item): item.section.title ?? "Overview"
-        case .formula(let formula): formula.desc ?? "Version \(formula.version)"
-        case .cask(let cask): cask.desc ?? cask.token
+        case .package(let package): package.description ?? "Version \(package.version)"
         case .service(let service): service.status.label
-        case .availableFormula: "Available from Homebrew"
-        case .availableCask: "Available from Homebrew"
+        case .available(let package): package.description ?? "Available from Homebrew"
         case .command: "Command"
         }
     }
@@ -484,11 +438,10 @@ private struct QuickOpenItem: Identifiable {
     var category: String {
         switch kind {
         case .destination: String(localized: "Destination")
-        case .formula: String(localized: "Formula")
-        case .cask: String(localized: "Cask")
+        case .package(let package): package.kind == .formula ? String(localized: "Formula") : String(localized: "Cask")
         case .service: String(localized: "Service")
-        case .availableFormula: String(localized: "Available Formula")
-        case .availableCask: String(localized: "Available Cask")
+        case .available(let package):
+            package.kind == .formula ? String(localized: "Available Formula") : String(localized: "Available Cask")
         case .command: String(localized: "Command")
         }
     }
@@ -496,11 +449,9 @@ private struct QuickOpenItem: Identifiable {
     var systemImage: String {
         switch kind {
         case .destination(let item): item.icon
-        case .formula: "terminal"
-        case .cask: "macwindow"
-        case .service: "gearshape.2"
-        case .availableFormula: "arrow.down.circle"
-        case .availableCask: "arrow.down.circle"
+        case .package(let package): package.kind.systemImage
+        case .service: SidebarItem.services.icon
+        case .available: "arrow.down.circle"
         case .command(let command): command.systemImage
         }
     }
@@ -508,11 +459,8 @@ private struct QuickOpenItem: Identifiable {
     var color: Color {
         switch kind {
         case .destination: .accentColor
-        case .formula: .blue
-        case .cask: .purple
+        case .package(let package), .available(let package): package.kind.color
         case .service(let service): service.status.color
-        case .availableFormula: .blue
-        case .availableCask: .purple
         case .command: .orange
         }
     }
@@ -533,9 +481,8 @@ private struct QuickOpenCommand {
 }
 
 #Preview {
-    @Previewable @State var selection: SidebarItem? = .dashboard
     @Previewable @State var isPresented = true
 
-    QuickOpenView(selection: $selection, isPresented: $isPresented)
+    QuickOpenView(isPresented: $isPresented)
         .environment(AppStores())
 }

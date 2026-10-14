@@ -8,23 +8,12 @@ struct ServiceStatusBadge: View {
     var isBusy = false
 
     var body: some View {
-        HStack(spacing: Spacing.related) {
-            if isBusy {
-                ProgressView()
-                    .controlSize(.mini)
-            } else {
-                Circle()
-                    .fill(service.status.color)
-                    .frame(width: IconSize.statusDot, height: IconSize.statusDot)
-            }
-
-            Text(service.status.label)
-                .font(.callout)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Status: \(service.status.label)")
-        .accessibilityValue(isBusy ? "Busy" : "")
-        .help(service.statusHelp)
+        StatusDotLabel(text: service.status.label, color: service.status.color, isBusy: isBusy)
+            .font(.callout)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Status: \(service.status.label)")
+            .accessibilityValue(isBusy ? "Busy" : "")
+            .help(service.statusHelp)
     }
 }
 

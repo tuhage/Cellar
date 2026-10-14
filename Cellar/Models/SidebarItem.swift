@@ -30,8 +30,8 @@ enum SidebarItem: String, Identifiable, CaseIterable, Sendable {
     var icon: String {
         switch self {
         case .dashboard: "square.grid.2x2"
-        case .formulae: "terminal"
-        case .casks: "macwindow"
+        case .formulae: PackageKind.formula.systemImage
+        case .casks: PackageKind.cask.systemImage
         case .outdated: "arrow.triangle.2.circlepath"
         case .services: "gearshape.2"
         case .brewfile: "doc.text"

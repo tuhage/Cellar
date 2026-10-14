@@ -24,6 +24,7 @@ final class AppStores {
 
     /// Pass an activity store only to seed previews.
     init(activity: ActivityStore = ActivityStore()) {
+        SettingsKey.migrateRenamedKeys()
         self.activity = activity
         packages = PackageStore(activityStore: activity)
         dependencies = DependencyStore(packageStore: packages)

@@ -8,7 +8,7 @@ struct ActivationPreviewSheet: View {
 
     @Environment(BrewfileStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("projectServicesRegisterAtLogin") private var registerAtLogin = false
+    @AppStorage(SettingsKey.registersProjectServicesAtLogin) private var registerAtLogin = false
 
     var body: some View {
         let plan = store.activationPlan(for: project)

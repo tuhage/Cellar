@@ -20,11 +20,8 @@ struct ErrorView: View {
                 Button("Try Again", action: retryAction)
                     .buttonStyle(.borderedProminent)
             }
-            Button("Copy Details") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(message, forType: .string)
-            }
-            .buttonStyle(.borderless)
+            CopyButton(text: message, title: "Copy Details")
+                .buttonStyle(.borderless)
         }
         .transition(.opacity)
     }

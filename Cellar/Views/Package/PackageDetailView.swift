@@ -8,7 +8,6 @@ struct PackageDetailView: View {
 
     @Environment(PackageStore.self) private var store
     @Environment(ActivityStore.self) private var activityStore
-    @AppStorage("selectedSidebarItem") private var sidebarSelection = SidebarItem.dashboard.rawValue
     @State private var uninstallRequest: UninstallRequest?
     /// Details for a search result that arrived with a name only.
     @State private var fetchedDetails: PackageType?
@@ -68,7 +67,7 @@ struct PackageDetailView: View {
     }
 
     private var tint: Color {
-        shown.kind == .formula ? .blue : .purple
+        shown.kind.color
     }
 
     // MARK: - Actions
@@ -271,10 +270,7 @@ struct PackageDetailView: View {
         guard let formula = store.formulae.first(where: { $0.name == name || $0.fullName == name }) else {
             return nil
         }
-        return {
-            store.formulaList.select(PackageID(kind: .formula, name: formula.name))
-            sidebarSelection = SidebarItem.formulae.rawValue
-        }
+        return { Navigator.show(PackageType.formula(formula).id, in: store) }
     }
 
     // MARK: - Data

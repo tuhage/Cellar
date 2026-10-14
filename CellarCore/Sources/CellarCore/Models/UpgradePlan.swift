@@ -50,20 +50,6 @@ public struct UpgradePlan: Codable, Hashable, Sendable {
             .filter { seen.insert($0.id).inserted }
     }
 
-    /// Parses brew's human-readable sizes ("186.4MB", "17.3KB", "11MB"),
-    /// which use powers of 1000.
-    static func parseSize(_ text: String) -> Int64? {
-        let trimmed = text.trimmingCharacters(in: CharacterSet(charactersIn: "()"))
-        let multipliers: [(suffix: String, factor: Double)] = [
-            ("GB", 1_000_000_000), ("MB", 1_000_000), ("KB", 1_000), ("B", 1),
-        ]
-        for (suffix, factor) in multipliers where trimmed.hasSuffix(suffix) {
-            guard let value = Double(trimmed.dropLast(suffix.count)) else { return nil }
-            return Int64((value * factor).rounded())
-        }
-        return nil
-    }
-
     // MARK: Preview
 
     public static var preview: UpgradePlan {
@@ -97,7 +83,7 @@ extension UpgradePlan {
 
         /// The name without its tap prefix.
         public var shortName: String {
-            name.split(separator: "/").last.map(String.init) ?? name
+            Tap.packageName(fromQualified: name)
         }
 
         public init(
@@ -121,14 +107,13 @@ extension UpgradePlan {
             let tokens = line.split(whereSeparator: \.isWhitespace).map(String.init)
             guard tokens.count >= 4, tokens[2] == "->" else { return nil }
             let name = tokens[0]
-            let shortName = name.split(separator: "/").last.map(String.init) ?? name
             self.init(
                 name: name,
                 currentVersion: tokens[1],
                 targetVersion: tokens[3],
-                downloadBytes: tokens.count >= 5 ? UpgradePlan.parseSize(tokens[4]) : nil,
+                downloadBytes: tokens.count >= 5 ? ByteSize.parse(tokens[4]) : nil,
                 isCask: isCask,
-                isRequested: requested.contains(name) || requested.contains(shortName)
+                isRequested: requested.contains(name) || requested.contains(Tap.packageName(fromQualified: name))
             )
         }
     }

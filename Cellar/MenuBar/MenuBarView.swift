@@ -46,16 +46,15 @@ struct MenuBarView: View {
     /// A submenu so a stray click never stops a service.
     private func serviceMenu(_ service: BrewServiceItem) -> some View {
         Menu {
-            if service.isRunning {
-                Button("Stop") { Task { await serviceStore.stop(service) } }
-                Button("Restart") { Task { await serviceStore.restart(service) } }
-            } else {
-                Button("Start") { Task { await serviceStore.start(service) } }
+            ForEach(ServiceAction.basic.filter { $0.isAvailable(for: service) }) { action in
+                Button(action.title(for: service)) {
+                    Task { await action.perform(on: service, store: serviceStore) }
+                }
             }
             Divider()
             Button("Show in Cellar") {
-                serviceStore.selectedServiceId = service.id
-                show(.services)
+                Navigator.show(service: service.name, in: serviceStore)
+                showMainWindow()
             }
         } label: {
             Label(
@@ -63,7 +62,7 @@ struct MenuBarView: View {
                 systemImage: service.isError ? "exclamationmark.octagon" : "circle.fill"
             )
         }
-        .disabled(activityStore.isActive(.package(service.name)))
+        .disabled(serviceStore.isBusy(service))
     }
 
     // MARK: - Resources
@@ -90,7 +89,8 @@ struct MenuBarView: View {
     private var updatesSection: some View {
         Section("Updates") {
             if let operation = packageStore.upgradeAllOperation, operation.isRunning {
-                Text(upgradeProgressTitle(operation))
+                Text(operation.currentStep.map { "Upgrading \($0.name) (\(operation.stepProgress))" }
+                     ?? "Upgrading Packages\u{2026}")
                 Button("Stop Upgrading\u{2026}") {
                     if BatchCancellation.confirmWithAlert() {
                         activityStore.cancel(operation.id)
@@ -99,11 +99,11 @@ struct MenuBarView: View {
             } else if packageStore.totalOutdated == 0 {
                 Text("Everything Up to Date")
             } else {
-                Button("Upgrade \(packageStore.totalOutdated) \(packageStore.totalOutdated == 1 ? "Package" : "Packages")\u{2026}") {
-                    show(nil)
+                Button("Upgrade \(String.count(packageStore.totalOutdated, "Package"))\u{2026}") {
+                    showMainWindow()
                     packageStore.isUpgradePreviewPresented = true
                 }
-                .disabled(packageStore.isCheckingForUpdates)
+                .disabled(!packageStore.canUpgradeAll)
             }
 
             Button(packageStore.isCheckingForUpdates ? "Checking for Package Updates\u{2026}" : "Check for Package Updates") {
@@ -113,24 +113,17 @@ struct MenuBarView: View {
         }
     }
 
-    private func upgradeProgressTitle(_ operation: BrewOperation) -> String {
-        guard let step = operation.currentStep, let position = operation.currentStepNumber else {
-            return "Upgrading Packages\u{2026}"
-        }
-        return "Upgrading \(step.name) (\(position) of \(operation.steps.count))"
-    }
-
     // MARK: - Maintenance
 
     private var maintenanceSection: some View {
         Section {
             Button(maintenanceStore.runningTask?.kind == .cleanup ? "Cleaning Up\u{2026}" : "Clean Up\u{2026}") {
-                show(nil)
+                showMainWindow()
                 maintenanceStore.isCleanupPreviewPresented = true
             }
             .disabled(maintenanceStore.isRunning)
 
-            Button("Refresh") {
+            Button("Reload") {
                 Task { await refreshAll() }
             }
         }
@@ -140,7 +133,7 @@ struct MenuBarView: View {
 
     private var appSection: some View {
         Section {
-            Button("Open Cellar") { show(nil) }
+            Button("Open Cellar", action: showMainWindow)
                 .keyboardShortcut("o")
             Button("Quit Cellar") { NSApplication.shared.terminate(nil) }
                 .keyboardShortcut("q")
@@ -149,12 +142,8 @@ struct MenuBarView: View {
 
     // MARK: - Helpers
 
-    /// Brings the main window forward — reopening it if it was closed —
-    /// optionally on a page.
-    private func show(_ item: SidebarItem?) {
-        if let item {
-            UserDefaults.standard.set(item.rawValue, forKey: "selectedSidebarItem")
-        }
+    /// Brings the main window forward, reopening it if it was closed.
+    private func showMainWindow() {
         if let window = NSApplication.shared.cellarMainWindow {
             window.deminiaturize(nil)
             window.makeKeyAndOrderFront(nil)

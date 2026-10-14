@@ -113,7 +113,7 @@ private struct SegmentRow: View {
         case .otherFiles: usage.prefix.path
         case .cache: usage.cache.path
         }
-        return (path as NSString).abbreviatingWithTildeInPath
+        return path.abbreviatingWithTildeInPath
     }
 }
 

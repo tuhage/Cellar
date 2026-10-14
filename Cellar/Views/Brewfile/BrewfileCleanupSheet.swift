@@ -32,7 +32,7 @@ struct BrewfileCleanupSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button(removedCount == 1 ? "Uninstall 1 Item" : "Uninstall \(removedCount) Items", role: .destructive) {
+                Button("Uninstall \(String.count(removedCount, "Item"))", role: .destructive) {
                     let keptItems = items.filter { kept.contains($0.id) }
                     Task { await store.cleanUp(brewfile, keeping: keptItems) }
                     dismiss()

@@ -31,13 +31,13 @@ struct ServiceActionButtons: View {
     let service: BrewServiceItem
     @Binding var pending: PendingServiceAction?
 
-    @Environment(ActivityStore.self) private var activityStore
+    @Environment(ServiceStore.self) private var store
 
     var body: some View {
         ForEach(actions.filter { $0.isAvailable(for: service) }) { action in
             ServiceActionButton(action: action, service: service, pending: $pending)
         }
-        .disabled(activityStore.isActive(.package(service.name)))
+        .disabled(store.isBusy(service))
     }
 }
 
@@ -59,18 +59,11 @@ private struct ServiceActionConfirmation: ViewModifier {
     @Environment(ServiceStore.self) private var store
     @Environment(PackageStore.self) private var packageStore
 
-    private var pendingForceQuit: Binding<PendingServiceAction?> {
-        Binding(
-            get: { pending?.action == .forceQuit ? pending : nil },
-            set: { pending = $0 }
-        )
-    }
-
     func body(content: Content) -> some View {
         content
             .confirmationDialog(
                 pending.map { "Force quit \($0.service.name)?" } ?? "",
-                isPresented: pendingForceQuit.isPresent(),
+                isPresented: Binding(get: { pending?.action == .forceQuit }, set: { if !$0 { pending = nil } }),
                 titleVisibility: .visible,
                 presenting: pending
             ) { pending in

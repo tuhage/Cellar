@@ -26,7 +26,7 @@ final class CellarFinderSyncExtension: FIFinderSync {
     // MARK: - Badges
 
     override func requestBadgeIdentifier(for url: URL) {
-        guard FileManager.default.fileExists(atPath: url.appendingPathComponent("Brewfile").path) else { return }
+        guard FileManager.default.fileExists(atPath: Brewfile.path(inFolder: url)) else { return }
         FIFinderSyncController.default().setBadgeIdentifier(Self.brewfileBadgeIdentifier, for: url)
     }
 
@@ -104,8 +104,9 @@ final class CellarFinderSyncExtension: FIFinderSync {
             ? controller.targetedURL()
             : controller.selectedItemURLs()?.first
         guard let target else { return nil }
-        let brewfileURL = target.lastPathComponent == "Brewfile" ? target : target.appendingPathComponent("Brewfile")
-        return FileManager.default.fileExists(atPath: brewfileURL.path) ? brewfileURL : nil
+        let path = Brewfile.path(forFileOrFolder: target)
+        guard Brewfile.isNamedBrewfile(path), FileManager.default.fileExists(atPath: path) else { return nil }
+        return URL(fileURLWithPath: path)
     }
 
     // MARK: - Actions

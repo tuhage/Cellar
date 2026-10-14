@@ -47,14 +47,7 @@ struct MaintenanceView: View {
         .navigationTitle("Maintenance")
         .dataFreshness(store.diskUsage.lastUpdated)
         .maintenanceSearchable(text: $searchText, enabled: !store.reports.isEmpty)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                RefreshToolbarButton(isLoading: store.diskUsage.isLoading) {
-                    await reloadDiskUsage()
-                }
-            }
-        }
-        .focusedSceneValue(\.pageRefresh, AsyncAction { await reloadDiskUsage() })
+        .pageRefresh(isLoading: store.diskUsage.isLoading) { await reloadDiskUsage() }
         .task { await store.diskUsage.load() }
         .confirmationDialog(
             "Clear all maintenance reports?",
@@ -64,7 +57,7 @@ struct MaintenanceView: View {
                 store.clearReports()
             }
         } message: {
-            Text("This removes \(store.reports.count) \(store.reports.count == 1 ? "report" : "reports"). Your schedule isn’t affected.")
+            Text("This removes \(String.count(store.reports.count, "report")). Your schedule isn’t affected.")
         }
     }
 

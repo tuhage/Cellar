@@ -43,7 +43,7 @@ struct ServiceUsageSection: View {
     }
 
     private func footnote(for usage: ResourceUsage) -> String {
-        let processes = usage.processCount == 1 ? "1 process" : "\(usage.processCount) processes"
+        let processes = String.count(usage.processCount, "process")
         return "Includes \(processes). 100% CPU is one full core."
     }
 }

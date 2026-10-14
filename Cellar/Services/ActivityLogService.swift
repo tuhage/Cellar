@@ -48,13 +48,11 @@ final class ActivityLogService {
 
     /// Records the outcome and closes the file.
     func end(_ id: UUID, status: BrewOperation.Status) {
-        let outcome = switch status {
-        case .running: "Still running"
-        case .succeeded: "Completed"
-        case .failed(let reason): "Failed — \(reason)"
-        case .cancelled: "Cancelled"
+        if case .failed(let reason) = status {
+            append(id, "== \(status.label) — \(reason)")
+        } else {
+            append(id, "== \(status.label)")
         }
-        append(id, "== \(outcome)")
         try? handles[id]?.close()
         handles[id] = nil
     }

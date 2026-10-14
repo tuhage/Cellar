@@ -1,15 +1,34 @@
 import SwiftUI
 
-/// The toolbar's refresh button. Pages name what it does — "Reload" for
-/// local lists, "Check for Updates" when it runs `brew update`.
-struct RefreshToolbarButton: View {
-    var title = "Refresh"
-    var systemImage = "arrow.clockwise"
-    /// Tooltip; defaults to the title. Say what the button fetches when
-    /// pages refresh different things.
-    var help: String?
-    var isLoading: Bool
-    var action: () async -> Void
+extension View {
+    /// The page's refresh: a toolbar button and ⌘R, both running `action`.
+    /// Name what it does — "Reload" for local lists, "Check for Updates"
+    /// when it runs `brew update`.
+    ///
+    /// - Parameter help: Tooltip; defaults to the title. Say what the button
+    ///   fetches when pages refresh different things.
+    func pageRefresh(
+        _ title: String = "Reload",
+        systemImage: String = "arrow.clockwise",
+        help: String? = nil,
+        isLoading: Bool,
+        action: @escaping @MainActor () async -> Void
+    ) -> some View {
+        toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                RefreshToolbarButton(title: title, systemImage: systemImage, help: help, isLoading: isLoading, action: action)
+            }
+        }
+        .focusedSceneValue(\.pageRefresh, AsyncAction(action: action))
+    }
+}
+
+private struct RefreshToolbarButton: View {
+    let title: String
+    let systemImage: String
+    let help: String?
+    let isLoading: Bool
+    let action: @MainActor () async -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -26,11 +45,17 @@ struct RefreshToolbarButton: View {
 }
 
 #Preview("Idle") {
-    RefreshToolbarButton(isLoading: false) {}
-        .padding()
+    NavigationStack {
+        Text("Page")
+            .pageRefresh(isLoading: false) {}
+    }
+    .frame(width: 400, height: 200)
 }
 
 #Preview("Loading") {
-    RefreshToolbarButton(isLoading: true) {}
-        .padding()
+    NavigationStack {
+        Text("Page")
+            .pageRefresh(isLoading: true) {}
+    }
+    .frame(width: 400, height: 200)
 }

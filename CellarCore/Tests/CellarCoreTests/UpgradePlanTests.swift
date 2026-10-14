@@ -56,12 +56,4 @@ struct UpgradePlanTests {
         #expect(items.count == 1)
         #expect(items.first?.isCask == true)
     }
-
-    @Test("upgradePlan_parseSize_usesPowersOfThousand")
-    func upgradePlan_parseSize_usesPowersOfThousand() {
-        #expect(UpgradePlan.parseSize("(11MB)") == 11_000_000)
-        #expect(UpgradePlan.parseSize("(1.2GB)") == 1_200_000_000)
-        #expect(UpgradePlan.parseSize("(512B)") == 512)
-        #expect(UpgradePlan.parseSize("(soon)") == nil)
-    }
 }

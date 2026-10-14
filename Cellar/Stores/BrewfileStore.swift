@@ -184,7 +184,7 @@ final class BrewfileStore {
         let fileURLs = urls.filter(\.isFileURL)
         for url in fileURLs {
             let path = Brewfile.path(forFileOrFolder: url)
-            let isProject = (path as NSString).lastPathComponent == "Brewfile" && !Brewfile.isDefaultMacPath(path)
+            let isProject = Brewfile.isNamedBrewfile(path) && !Brewfile.isDefaultMacPath(path)
             add(kind: isProject ? .project : .mac, name: Brewfile.suggestedName(forPath: path), path: path)
         }
         return !fileURLs.isEmpty
@@ -384,7 +384,7 @@ final class BrewfileStore {
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Cellar-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: folder) }
-            let copy = Brewfile(kind: .mac, name: brewfile.name, path: folder.appendingPathComponent("Brewfile").path)
+            let copy = Brewfile(kind: .mac, name: brewfile.name, path: Brewfile.path(inFolder: folder))
             try copy.write(BrewfileCleanupPlan.brewfileText(brewfile.read(), keeping: kept))
             activity.log("Keeping \(kept.map(\.name).formatted(.list(type: .and)))")
             try await activity.stream(self.brew.bundleCleanup(at: copy.path))
@@ -392,18 +392,19 @@ final class BrewfileStore {
     }
 
     /// Runs a Brewfile action as an activity, then refreshes what it
-    /// changed — even after a failure, which may have installed some packages.
+    /// changed; see `ActivityStore.perform(_:retry:reloading:_:)`.
     private func perform(
         _ kind: BrewOperation.Kind,
         changesPackages: Bool,
         _ body: @escaping @MainActor (ActivityContext) async throws -> Void
     ) async {
-        await activityStore.perform(kind, body)
-        guard changesPackages else {
-            await reloadAndCheck()
-            return
-        }
-        // The Brewfiles page re-checks status when the package list reloads.
+        await activityStore.perform(kind, reloading: {
+            await (changesPackages ? self.reloadPackages() : self.reloadAndCheck())
+        }, body)
+    }
+
+    /// The Brewfiles page re-checks status when the package list reloads.
+    private func reloadPackages() async {
         reloadContent()
         async let packages: Void = packages.loadAll(forceRefresh: true)
         async let taps: Void = taps.load(forceRefresh: true)

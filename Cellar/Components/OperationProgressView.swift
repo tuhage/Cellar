@@ -50,10 +50,8 @@ struct OperationProgressView: View {
     }
 
     private var countLabel: String {
-        let position = operation.currentStepNumber ?? operation.finishedStepCount
         let failed = operation.failedSteps.count
-        let count = "\(position) of \(operation.steps.count)"
-        return failed > 0 ? "\(count) · \(failed) failed" : count
+        return failed > 0 ? "\(operation.stepProgress) · \(failed) failed" : operation.stepProgress
     }
 
     @ViewBuilder
@@ -108,10 +106,7 @@ struct OperationProgressView: View {
     /// current package started belongs to the previous one and is left out.
     private func detailLine(_ work: (startedAt: Date, versions: String?), now: Date) -> String {
         var parts = work.versions.map { [$0] } ?? []
-        parts.append(
-            Duration.seconds(max(0, now.timeIntervalSince(work.startedAt)))
-                .formatted(.time(pattern: .minuteSecond))
-        )
+        parts.append(Duration.elapsed(from: work.startedAt, to: now))
         if let lastOutputAt = operation.lastOutputAt, lastOutputAt >= work.startedAt,
            let line = operation.lastLogLine {
             parts.append(line)
@@ -137,7 +132,7 @@ struct RunningOperationBar: View {
                 .frame(maxWidth: 560, alignment: .leading)
         } actions: {
             Button("Details") {
-                NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                ActivityPanel.show()
             }
             .help("Show brew’s output in Activity")
 

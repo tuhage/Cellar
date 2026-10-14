@@ -6,7 +6,8 @@ import CellarCore
 struct DependencyInspector: View {
     let node: DependencyNode
     let graph: DependencyGraph
-    let isCask: Bool
+    /// The installed package; `nil` while the package lists catch up.
+    let package: PackageID?
     /// Installed and not busy with another operation.
     let canUninstall: Bool
     let uninstall: () -> Void
@@ -35,7 +36,9 @@ struct DependencyInspector: View {
             DependencyBadges(node: node, graph: graph)
 
             HStack(spacing: Spacing.item) {
-                ShowPackageButton(name: node.name, isCask: isCask)
+                if let package {
+                    ShowPackageButton(package: package)
+                }
                 Button(role: .destructive, action: uninstall) {
                     Label("Uninstall\u{2026}", systemImage: "trash")
                 }
@@ -85,7 +88,7 @@ struct DependencyInspector: View {
             Section("Removing It") {
                 Text(freed.isEmpty
                     ? "Nothing else needs it, and none of its dependencies become unused."
-                    : "Nothing else needs it. Uninstalling it leaves \(dependencyCount(freed.count)) unused:")
+                    : "Nothing else needs it. Uninstalling it leaves \(String.count(freed.count, "dependency")) unused:")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 ForEach(freed, id: \.self) { name in
@@ -100,7 +103,7 @@ struct DependencyInspector: View {
                     packageLink(name)
                 }
             } header: {
-                Text("Removing It Affects \(packageCount(node.dependents.count))")
+                Text("Removing It Affects \(String.count(node.dependents.count, "Package"))")
             }
         }
     }
@@ -119,7 +122,7 @@ struct DependencyInspector: View {
                 packageLink(name)
             }
             if indirectCount > 0 {
-                Text("Plus \(dependencyCount(indirectCount)) through these.")
+                Text("Plus \(String.count(indirectCount, "dependency")) through these.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -146,13 +149,6 @@ struct DependencyInspector: View {
         .help("Show \(name)")
     }
 
-    private func packageCount(_ count: Int) -> String {
-        count == 1 ? "1 Package" : "\(count) Packages"
-    }
-
-    private func dependencyCount(_ count: Int) -> String {
-        count == 1 ? "1 dependency" : "\(count) dependencies"
-    }
 }
 
 // MARK: - Preview
@@ -164,7 +160,7 @@ struct DependencyInspector: View {
     DependencyInspector(
         node: graph.node(named: "gettext")!,
         graph: graph,
-        isCask: false,
+        package: PackageID(kind: .formula, name: "gettext"),
         canUninstall: true,
         uninstall: {}
     )

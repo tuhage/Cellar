@@ -2,29 +2,33 @@ import SwiftUI
 import CellarCore
 
 /// Offers to restart services that were upgraded while running and so still
-/// run the previous version.
+/// run the previous version. Shows nothing when there are none.
 struct RestartServicesBanner: View {
-    let services: [BrewServiceItem]
-    var isRestarting = false
-    let restart: () -> Void
+    @Environment(ServiceStore.self) private var serviceStore
+    @Environment(PackageStore.self) private var packageStore
 
     var body: some View {
-        NoticeBanner(
-            tint: .blue,
-            systemImage: "arrow.clockwise.circle.fill",
-            title: title,
-            message: message
-        ) {
-            if isRestarting {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Button(services.count == 1 ? "Restart" : "Restart All", action: restart)
+        let services = serviceStore.servicesNeedingRestart(formulae: packageStore.formulae)
+        if !services.isEmpty {
+            NoticeBanner(
+                tint: .blue,
+                systemImage: "arrow.clockwise.circle.fill",
+                title: Self.title(for: services),
+                message: Self.message(for: services)
+            ) {
+                if services.contains(where: serviceStore.isBusy) {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Button(services.count == 1 ? "Restart" : "Restart All") {
+                        Task { await serviceStore.restart(services) }
+                    }
+                }
             }
         }
     }
 
-    private var title: String {
+    private static func title(for services: [BrewServiceItem]) -> String {
         if services.count == 1, let service = services.first {
             return "\(service.name) is still running the previous version"
         }
@@ -32,7 +36,7 @@ struct RestartServicesBanner: View {
         return "\(names) are still running previous versions"
     }
 
-    private var message: String {
+    private static func message(for services: [BrewServiceItem]) -> String {
         let base = "Upgraded while running. Restart to use the new version."
         return services.contains(where: \.requiresRoot)
             ? base + " You’ll be asked for your password."
@@ -41,11 +45,7 @@ struct RestartServicesBanner: View {
 }
 
 #Preview {
-    RestartServicesBanner(
-        services: [
-            BrewServiceItem(name: "postgresql@17", status: .started, user: "tuhage", file: nil, exitCode: nil, pid: 1828, registered: true),
-            BrewServiceItem(name: "tailscale", status: .started, user: "root", file: nil, exitCode: nil, pid: 813, registered: true),
-        ]
-    ) {}
-    .frame(width: 600)
+    RestartServicesBanner()
+        .environment(AppStores())
+        .frame(width: 600)
 }

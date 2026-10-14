@@ -78,6 +78,30 @@ final class ActivityStore {
         }
     }
 
+    /// Runs `body` as a tracked operation, then `reload`s what it may have
+    /// changed and returns whether it succeeded.
+    ///
+    /// Every store's action helper follows this rule: after a success the
+    /// reload runs inside the operation, so its target stays busy until the
+    /// lists are current; after a failure or cancellation it runs too,
+    /// since brew may have changed something before it stopped.
+    @discardableResult
+    func perform(
+        _ kind: BrewOperation.Kind,
+        retry: Retry = .rerun,
+        reloading reload: @escaping @MainActor () async -> Void,
+        _ body: @escaping @MainActor (ActivityContext) async throws -> Void
+    ) async -> Bool {
+        let succeeded = await perform(kind, retry: retry) { activity in
+            try await body(activity)
+            await reload()
+        } != nil
+        if !succeeded {
+            await reload()
+        }
+        return succeeded
+    }
+
     /// Asks a running operation to stop. It is marked as cancelling until
     /// brew has actually exited.
     func cancel(_ id: UUID) {

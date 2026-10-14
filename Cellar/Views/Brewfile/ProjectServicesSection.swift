@@ -52,8 +52,7 @@ struct ProjectServicesSection: View {
             }
             Spacer()
             if let service {
-                StatusDotLabel(text: service.isRunning ? "Running" : "Stopped", color: service.status.color)
-                    .font(.callout)
+                ServiceStatusBadge(service: service, isBusy: serviceStore.isBusy(service))
             } else {
                 StatusBadge(text: "Not Installed", color: .orange, icon: "exclamationmark.triangle")
             }

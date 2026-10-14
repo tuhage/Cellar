@@ -19,7 +19,7 @@ struct PackageTable: View {
     /// Where each page remembers its sort order.
     static func sortStorage(for kind: PackageKind) -> SortOrderStorage<PackageType> {
         SortOrderStorage(
-            key: "\(kind.rawValue)Sort",
+            key: SettingsKey.sortOrder(kind.rawValue),
             columns: ["name": nameOrder, "version": versionOrder],
             defaultColumn: "name"
         )

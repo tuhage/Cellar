@@ -98,7 +98,7 @@ struct BrewfileView: View {
         .sheet(item: $sheet, content: sheetContent)
         .confirmationDialog(
             confirmation?.title ?? "",
-            isPresented: isConfirming,
+            isPresented: $confirmation.isPresent(),
             titleVisibility: .visible,
             presenting: confirmation
         ) { request in
@@ -106,7 +106,7 @@ struct BrewfileView: View {
         } message: { request in
             Text(request.message)
         }
-        .fileImporter(isPresented: isLocatingFolder, allowedContentTypes: [.folder]) { result in
+        .fileImporter(isPresented: $folderToLocate.isPresent(), allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result, let brewfile = folderToLocate {
                 Task { await store.relocate(brewfile, to: url) }
             }
@@ -118,7 +118,7 @@ struct BrewfileView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await store.reloadIfChanged() }
         }
-        .focusedSceneValue(\.pageRefresh, AsyncAction { await store.reloadAndCheck() })
+        .pageRefresh(isLoading: store.isCheckingStatus) { await store.reloadAndCheck() }
     }
 
     /// Re-check status when the selection changes or the package list was
@@ -188,11 +188,6 @@ struct BrewfileView: View {
             }
             .help("Add a project folder or another Brewfile")
         }
-        ToolbarItem(placement: .primaryAction) {
-            RefreshToolbarButton(isLoading: store.isCheckingStatus) {
-                await store.reloadAndCheck()
-            }
-        }
     }
 
     // MARK: - Sheets
@@ -243,14 +238,6 @@ struct BrewfileView: View {
     }
 
     // MARK: - Confirmations
-
-    private var isConfirming: Binding<Bool> {
-        Binding(get: { confirmation != nil }, set: { if !$0 { confirmation = nil } })
-    }
-
-    private var isLocatingFolder: Binding<Bool> {
-        Binding(get: { folderToLocate != nil }, set: { if !$0 { folderToLocate = nil } })
-    }
 
     private func confirm(_ request: BrewfileConfirmation) {
         switch request {

@@ -13,10 +13,7 @@ struct PackageListPage: View {
     @State private var filter = PackageFilter.all
     @State private var isSearchPresented = false
     @State private var uninstallRequest: UninstallRequest?
-    @AppStorage(PackageInspector.visibilityKey) private var showsInspector = true
-
-    /// Debounces typing before asking brew.
-    private static let searchDelay: Duration = .milliseconds(300)
+    @AppStorage(SettingsKey.showsInspector(.package)) private var showsInspector = true
 
     init(kind: PackageKind) {
         self.kind = kind
@@ -46,24 +43,18 @@ struct PackageListPage: View {
                 Text("Installed").tag(PackageListState.SearchScope.installed)
                 Text("Homebrew").tag(PackageListState.SearchScope.homebrew)
             }
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    RefreshToolbarButton(
-                        title: "Reload",
-                        help: "Reload installed \(kind.noun(count: 2)). Use Check for Updates on the Updates page to find new versions.",
-                        isLoading: store.isLoading
-                    ) {
-                        await store.loadAll(forceRefresh: true)
-                    }
-                }
+            .pageRefresh(
+                help: "Reload installed \(kind.noun(count: 2)). Use Check for Updates on the Updates page to find new versions.",
+                isLoading: store.isLoading
+            ) {
+                await store.loadAll(forceRefresh: true)
             }
             .packageSelection(selectedPackage, uninstallRequest: $uninstallRequest)
-            .focusedSceneValue(\.pageRefresh, AsyncAction { await store.loadAll(forceRefresh: true) })
             .task { await store.loadAll() }
             .task(id: SearchTrigger(query: list.trimmedQuery, scope: list.searchScope)) {
                 list.prepareSearch()
                 guard list.isSearching else { return }
-                try? await Task.sleep(for: Self.searchDelay)
+                try? await Task.sleep(for: PackageStore.searchDelay)
                 guard !Task.isCancelled else { return }
                 await store.searchHomebrew(kind)
             }

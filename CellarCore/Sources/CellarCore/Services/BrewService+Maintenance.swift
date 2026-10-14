@@ -41,6 +41,17 @@ extension BrewService {
         return output.stdout + output.stderr
     }
 
+    // MARK: Version
+
+    /// "Homebrew 4.6.3" — the first line of `brew --version`.
+    public func version() async throws -> String {
+        let output = try await runChecked(["--version"]).stdout
+        guard let line = output.split(whereSeparator: \.isNewline).first else {
+            throw BrewError.parsingFailure(context: "Homebrew returned no version")
+        }
+        return String(line)
+    }
+
     // MARK: Directories
 
     public func path(of directory: BrewDirectory) async throws -> String {

@@ -62,31 +62,32 @@ struct PackageMenu: View {
         }
 
         if !upgradable.isEmpty {
-            Button("Upgrade \(Self.count(upgradable.count, "Package", "Packages"))") {
+            Button("Upgrade \(String.count(upgradable.count, "Package"))") {
                 Task { await store.upgrade(upgradable) }
             }
         }
         if formulae.contains(where: { !$0.pinned }) {
-            Button("Pin \(Self.count(formulae.count(where: { !$0.pinned }), "Formula", "Formulae"))") {
+            Button("Pin \(Self.formulae(formulae.count(where: { !$0.pinned })))") {
                 Task { await store.setPinned(true, for: formulae) }
             }
         }
         if formulae.contains(where: \.pinned) {
-            Button("Unpin \(Self.count(formulae.count(where: \.pinned), "Formula", "Formulae"))") {
+            Button("Unpin \(Self.formulae(formulae.count(where: \.pinned)))") {
                 Task { await store.setPinned(false, for: formulae) }
             }
         }
 
         Divider()
 
-        Button("Uninstall \(Self.count(installed.count, "Package", "Packages"))\u{2026}", role: .destructive) {
+        Button("Uninstall \(String.count(installed.count, "Package"))\u{2026}", role: .destructive) {
             requestUninstall(UninstallRequest(packages: installed))
         }
         .disabled(installed.isEmpty)
     }
 
-    private static func count(_ count: Int, _ singular: String, _ plural: String) -> String {
-        "\(count) \(count == 1 ? singular : plural)"
+    /// "3 Formulae" — an irregular plural, so not `String.count`.
+    private static func formulae(_ count: Int) -> String {
+        "\(count) \(PackageKind.formula.noun(count: count).capitalized)"
     }
 }
 

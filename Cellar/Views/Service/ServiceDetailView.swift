@@ -116,7 +116,7 @@ struct ServiceDetailView: View {
             NoticeText(title: "\(title) failed", message: reason)
             Spacer()
             Button("Details") {
-                NotificationCenter.default.post(name: .openActivityPanel, object: nil)
+                ActivityPanel.show()
             }
             .controlSize(.small)
         }

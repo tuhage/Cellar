@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import CellarCore
 
 // MARK: - PackageKind
@@ -30,6 +30,21 @@ nonisolated enum PackageKind: String, CaseIterable, Sendable {
         case .cask: "macwindow"
         }
     }
+
+    var color: Color {
+        switch self {
+        case .formula: .blue
+        case .cask: .purple
+        }
+    }
+
+    /// The page that lists this kind.
+    var sidebarItem: SidebarItem {
+        switch self {
+        case .formula: .formulae
+        case .cask: .casks
+        }
+    }
 }
 
 // MARK: - PackageID
@@ -39,6 +54,24 @@ nonisolated struct PackageID: Hashable, Sendable {
     let kind: PackageKind
     /// The formula name or cask token brew uses.
     let name: String
+
+    init(kind: PackageKind, name: String) {
+        self.kind = kind
+        self.name = name
+    }
+
+    /// Parses `rawValue`.
+    init?(rawValue: String) {
+        let parts = rawValue.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2, let kind = PackageKind(rawValue: parts[0]) else { return nil }
+        self.init(kind: kind, name: parts[1])
+    }
+
+    /// "formula:wget" — the form Spotlight identifiers and Quick Open's
+    /// recent items use.
+    var rawValue: String {
+        "\(kind.rawValue):\(name)"
+    }
 }
 
 // MARK: - PackageType
@@ -65,13 +98,13 @@ nonisolated enum PackageType: Identifiable, Hashable, Sendable {
         }
     }
 
-    /// What people call it: the formula name or the cask's app name.
     /// The name brew operations are tracked under: a tap-qualified search
     /// result ("user/tap/foo") installs as "foo".
     var activityName: String {
-        identifier.split(separator: "/").last.map(String.init) ?? identifier
+        Tap.packageName(fromQualified: identifier)
     }
 
+    /// What people call it: the formula name or the cask's app name.
     var name: String {
         switch self {
         case .formula(let formula): formula.name
@@ -200,8 +233,7 @@ extension PackageType {
     }
 
     func copyInstallCommand() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(installCommand, forType: .string)
+        NSPasteboard.copy(installCommand)
     }
 
     func revealInFinder() {

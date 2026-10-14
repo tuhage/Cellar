@@ -10,10 +10,10 @@ struct TapListView: View {
     @State private var isAddingTap = false
     @State private var tapToRemove: TapUsage?
     @State private var sortOrder = Self.sortStorage.load()
-    @AppStorage("tapInspectorPresented") private var isInspectorPresented = false
+    @AppStorage(SettingsKey.showsInspector(.tap)) private var isInspectorPresented = false
 
     private static let sortStorage = SortOrderStorage<TapUsage>(
-        key: "tapSortOrder",
+        key: SettingsKey.sortOrder("tap"),
         columns: [
             "name": KeyPathComparator(\.name),
             "installed": KeyPathComparator(\.installedCount),
@@ -48,20 +48,17 @@ struct TapListView: View {
             .dataFreshness(store.lastUpdated)
             .searchable(text: $store.searchQuery, prompt: "Filter taps")
             .toolbar { toolbar }
-            .pageInspector(isPresented: $isInspectorPresented, widthKey: "tapInspectorWidth") {
+            .pageInspector(.tap, isPresented: $isInspectorPresented) {
                 inspector
             }
             .task { await store.load() }
-            .focusedSceneValue(\.pageRefresh, AsyncAction { await store.load(forceRefresh: true) })
+            .pageRefresh(isLoading: store.isLoading) { await store.load(forceRefresh: true) }
             .sheet(isPresented: $isAddingTap) {
                 AddTapSheet()
             }
             .confirmationDialog(
                 "Untap \(tapToRemove?.name ?? "")?",
-                isPresented: Binding(
-                    get: { tapToRemove != nil },
-                    set: { if !$0 { tapToRemove = nil } }
-                ),
+                isPresented: $tapToRemove.isPresent(),
                 presenting: tapToRemove
             ) { usage in
                 untapButtons(for: usage)
@@ -104,12 +101,6 @@ struct TapListView: View {
                 Label("Add Tap", systemImage: "plus")
             }
             .help("Add a tap")
-        }
-
-        ToolbarItem(placement: .primaryAction) {
-            RefreshToolbarButton(isLoading: store.isLoading) {
-                await store.load(forceRefresh: true)
-            }
         }
 
         ToolbarItem(placement: .status) {
@@ -267,9 +258,8 @@ struct TapListView: View {
         guard !installed.isEmpty else {
             return "Its formulae and casks will no longer be available. You can tap it again later."
         }
-        return "\(installed.briefList()) \(installed.count == 1 ? "comes" : "come") from this tap, "
-            + "so Homebrew won’t untap it on its own. Untapping anyway keeps them installed, "
-            + "but they can’t be upgraded or reinstalled until you tap it again."
+        return "Installed from this tap: \(installed.briefList()). Homebrew won’t untap it on its own. "
+            + "Untapping anyway keeps them installed, but they can’t be upgraded or reinstalled until you tap it again."
     }
 }
 

@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import CellarCore
 
@@ -68,8 +67,6 @@ private struct DoctorFindingRow: View {
 private struct CommandRow: View {
     let command: String
 
-    @State private var isCopied = false
-
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.item) {
             Text(command)
@@ -77,25 +74,12 @@ private struct CommandRow: View {
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(command, forType: .string)
-                isCopied = true
-            } label: {
-                Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(.borderless)
-            .help(isCopied ? "Copied" : "Copy Command")
-            .accessibilityLabel(isCopied ? "Copied" : "Copy Command")
+            CopyButton(text: command, title: "Copy Command")
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
         }
         .padding(Spacing.item)
         .cardStyle(cornerRadius: CornerRadius.small)
-        .task(id: isCopied) {
-            guard isCopied else { return }
-            try? await Task.sleep(for: .seconds(2))
-            isCopied = false
-        }
     }
 }
 

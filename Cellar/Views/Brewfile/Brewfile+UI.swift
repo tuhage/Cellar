@@ -41,8 +41,8 @@ extension BrewfileContent.Entry.Kind {
     var systemImage: String {
         switch self {
         case .tap: "spigot"
-        case .brew: "terminal"
-        case .cask: "macwindow"
+        case .brew: PackageKind.formula.systemImage
+        case .cask: PackageKind.cask.systemImage
         case .mas: "bag"
         case .vscode: "chevron.left.forwardslash.chevron.right"
         case .go, .cargo, .whalebrew, .other: "shippingbox"
@@ -91,22 +91,6 @@ extension ProjectServiceState {
         case .running: .green
         case .partial: .orange
         case .stopped, .noServices: .secondary
-        }
-    }
-}
-
-/// A status dot with its label, so state never depends on color alone.
-struct StatusDotLabel: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: Spacing.related) {
-            Circle()
-                .fill(color)
-                .frame(width: IconSize.statusDot, height: IconSize.statusDot)
-                .accessibilityHidden(true)
-            Text(text)
         }
     }
 }

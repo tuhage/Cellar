@@ -18,6 +18,8 @@ enum ServiceAction: CaseIterable, Identifiable {
     static let lifecycle: [ServiceAction] = [.start, .runOnce, .stop, .stopKeepingRegistration, .restart]
     /// Actions that need confirmation.
     static let destructive: [ServiceAction] = [.forceQuit, .uninstall]
+    /// What menus outside the Services page offer (menu bar, Quick Open).
+    static let basic: [ServiceAction] = [.start, .stop, .restart]
 
     var isDestructive: Bool {
         Self.destructive.contains(self)

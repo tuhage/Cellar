@@ -12,7 +12,7 @@ struct DependencyGraphView: View {
     @Environment(MaintenanceStore.self) private var maintenanceStore
     @FocusedValue(\.windowCommands) private var windowCommands
 
-    @AppStorage("dependencyInspectorPresented") private var isInspectorPresented = true
+    @AppStorage(SettingsKey.showsInspector(.dependency)) private var isInspectorPresented = true
     @State private var uninstallRequest: UninstallRequest?
 
     var body: some View {
@@ -30,11 +30,11 @@ struct DependencyGraphView: View {
                 }
             }
             .toolbar { toolbar(graph) }
-            .pageInspector(isPresented: $isInspectorPresented, widthKey: "dependencyInspectorWidth") {
+            .pageInspector(.dependency, isPresented: $isInspectorPresented) {
                 inspector(graph)
             }
             .task(id: store.packageStore.lastUpdated) { await store.load() }
-            .focusedSceneValue(\.pageRefresh, AsyncAction { await store.load(forceRefresh: true) })
+            .pageRefresh(isLoading: store.isLoading) { await store.load(forceRefresh: true) }
             .uninstallConfirmation($uninstallRequest)
     }
 
@@ -147,12 +147,6 @@ struct DependencyGraphView: View {
             .disabled(removableCount == 0 || maintenanceStore.isRunning)
             .help("Uninstall dependencies nothing needs anymore (brew autoremove)")
         }
-
-        ToolbarItem(placement: .primaryAction) {
-            RefreshToolbarButton(isLoading: store.isLoading) {
-                await store.load(forceRefresh: true)
-            }
-        }
     }
 
     // MARK: - Context Menu
@@ -166,7 +160,9 @@ struct DependencyGraphView: View {
             Label("Why Is It Installed?", systemImage: "questionmark.circle")
         }
 
-        ShowPackageButton(name: node.name, isCask: store.isCask(node.name))
+        if let package = store.package(named: node.name) {
+            ShowPackageButton(package: package.id)
+        }
 
         Divider()
 
@@ -186,7 +182,7 @@ struct DependencyGraphView: View {
             DependencyInspector(
                 node: node,
                 graph: graph,
-                isCask: store.isCask(name),
+                package: store.package(named: name)?.id,
                 canUninstall: canUninstall(name),
                 uninstall: { requestUninstall(name) }
             )

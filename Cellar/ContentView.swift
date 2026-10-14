@@ -2,7 +2,7 @@ import SwiftUI
 import CellarCore
 
 struct ContentView: View {
-    @AppStorage("selectedSidebarItem") private var storedSelection: String = SidebarItem.dashboard.rawValue
+    @AppStorage(SettingsKey.selectedSidebarItem) private var storedSelection: String = SidebarItem.dashboard.rawValue
 
     private var selection: Binding<SidebarItem?> {
         Binding(
@@ -51,7 +51,7 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
         } detail: {
             if let item = selection.wrappedValue {
-                DetailView(item: item, selection: selection)
+                DetailView(item: item)
             } else {
                 ContentUnavailableView(
                     "Select an Item",
@@ -98,7 +98,7 @@ struct ContentView: View {
             }
         }
         .animation(reduceMotion ? nil : AnimationToken.smooth, value: noticeStore.current)
-        .urlSchemeHandler(selection: selection)
+        .urlSchemeHandler()
         .focusedSceneValue(\.windowCommands, windowCommands)
     }
 
@@ -110,7 +110,7 @@ struct ContentView: View {
                 .onTapGesture { isQuickOpenPresented = false }
                 .accessibilityHidden(true)
 
-            QuickOpenView(selection: selection, isPresented: $isQuickOpenPresented)
+            QuickOpenView(isPresented: $isQuickOpenPresented)
                 .frame(width: 580, height: 460)
                 .floatingSurface(cornerRadius: CornerRadius.extraLarge)
                 .padding(.top, Spacing.section * 3)
@@ -120,11 +120,11 @@ struct ContentView: View {
 
     private var windowCommands: WindowCommands {
         WindowCommands(
-            navigate: { selection.wrappedValue = $0 },
+            navigate: Navigator.show,
             openQuickOpen: { isQuickOpenPresented = true },
             showActivity: { openWindow(id: SceneID.activity) },
             refreshAll: refreshAll,
-            canUpgradeAll: !packageStore.upgradableFormulae.isEmpty || !packageStore.outdatedCasks.isEmpty,
+            canUpgradeAll: packageStore.canUpgradeAll,
             previewUpgradeAll: { packageStore.isUpgradePreviewPresented = true },
             canCleanUp: !maintenanceStore.isRunning,
             previewCleanup: { maintenanceStore.isCleanupPreviewPresented = true },
@@ -136,12 +136,11 @@ struct ContentView: View {
 
 private struct DetailView: View {
     let item: SidebarItem
-    @Binding var selection: SidebarItem?
 
     var body: some View {
         switch item {
         case .dashboard:
-            DashboardView(selection: $selection)
+            DashboardView()
         case .formulae:
             FormulaListView()
         case .casks:

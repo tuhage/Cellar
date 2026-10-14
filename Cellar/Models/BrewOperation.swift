@@ -176,7 +176,7 @@ extension BrewOperation {
             case .pin(let name): ("Pinning \(name)", "Pinned \(name)", "pin")
             case .unpin(let name): ("Unpinning \(name)", "Unpinned \(name)", "pin.slash")
             case .upgradeAll(let count):
-                ("Upgrading \(Self.packages(count))", "Upgraded \(Self.packages(count))", "arrow.up.circle")
+                ("Upgrading \(String.count(count, "package"))", "Upgraded \(String.count(count, "package"))", "arrow.up.circle")
             case .serviceStart(let name): ("Starting \(name)", "Started \(name)", "play.circle")
             case .serviceRun(let name): ("Running \(name) once", "Started \(name) for this session", "play.circle")
             case .serviceStop(let name): ("Stopping \(name)", "Stopped \(name)", "stop.circle")
@@ -196,10 +196,6 @@ extension BrewOperation {
             case .autoremove: ("Removing unused dependencies", "Removed unused dependencies", "shippingbox")
             case .healthCheck: ("Running brew doctor", "Finished brew doctor", "stethoscope")
             }
-        }
-
-        private static func packages(_ count: Int) -> String {
-            "\(count) \(count == 1 ? "package" : "packages")"
         }
     }
 }
@@ -288,5 +284,11 @@ extension BrewOperation {
     /// Position of the running step, 1-based ("3 of 8").
     var currentStepNumber: Int? {
         steps.firstIndex { $0.status == .running }.map { $0 + 1 }
+    }
+
+    /// "3 of 8": the running package's position, or how many finished
+    /// while between packages.
+    var stepProgress: String {
+        "\(currentStepNumber ?? finishedStepCount) of \(steps.count)"
     }
 }

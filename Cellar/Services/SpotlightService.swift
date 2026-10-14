@@ -22,7 +22,7 @@ nonisolated final class SpotlightService: Sendable {
 
         let formulaeItems = formulae.map { formula in
             makeItem(
-                identifier: "formula:\(formula.name)",
+                identifier: PackageID(kind: .formula, name: formula.name).rawValue,
                 domain: Self.formulaeDomain,
                 title: formula.name,
                 description: formula.desc ?? "Homebrew formula",
@@ -32,7 +32,7 @@ nonisolated final class SpotlightService: Sendable {
 
         let caskItems = casks.map { cask in
             makeItem(
-                identifier: "cask:\(cask.token)",
+                identifier: PackageID(kind: .cask, name: cask.token).rawValue,
                 domain: Self.casksDomain,
                 title: cask.displayName,
                 description: cask.desc ?? "Homebrew cask",

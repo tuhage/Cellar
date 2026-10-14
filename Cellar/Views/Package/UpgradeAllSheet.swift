@@ -47,7 +47,7 @@ struct UpgradeAllSheet: View {
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Spacing.textPair) {
-                Text("Upgrade \(selected.count) \(selected.count == 1 ? "Package" : "Packages")")
+                Text("Upgrade \(String.count(selected.count, "Package"))")
                     .font(.headline)
                 Text("Packages upgrade one at a time; you can follow and cancel each step.")
                     .font(.caption)

@@ -40,8 +40,8 @@ enum StatusCommand {
             return
         }
 
-        let label = summary.updatesAvailable == 1 ? "package" : "packages"
-        print("  \(TerminalOutput.warning("\u{26A0} \(summary.updatesAvailable) outdated \(label)"))")
+        let outdated = String.count(summary.updatesAvailable, "outdated package")
+        print("  \(TerminalOutput.warning("\u{26A0} \(outdated)"))")
 
         for formula in summary.outdatedFormulae {
             print("    \(TerminalOutput.warning("\u{2191}")) \(formula.name) \(formula.version)")

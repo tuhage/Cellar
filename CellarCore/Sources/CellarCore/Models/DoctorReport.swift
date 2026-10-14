@@ -33,7 +33,7 @@ public struct DoctorReport: Hashable, Sendable {
         if findings.isEmpty {
             return isReadyToBrew ? "Your system is ready to brew. No issues found." : "Health check completed with notes."
         }
-        return "Found \(findings.count) \(findings.count == 1 ? "warning" : "warnings") during health check."
+        return "Found \(String.count(findings.count, "warning")) during health check."
     }
 
     // MARK: Preview

@@ -15,8 +15,8 @@ struct TapInspector: View {
             header
             repositorySection
             installedSection
-            availableSection(title: "Formulae", systemImage: "terminal", names: usage.availableFormulae)
-            availableSection(title: "Casks", systemImage: "macwindow", names: usage.availableCasks)
+            availableSection(.formula, names: usage.availableFormulae)
+            availableSection(.cask, names: usage.availableCasks)
         }
     }
 
@@ -82,20 +82,20 @@ struct TapInspector: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(usage.installedFormulae, id: \.self) { name in
-                installedRow(name, isCask: false)
+                installedRow(PackageID(kind: .formula, name: name))
             }
             ForEach(usage.installedCasks, id: \.self) { token in
-                installedRow(token, isCask: true)
+                installedRow(PackageID(kind: .cask, name: token))
             }
         } header: {
             CountedSectionHeader(title: "Installed", systemImage: "checkmark.circle", count: usage.installedCount)
         }
     }
 
-    private func installedRow(_ name: String, isCask: Bool) -> some View {
-        ShowPackageButton(name: name, isCask: isCask) {
+    private func installedRow(_ package: PackageID) -> some View {
+        ShowPackageButton(package: package) {
             HStack {
-                Label(name, systemImage: isCask ? "macwindow" : "terminal")
+                Label(package.name, systemImage: package.kind.systemImage)
                 Spacer()
                 Image(systemName: "arrow.forward.circle")
                     .foregroundStyle(.secondary)
@@ -107,7 +107,7 @@ struct TapInspector: View {
     }
 
     @ViewBuilder
-    private func availableSection(title: String, systemImage: String, names: [String]) -> some View {
+    private func availableSection(_ kind: PackageKind, names: [String]) -> some View {
         if !names.isEmpty {
             Section {
                 ForEach(names, id: \.self) { name in
@@ -115,7 +115,7 @@ struct TapInspector: View {
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                CountedSectionHeader(title: "Available \(title)", systemImage: systemImage, count: names.count)
+                CountedSectionHeader(title: "Available \(kind.title)", systemImage: kind.systemImage, count: names.count)
             }
         }
     }

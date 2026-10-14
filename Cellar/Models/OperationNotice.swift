@@ -1,48 +1,25 @@
-import SwiftUI
+import Foundation
 
 /// What to tell the user about a finished operation, in a toast or a
 /// system notification.
 struct OperationNotice: Identifiable, Equatable {
-    enum Outcome {
-        case success
-        case failure
-        case cancelled
-
-        var color: Color {
-            switch self {
-            case .success: .green
-            case .failure: .red
-            case .cancelled: .secondary
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .success: "checkmark.circle.fill"
-            case .failure: "exclamationmark.triangle.fill"
-            case .cancelled: "minus.circle.fill"
-            }
-        }
-    }
-
     let id: UUID
-    let outcome: Outcome
+    /// How the operation ended; see `BrewOperation.Status+UI` for its look.
+    let status: BrewOperation.Status
     let title: String
     let message: String?
 
     init(operation: BrewOperation) {
         id = operation.id
+        status = operation.status
         switch operation.status {
         case .succeeded, .running:
-            outcome = .success
             title = operation.kind.completionTitle
             message = operation.isBatch ? "\(operation.succeededStepCount) of \(operation.steps.count) upgraded." : nil
         case .failed(let reason):
-            outcome = .failure
             title = "\(operation.kind.displayTitle) failed"
             message = reason
         case .cancelled:
-            outcome = .cancelled
             title = "\(operation.kind.displayTitle) cancelled"
             message = operation.isBatch
                 ? "\(operation.succeededStepCount) of \(operation.steps.count) upgraded before cancelling."
@@ -51,7 +28,10 @@ struct OperationNotice: Identifiable, Equatable {
     }
 
     /// Failures stay until dismissed so they can't be missed.
-    var staysUntilDismissed: Bool { outcome == .failure }
+    var staysUntilDismissed: Bool {
+        if case .failed = status { return true }
+        return false
+    }
 
     var spokenText: String {
         [title, message].compactMap(\.self).joined(separator: ". ")

@@ -1,6 +1,7 @@
 import SwiftUI
 import FinderSync
 import ServiceManagement
+import UniformTypeIdentifiers
 import UserNotifications
 import CellarCore
 
@@ -311,7 +312,7 @@ private struct UpdateSection: View {
 
 private struct BrewInfoRow: View {
     @State private var brewVersion = "Loading\u{2026}"
-    @State private var brewPrefix = ""
+    @State private var brewPrefix: String?
 
     var body: some View {
         LabeledContent("Version") {
@@ -321,7 +322,7 @@ private struct BrewInfoRow: View {
         }
         .task { await loadBrewInfo() }
 
-        if !brewPrefix.isEmpty {
+        if let brewPrefix {
             LabeledContent("Prefix") {
                 Text(brewPrefix)
                     .fontDesign(.monospaced)
@@ -332,20 +333,10 @@ private struct BrewInfoRow: View {
     }
 
     private func loadBrewInfo() async {
-        let process = BrewProcess()
-
-        if let output = try? await process.run(["--version"]) {
-            let firstLine = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-                .components(separatedBy: "\n").first ?? ""
-            brewVersion = firstLine.isEmpty ? "Unknown" : firstLine
-        } else {
-            brewVersion = "Not found"
-        }
-
-        if let output = try? await process.run(["--prefix"]) {
-            let prefix = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !prefix.isEmpty { brewPrefix = prefix }
-        }
+        async let version = try? BrewService.shared.version()
+        async let prefix = try? BrewService.shared.path(of: .prefix)
+        brewVersion = await version ?? "Not found"
+        brewPrefix = await prefix
     }
 }
 
@@ -472,11 +463,12 @@ private struct FinderExtensionRow: View {
 private struct FinderMonitoredPathsRow: View {
     @State private var paths: [String] = AppGroupStorage.finderSyncPaths
     @State private var selection: String?
+    @State private var isChoosingFolder = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             List(paths, id: \.self, selection: $selection) { path in
-                Label(abbreviate(path), systemImage: "folder")
+                Label(path.abbreviatingWithTildeInPath, systemImage: "folder")
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -484,7 +476,7 @@ private struct FinderMonitoredPathsRow: View {
             .listStyle(.bordered(alternatesRowBackgrounds: true))
 
             HStack(spacing: 0) {
-                Button("Add Folder", systemImage: "plus", action: addFolder)
+                Button("Add Folder", systemImage: "plus") { isChoosingFolder = true }
                 Button("Remove Folder", systemImage: "minus") {
                     if let selection { remove(selection) }
                 }
@@ -495,11 +487,8 @@ private struct FinderMonitoredPathsRow: View {
             .buttonStyle(.borderless)
             .padding(.top, Spacing.compact)
         }
-    }
-
-    private func abbreviate(_ path: String) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
+        .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder], onCompletion: add)
+        .fileDialogMessage("Choose a folder to monitor for Brewfiles")
     }
 
     private func remove(_ path: String) {
@@ -508,14 +497,10 @@ private struct FinderMonitoredPathsRow: View {
         AppGroupStorage.finderSyncPaths = paths
     }
 
-    private func addFolder() {
-        let panel = NSOpenPanel()
-        panel.title = "Choose Folder to Monitor"
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-
-        guard panel.runModal() == .OK, let path = panel.url?.path, !paths.contains(path) else { return }
+    private func add(_ result: Result<URL, Error>) {
+        guard case .success(let url) = result else { return }
+        let path = url.path(percentEncoded: false)
+        guard !paths.contains(path) else { return }
         paths.append(path)
         AppGroupStorage.finderSyncPaths = paths
     }

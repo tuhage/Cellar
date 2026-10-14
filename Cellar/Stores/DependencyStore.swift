@@ -25,10 +25,10 @@ final class DependencyStore: LoadableStore {
     var lastUpdated: Date?
     var searchQuery = ""
     var searchScope: DependencySearchScope {
-        didSet { UserDefaults.standard.set(searchScope.rawValue, forKey: Self.searchScopeKey) }
+        didSet { UserDefaults.standard.set(searchScope.rawValue, forKey: SettingsKey.dependencySearchScope) }
     }
     var filter: DependencyFilter {
-        didSet { UserDefaults.standard.set(filter.rawValue, forKey: Self.filterKey) }
+        didSet { UserDefaults.standard.set(filter.rawValue, forKey: SettingsKey.dependencyFilter) }
     }
     var selectedNodeName: String?
 
@@ -36,14 +36,12 @@ final class DependencyStore: LoadableStore {
 
     let packageStore: PackageStore
     private static let cache = CachePolicy(fileName: "cache-dependencies.json")
-    private static let searchScopeKey = "dependencySearchScope"
-    private static let filterKey = "dependencyFilter"
 
     init(packageStore: PackageStore) {
         self.packageStore = packageStore
         let defaults = UserDefaults.standard
-        searchScope = defaults.string(forKey: Self.searchScopeKey).flatMap(DependencySearchScope.init) ?? .name
-        filter = defaults.string(forKey: Self.filterKey).flatMap(DependencyFilter.init) ?? .all
+        searchScope = defaults.string(forKey: SettingsKey.dependencySearchScope).flatMap(DependencySearchScope.init) ?? .name
+        filter = defaults.string(forKey: SettingsKey.dependencyFilter).flatMap(DependencyFilter.init) ?? .all
     }
 
     // MARK: Computed
@@ -83,10 +81,6 @@ final class DependencyStore: LoadableStore {
     func package(named name: String) -> PackageType? {
         packageStore.package(PackageID(kind: .formula, name: name))
             ?? packageStore.package(PackageID(kind: .cask, name: name))
-    }
-
-    func isCask(_ name: String) -> Bool {
-        package(named: name)?.kind == .cask
     }
 
     // MARK: Actions
