@@ -71,6 +71,7 @@ struct DashboardView: View {
         }
 
         RestartServicesBanner()
+        RelaunchBanner()
 
         if activityStore.failedCount > 0 {
             NoticeBanner(

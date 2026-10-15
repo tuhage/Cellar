@@ -36,8 +36,10 @@ final class AppStores {
         maintenance.loadReports()
         Self.removeObsoleteCaches()
 
-        activity.onFinish = { [notices, services] operation in
+        activity.onFinish = { [notices, services, updates] operation in
             notices.announce(operation)
+            // Any upgrade, Brewfile install or reinstall may have replaced Cellar itself.
+            updates.checkInstalledCopy()
             // Removing a formula removes its service, wherever it was uninstalled.
             if case .uninstall(_, isCask: false) = operation.kind, operation.status == .succeeded {
                 Task { await services.load(forceRefresh: true) }

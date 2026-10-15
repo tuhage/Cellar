@@ -24,8 +24,11 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .appInfo) {
-            Button("Check for Cellar Updates\u{2026}") {
-                updateStore.checkForUpdates()
+            // A Homebrew-installed Cellar shows up in Updates like any other cask.
+            if !updateStore.isManagedByHomebrew {
+                Button("Check for Cellar Updates\u{2026}") {
+                    updateStore.checkForUpdates()
+                }
             }
         }
 

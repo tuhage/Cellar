@@ -31,6 +31,9 @@ struct OutdatedView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 RestartServicesBanner()
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                RelaunchBanner()
+            }
             .loadErrorBanner(for: store) { await store.load(forceRefresh: true) }
             .navigationTitle("Updates")
             .dataFreshness(store.lastUpdated)

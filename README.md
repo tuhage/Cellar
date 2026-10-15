@@ -81,7 +81,7 @@ brew install --cask tuhage/cellar/cellar
 
 Or download the latest `.dmg` from [Releases](https://github.com/tuhage/Cellar/releases/latest), open it and drag **Cellar** to **Applications**.
 
-Cellar is signed with a Developer ID and notarized by Apple. It checks for its own updates daily and installs them in-app; signed updates are verified before they're installed. You can change this under **Settings › About**.
+Cellar is signed with a Developer ID and notarized by Apple. Installed with Homebrew, it updates with your other packages: `brew upgrade` or Cellar's own Updates page. Installed from the `.dmg`, it checks for its own updates daily and installs them in-app; signed updates are verified before they're installed. You can change this under **Settings › About**.
 
 **Requirements:** macOS 15 or later and [Homebrew](https://brew.sh). If Homebrew isn't installed, Cellar walks you through installing it.
 

@@ -281,30 +281,40 @@ private struct UpdateSection: View {
     var body: some View {
         @Bindable var store = store
 
-        Section {
-            Toggle("Check for Cellar Updates Automatically", isOn: $store.automaticallyChecksForUpdates)
+        if store.isManagedByHomebrew {
+            Section {
+                LabeledContent("Installed With", value: "Homebrew")
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text("Cellar updates with your other packages: in Updates, or with `brew upgrade` in Terminal.")
+            }
+        } else {
+            Section {
+                Toggle("Check for Cellar Updates Automatically", isOn: $store.automaticallyChecksForUpdates)
 
-            Toggle("Download and Install Automatically", isOn: $store.automaticallyDownloadsUpdates)
-                .disabled(!store.automaticallyChecksForUpdates)
+                Toggle("Download and Install Automatically", isOn: $store.automaticallyDownloadsUpdates)
+                    .disabled(!store.automaticallyChecksForUpdates)
 
-            if let lastChecked = store.lastChecked {
-                LabeledContent("Last Checked") {
-                    Text(lastChecked, format: .relative(presentation: .named))
-                        .foregroundStyle(.secondary)
+                if let lastChecked = store.lastChecked {
+                    LabeledContent("Last Checked") {
+                        Text(lastChecked, format: .relative(presentation: .named))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
 
-            Button {
-                store.checkForUpdates()
-            } label: {
-                Label("Check for Cellar Updates\u{2026}", systemImage: "arrow.triangle.2.circlepath")
+                Button {
+                    store.checkForUpdates()
+                } label: {
+                    Label("Check for Cellar Updates\u{2026}", systemImage: "arrow.triangle.2.circlepath")
+                }
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text("Updates are downloaded from signed GitHub Releases and verified before installation. Automatic updates are installed when Cellar is idle or the app quits.")
             }
-        } header: {
-            Text("Updates")
-        } footer: {
-            Text("Updates are downloaded from signed GitHub Releases and verified before installation. Automatic updates are installed when Cellar is idle or the app quits.")
+            .onAppear { store.refreshPreferences() }
         }
-        .onAppear { store.refreshPreferences() }
     }
 }
 
