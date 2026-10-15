@@ -27,7 +27,7 @@
 - **See before you change.** Upgrade All, Clean Up and removing unused dependencies show exactly what brew will do — every package, pulled-in dependency and download size — before anything runs.
 - **Follow every operation.** Live progress tells you which package is upgrading, how many are left and what brew is doing right now. Cancel any time, retry just what failed, and find every run's full log in `~/Library/Logs/Cellar`.
 - **Failures that tell you what to do.** Outdated Command Line Tools, a full disk, no internet or a cask app installed outside Homebrew are recognized and explained, with a button that fixes them.
-- **Native and private.** Built with SwiftUI and Apple frameworks only. No account and no telemetry: Cellar talks to `brew` on your Mac and checks GitHub for its own updates.
+- **Native and private.** Built with SwiftUI. Its only dependency is Sparkle, which updates the `.dmg` version. No account and no telemetry: Cellar talks to `brew` on your Mac and checks GitHub for its own updates.
 
 ## Features
 
