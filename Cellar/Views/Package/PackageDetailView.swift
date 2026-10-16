@@ -117,7 +117,7 @@ struct PackageDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButtonStyle()
             .controlSize(.large)
             .disabled(true)
         } else if let primary = PackagePrimaryAction(package: shown, store: store) {
@@ -127,7 +127,7 @@ struct PackageDetailView: View {
                 Label(primary.title, systemImage: primary.systemImage)
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButtonStyle()
             .controlSize(.large)
             .tint(shown.isInstalled ? .orange : .accentColor)
             .help(primary.help)
