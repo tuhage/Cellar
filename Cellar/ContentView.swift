@@ -17,7 +17,6 @@ struct ContentView: View {
     @Environment(PackageStore.self) private var packageStore
     @Environment(MaintenanceStore.self) private var maintenanceStore
     @Environment(ActivityStore.self) private var activityStore
-    @Environment(NoticeStore.self) private var noticeStore
     @Environment(\.refreshAll) private var refreshAll
     @Environment(\.openWindow) private var openWindow
     @Environment(\.startBackgroundWork) private var startBackgroundWork
@@ -52,6 +51,7 @@ struct ContentView: View {
         } detail: {
             if let item = selection.wrappedValue {
                 DetailView(item: item)
+                    .defaultOperationNotice()
             } else {
                 EmptyStateView(
                     title: "Select an Item",
@@ -90,14 +90,6 @@ struct ContentView: View {
             }
         }
         .animation(reduceMotion ? nil : AnimationToken.snap, value: isQuickOpenPresented)
-        .overlay(alignment: .topTrailing) {
-            if let notice = noticeStore.current {
-                OperationNoticeView(notice: notice)
-                    .padding(Spacing.section)
-                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .animation(reduceMotion ? nil : AnimationToken.smooth, value: noticeStore.current)
         .urlSchemeHandler()
         .focusedSceneValue(\.windowCommands, windowCommands)
     }

@@ -23,6 +23,7 @@ struct PageInspector<Inspector: View>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .operationNotice()
             .inspector(isPresented: Binding(get: { isShown }, set: { isPresented = $0 })) {
                 inspector
                     .inspectorColumnWidth(min: 320, ideal: 400, max: WindowSize.readableWidth)
